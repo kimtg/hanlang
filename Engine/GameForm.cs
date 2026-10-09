@@ -13,9 +13,8 @@ namespace HanlangGame.Engine
         private readonly Stopwatch _stopwatch = new();
         private long _lastTicks;
 
-        public const int ScaleFactor = 3; // 3배 정수 스케일링
-        public const int WindowWidth = PixelBuffer.Width * ScaleFactor;   // 960
-        public const int WindowHeight = PixelBuffer.Height * ScaleFactor; // 720
+        public const int WindowWidth = PixelBuffer.Width;   // 960
+        public const int WindowHeight = PixelBuffer.Height; // 720
 
         public GameForm()
         {
@@ -69,15 +68,12 @@ namespace HanlangGame.Engine
             base.OnPaint(e);
 
             var g = e.Graphics;
-            g.InterpolationMode = InterpolationMode.NearestNeighbor;
-            g.PixelOffsetMode = PixelOffsetMode.Half;
-            g.SmoothingMode = SmoothingMode.None;
+            g.InterpolationMode = InterpolationMode.HighQualityBicubic;
+            g.PixelOffsetMode = PixelOffsetMode.HighQuality;
+            g.SmoothingMode = SmoothingMode.AntiAlias;
 
-            // 320x240 -> 960x720 칼 같은 도트 정수 확대
-            g.DrawImage(_scene.Buffer.Bitmap,
-                        new Rectangle(0, 0, WindowWidth, WindowHeight),
-                        new Rectangle(0, 0, PixelBuffer.Width, PixelBuffer.Height),
-                        GraphicsUnit.Pixel);
+            // 960x720 1:1 다이렉트 고해상도 출력
+            g.DrawImage(_scene.Buffer.Bitmap, 0, 0, WindowWidth, WindowHeight);
         }
 
         private void OnKeyDown(object? sender, KeyEventArgs e)

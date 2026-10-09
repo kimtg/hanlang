@@ -238,8 +238,8 @@ namespace HanlangGame
             _player.Update(dt);
 
             // 카메라 추적 (좌우 횡스크롤 한계)
-            float targetCamX = _player.X - PixelBuffer.Width / 2f;
-            float maxCamX = Math.Max(0, _stageManager.StageWidth - PixelBuffer.Width);
+            float targetCamX = _player.X - PixelBuffer.VirtualWidth / 2f;
+            float maxCamX = Math.Max(0, _stageManager.StageWidth - PixelBuffer.VirtualWidth);
             _cameraX = Math.Clamp(targetCamX, 0, maxCamX);
 
             // 스테이지 및 적 AI 업데이트
@@ -307,19 +307,21 @@ namespace HanlangGame
                     break;
             }
 
-            // 상단 알림 배너 팝업
+            // 상단 알림 배너 팝업 (960x720 고해상도)
             if (_notifyTimer > 0 && !string.IsNullOrEmpty(_notifyMessage))
             {
-                int notiW = _notifyMessage.Length * 12 + 16;
+                var size = _buffer.Graphics.MeasureString(_notifyMessage, _buffer.FontSubtitle);
+                int notiW = (int)size.Width + 48;
+                int notiH = 46;
                 int notiX = (PixelBuffer.Width - notiW) / 2;
-                int notiY = 32;
+                int notiY = 82;
 
-                _buffer.FillRect(notiX, notiY, notiW, 16, Color.FromArgb(220, 10, 10, 20));
-                _buffer.DrawRect(notiX, notiY, notiW, 16, Color.FromArgb(240, 200, 60));
-                _buffer.DrawTextCentered(_notifyMessage, notiY + 1, Color.FromArgb(255, 230, 120));
+                _buffer.FillRoundedRect(notiX, notiY, notiW, notiH, 10f, Color.FromArgb(235, 20, 20, 30));
+                _buffer.DrawRoundedRect(notiX, notiY, notiW, notiH, 10f, Color.FromArgb(255, 215, 70), 2f);
+                _buffer.DrawOutlinedTextCentered(_notifyMessage, notiY + 9, Color.FromArgb(255, 240, 160), Color.FromArgb(40, 25, 10), _buffer.FontSubtitle, 1.8f);
             }
 
-            // 레트로 CRT 스캔라인 효과
+            // 960x720 고해상도 모드 유지
             _buffer.DrawScanlines();
         }
 
@@ -332,10 +334,10 @@ namespace HanlangGame
                 renderCamX += (float)(Math.Sin(ScreenShakeTimer * 65f) * ScreenShakeIntensity);
             }
 
-            // 1. 배경
+            // 1. 960x720 고해상도 배경 & 바닥 렌더링
             _stageManager.RenderBackground(_buffer, renderCamX);
 
-            // 2. 2.5D 깊이 정렬 렌더링 (Y 좌표 기준 오름차순, 동일 깊이는 Z 기준 오름차순으로 그리기)
+            // 2. 2.5D 깊이 정렬 렌더링 (Y 좌표 기준 오름차순, 동일 깊이는 Z 기준 오름차순)
             var renderList = new List<Entity>();
             renderList.Add(_player);
             renderList.AddRange(_stageManager.Enemies);
@@ -349,52 +351,61 @@ namespace HanlangGame
                 return a.Z.CompareTo(b.Z);
             });
 
+            // 오브젝트는 도트 스프라이트 그대로 3배 정수 확대 출력
             foreach (var entity in renderList)
             {
                 entity.Render(_buffer, renderCamX);
             }
 
-            // 3. 말풍선 및 파티클 렌더링
+            // 3. 960x720 고해상도 타격 이펙트, 말풍선, 데미지 플로팅 텍스트
             _combatSystem.Render(_buffer, renderCamX);
 
-            // 4. 다음 구역 화살표
+            // 4. 960x720 고해상도 다음 구역 화살표
             _stageManager.RenderStageClearArrow(_buffer);
 
-            // 5. 상단 HUD & 보스 게이지
+            // 5. 960x720 고해상도 상단 HUD & 하단 보스 게이지
             _hud.Render(_buffer, _player, _stageManager.CurrentBoss, _stageManager.CurrentStage);
         }
 
         private void RenderGameOver()
         {
-            _buffer.FillRect(0, 0, PixelBuffer.Width, PixelBuffer.Height, Color.FromArgb(170, 0, 0, 0));
-            _buffer.DrawTextCentered("패 배 하 였 소", 70, Color.FromArgb(255, 60, 60), large: true);
-            _buffer.DrawTextCentered("유생 한랑이 저잣거리에서 쓰러졌습니다.", 100, Color.FromArgb(220, 220, 220));
+            _buffer.FillRect(0, 0, PixelBuffer.Width, PixelBuffer.Height, Color.FromArgb(195, 10, 5, 15));
+            _buffer.DrawOutlinedTextCentered("패 배 하 였 소", 180, Color.FromArgb(255, 65, 65), Color.Black, _buffer.FontHuge, 4f);
+            _buffer.DrawOutlinedTextCentered("유생 한랑이 저잣거리에서 쓰러졌습니다.", 270, Color.FromArgb(230, 230, 230), Color.Black, _buffer.FontSubtitle, 2f);
 
-            _buffer.DrawTextCentered("[ Z 키: 다시 도전 ]", 140, Color.FromArgb(255, 240, 80));
-            _buffer.DrawTextCentered("[ ESC 키: 타이틀로 복귀 ]", 160, Color.FromArgb(180, 180, 190));
+            int btnY = 380;
+            _buffer.FillRoundedRect((PixelBuffer.Width - 360) / 2, btnY, 360, 50, 8f, Color.FromArgb(200, 40, 25, 25));
+            _buffer.DrawRoundedRect((PixelBuffer.Width - 360) / 2, btnY, 360, 50, 8f, Color.FromArgb(255, 215, 60), 2f);
+            _buffer.DrawOutlinedTextCentered("[ Z 키 : 다시 도전 ]", btnY + 11, Color.FromArgb(255, 240, 90), Color.Black, _buffer.FontHeader, 2f);
+
+            int btn2Y = 450;
+            _buffer.FillRoundedRect((PixelBuffer.Width - 360) / 2, btn2Y, 360, 45, 8f, Color.FromArgb(160, 25, 25, 30));
+            _buffer.DrawRoundedRect((PixelBuffer.Width - 360) / 2, btn2Y, 360, 45, 8f, Color.FromArgb(150, 150, 170), 1.5f);
+            _buffer.DrawOutlinedTextCentered("[ ESC 키 : 타이틀로 복귀 ]", btn2Y + 11, Color.FromArgb(200, 200, 210), Color.Black, _buffer.FontBody, 1.8f);
         }
 
         private void RenderGameWon()
         {
-            _buffer.FillRect(0, 0, PixelBuffer.Width, PixelBuffer.Height, Color.FromArgb(20, 15, 30));
+            _buffer.FillRect(0, 0, PixelBuffer.Width, PixelBuffer.Height, Color.FromArgb(245, 15, 15, 30));
 
-            _buffer.DrawTextCentered("★ 훈민정음 탈환 대성공! ★", 35, Color.FromArgb(255, 220, 40), large: true);
-            _buffer.DrawTextCentered("10월 9일 한글날, 세종대왕의 뜻을 지켜냈소!", 65, Color.FromArgb(255, 240, 180));
+            _buffer.DrawOutlinedTextCentered("★ 훈민정음 탈환 대성공! ★", 50, Color.FromArgb(255, 225, 50), Color.FromArgb(60, 40, 10), _buffer.FontHuge, 4f);
+            _buffer.DrawOutlinedTextCentered("10월 9일 한글날, 세종대왕의 뜻을 온전히 지켜냈소!", 120, Color.FromArgb(255, 245, 190), Color.Black, _buffer.FontSubtitle, 2f);
 
-            int boxX = 30;
-            int boxY = 90;
-            int boxW = 260;
-            int boxH = 95;
-            _buffer.FillRect(boxX, boxY, boxW, boxH, Color.FromArgb(245, 240, 225));
-            _buffer.DrawRect(boxX, boxY, boxW, boxH, Color.FromArgb(180, 130, 60));
+            int boxX = 80;
+            int boxY = 180;
+            int boxW = 800;
+            int boxH = 340;
+            _buffer.FillRoundedRect(boxX, boxY, boxW, boxH, 12f, Color.FromArgb(248, 244, 230));
+            _buffer.DrawRoundedRect(boxX, boxY, boxW, boxH, 12f, Color.FromArgb(160, 110, 40), 3f);
+            _buffer.DrawRoundedRect(boxX + 5, boxY + 5, boxW - 10, boxH - 10, 8f, Color.FromArgb(215, 185, 130), 1.5f);
 
-            _buffer.DrawTextCentered("『나랏말싸미 듕귁에 달아 문자와로 서르 사맛디 아니할ᄊᆡ", boxY + 10, Color.FromArgb(40, 30, 20));
-            _buffer.DrawTextCentered("이런 젼차로 어린 백셩이 니르고져 홇 배 이셔도", boxY + 28, Color.FromArgb(40, 30, 20));
-            _buffer.DrawTextCentered("마ᄎᆞᆷ내 제 ᛯ들 시러 펴디 몯ᄒᆞᇙ 노미 하니라.", boxY + 46, Color.FromArgb(40, 30, 20));
-            _buffer.DrawTextCentered("내 이ᄅᆞᆯ 위ᄒᆞ야 어엿비 너겨 새로 스믈여듧 字ᄅᆞᆯ ᄆᆡᇰᄀᆞ노니...』", boxY + 64, Color.FromArgb(180, 20, 20));
+            _buffer.DrawTextCentered("『나랏말ᄊᆞ미中듀ᇰ國귁에달아文문字ᄍᆞᆼ와로서르ᄉᆞᄆᆞᆺ디아니ᄒᆞᆯᄊᆡ", boxY + 35, Color.FromArgb(30, 20, 10), large: true);
+            _buffer.DrawTextCentered("이런젼ᄎᆞ로어린百ᄇᆡᆨ姓셔ᇰ이니르고져호ᇙ배이셔도", boxY + 95, Color.FromArgb(30, 20, 10), large: true);
+            _buffer.DrawTextCentered("ᄆᆞᄎᆞᆷ내제ᄠᅳ들시러펴디몯ᄒᆞᇙ노미하니라", boxY + 155, Color.FromArgb(30, 20, 10), large: true);
+            _buffer.DrawTextCentered("내이ᄅᆞᆯ為윙ᄒᆞ야어엿비너겨새로스믈여듧字ᄍᆞᆼᄅᆞᆯᄆᆡᇰᄀᆞ노니...』", boxY + 225, Color.FromArgb(170, 20, 20), large: true);
 
-            _buffer.DrawTextCentered("유생 한랑의 활약으로 온 백성이 한글을 누리게 되었도다!", 195, Color.FromArgb(100, 230, 120));
-            _buffer.DrawTextCentered("[ Z 키를 눌러 타이틀로 복귀 ]", 215, Color.FromArgb(200, 200, 200));
+            _buffer.DrawOutlinedTextCentered("유생 한랑의 쾌거로 온 백성이 자유로이 뜻을 펴게 되었도다!", 560, Color.FromArgb(120, 240, 140), Color.Black, _buffer.FontSubtitle, 2f);
+            _buffer.DrawOutlinedTextCentered("[ Z 키 또는 ESC 키를 눌러 타이틀로 복귀 ]", 620, Color.FromArgb(220, 220, 220), Color.Black, _buffer.FontHeader, 1.8f);
         }
     }
 }

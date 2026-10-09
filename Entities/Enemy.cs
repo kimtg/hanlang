@@ -471,34 +471,44 @@ namespace HanlangGame.Entities
 
             if (sprite != null)
             {
-                // 광폭화 시 붉은 투기 아우라 렌더링
+                // 960x720 고해상도 광폭화 붉은 투기 아우라 렌더링
                 if (IsBossType && IsRaging && !IsDead)
                 {
+                    int scx = sx * PixelBuffer.Scale;
+                    int scy = sy * PixelBuffer.Scale;
+                    int sdrawW = drawW * PixelBuffer.Scale;
+                    int sdrawH = drawH * PixelBuffer.Scale;
+
                     bool blink = ((int)(DateTime.UtcNow.Millisecond / 160) % 2 == 0);
-                    Color auraCol = blink ? Color.FromArgb(190, 240, 40, 40) : Color.FromArgb(130, 180, 20, 20);
-                    buffer.DrawRect(sx - 2, sy - 2, drawW + 4, drawH + 4, auraCol);
-                    buffer.FillRect(sx - 3, sy + drawH - 2, 2, 2, Color.FromArgb(255, 60, 60));
-                    buffer.FillRect(sx + drawW + 1, sy + drawH - 2, 2, 2, Color.FromArgb(255, 60, 60));
+                    int auraAlpha = blink ? 90 : 50;
+                    buffer.FillRoundedRect(scx - 8, scy - 8, sdrawW + 16, sdrawH + 16, 12f, Color.FromArgb(auraAlpha, 240, 30, 30));
+                    buffer.DrawRoundedRect(scx - 8, scy - 8, sdrawW + 16, sdrawH + 16, 12f, Color.FromArgb(210, 255, 60, 50), 2.5f);
                 }
 
                 buffer.DrawBitmap(sprite, sx, sy, flipX: !FacingRight);
             }
 
-            // 적 머리 위 체력바 표시 (모든 활동 중인 적 상시 표시)
+            // 960x720 고해상도 적 머리 위 체력바 표시 (활동 중인 적 상시 표시)
             if (!IsDead && State != "down" && !IsCarried)
             {
-                int barW = IsBossType ? 28 : 22;
-                int barH = 3;
-                int barX = sx + (drawW - barW) / 2;
-                int barY = sy - 7;
+                int scx = sx * PixelBuffer.Scale;
+                int scy = sy * PixelBuffer.Scale;
+                int sdrawW = drawW * PixelBuffer.Scale;
 
-                // 외곽 테두리
-                buffer.FillRect(barX - 1, barY - 1, barW + 2, barH + 2, Color.FromArgb(20, 20, 20));
-                // 배경 바
-                buffer.FillRect(barX, barY, barW, barH, Color.FromArgb(70, 20, 20));
-                // 잔여 체력
+                int barW = IsBossType ? 90 : 66;
+                int barH = 7;
+                int barX = scx + (sdrawW - barW) / 2;
+                int barY = scy - 18;
+
+                buffer.FillRoundedRect(barX - 1, barY - 1, barW + 2, barH + 2, 3f, Color.FromArgb(200, 20, 20, 20));
+                buffer.FillRoundedRect(barX, barY, barW, barH, 2f, Color.FromArgb(220, 60, 20, 20));
+
                 int fillW = Math.Max(0, (int)((float)CurrentHp / MaxHp * barW));
-                buffer.FillRect(barX, barY, fillW, barH, Color.FromArgb(235, 45, 45));
+                if (fillW > 0)
+                {
+                    Color hpCol = IsBossType ? (IsRaging ? Color.FromArgb(255, 60, 60) : Color.FromArgb(255, 130, 40)) : Color.FromArgb(235, 50, 50);
+                    buffer.FillRoundedRect(barX, barY, fillW, barH, 2f, hpCol);
+                }
             }
         }
     }

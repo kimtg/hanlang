@@ -34,29 +34,28 @@ namespace HanlangGame.UI
         {
             if (IsExpired) return;
 
-            int sx = (int)(X - cameraX);
-            int sy = (int)Y;
+            buffer.SetHighQualityModes();
+
+            int scx = (int)((X - cameraX) * PixelBuffer.Scale);
+            int scy = (int)(Y * PixelBuffer.Scale);
 
             string text = $"-{Value}";
 
-            // 피격 주체에 따른 시각적 구분:
-            // 플레이어 피격: 강렬한 선홍색
-            // 적 피격: 밝은 주황색 (치명타 시 샛노란색)
             Color color;
             if (IsPlayerHit)
             {
-                color = Color.FromArgb(255, 65, 65);
+                color = Color.FromArgb(255, 75, 75);
             }
             else
             {
-                color = (Value >= 24) ? Color.FromArgb(255, 235, 45) : Color.FromArgb(255, 175, 40);
+                color = (Value >= 24) ? Color.FromArgb(255, 235, 60) : Color.FromArgb(255, 185, 45);
             }
 
-            int textW = text.Length * 7;
-            int drawX = sx - textW / 2;
+            Font font = (Value >= 24) ? buffer.FontTitle : buffer.FontSubtitle;
+            float textW = buffer.Graphics.MeasureString(text, font).Width;
 
-            bool isLarge = Value >= 24;
-            buffer.DrawText(text, drawX, sy, color, large: isLarge);
+            // 선명한 고해상도 아웃라인 드롭섀도우와 함께 렌더링
+            buffer.DrawOutlinedText(text, scx - textW / 2f, scy, color, Color.FromArgb(200, 20, 20, 20), font, 3.5f);
         }
     }
 }

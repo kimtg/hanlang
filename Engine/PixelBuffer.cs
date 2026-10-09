@@ -8,31 +8,49 @@ namespace HanlangGame.Engine
 {
     public class PixelBuffer
     {
-        public const int Width = 320;
-        public const int Height = 240;
+        // 960 * 720 고해상도 렌더 버퍼
+        public const int Width = 960;
+        public const int Height = 720;
+
+        // 기존 2.5D 게임 로직 / 물리 좌표계 (320 * 240)
+        public const int VirtualWidth = 320;
+        public const int VirtualHeight = 240;
+        public const int Scale = 3;
 
         public Bitmap Bitmap { get; private set; }
         public Graphics Graphics { get; private set; }
 
-        private Font _tinyFont;
-        private Font _smallFont;
-        private Font _titleFont;
-        private Font _systemFont;
+        public Font FontHuge { get; }
+        public Font FontTitle { get; }
+        public Font FontSubtitle { get; }
+        public Font FontHeader { get; }
+        public Font FontBody { get; }
+        public Font FontSmall { get; }
+        public Font FontTiny { get; }
 
         public PixelBuffer()
         {
             Bitmap = new Bitmap(Width, Height, PixelFormat.Format32bppPArgb);
             Graphics = Graphics.FromImage(Bitmap);
-            Graphics.InterpolationMode = InterpolationMode.NearestNeighbor;
-            Graphics.PixelOffsetMode = PixelOffsetMode.Half;
-            Graphics.SmoothingMode = SmoothingMode.None;
-            Graphics.TextRenderingHint = TextRenderingHint.SingleBitPerPixelGridFit;
 
-            // 한글 렌더링에 적합한 시스템 폰트 준비
-            _tinyFont = new Font("Malgun Gothic", 7.5f, FontStyle.Bold);
-            _smallFont = new Font("Malgun Gothic", 9f, FontStyle.Bold);
-            _titleFont = new Font("Malgun Gothic", 12f, FontStyle.Bold);
-            _systemFont = new Font("Dotum", 8f, FontStyle.Regular);
+            SetHighQualityModes();
+
+            // 960x720 고해상도 글자용 안티앨리어싱 시스템 폰트 준비
+            FontHuge = new Font("Batang", 34f, FontStyle.Bold);
+            FontTitle = new Font("Malgun Gothic", 24f, FontStyle.Bold);
+            FontSubtitle = new Font("Malgun Gothic", 18f, FontStyle.Bold);
+            FontHeader = new Font("Malgun Gothic", 15f, FontStyle.Bold);
+            FontBody = new Font("Malgun Gothic", 13f, FontStyle.Bold);
+            FontSmall = new Font("Malgun Gothic", 11f, FontStyle.Regular);
+            FontTiny = new Font("Malgun Gothic", 9.5f, FontStyle.Regular);
+        }
+
+        public void SetHighQualityModes()
+        {
+            Graphics.InterpolationMode = InterpolationMode.HighQualityBicubic;
+            Graphics.PixelOffsetMode = PixelOffsetMode.HighQuality;
+            Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+            Graphics.TextRenderingHint = TextRenderingHint.ClearTypeGridFit;
         }
 
         public void Clear(Color color)
@@ -44,7 +62,6 @@ namespace HanlangGame.Engine
         {
             if (x >= 0 && x < Width && y >= 0 && y < Height)
             {
-                // direct drawing via small rect
                 using var brush = new SolidBrush(color);
                 Graphics.FillRectangle(brush, x, y, 1, 1);
             }
@@ -56,31 +73,79 @@ namespace HanlangGame.Engine
             Graphics.FillRectangle(brush, x, y, w, h);
         }
 
-        public void DrawRect(int x, int y, int w, int h, Color color)
+        public void DrawRect(int x, int y, int w, int h, Color color, float lineWidth = 1f)
         {
-            using var pen = new Pen(color, 1);
-            Graphics.DrawRectangle(pen, x, y, w - 1, h - 1);
+            using var pen = new Pen(color, lineWidth);
+            Graphics.DrawRectangle(pen, x, y, w, h);
         }
 
-        public void DrawLine(int x1, int y1, int x2, int y2, Color color)
+        public void DrawLine(float x1, float y1, float x2, float y2, Color color, float lineWidth = 1f)
         {
-            using var pen = new Pen(color, 1);
+            using var pen = new Pen(color, lineWidth);
             Graphics.DrawLine(pen, x1, y1, x2, y2);
         }
 
-        public void DrawShadow(int centerX, int groundY, int radiusX, int radiusY)
+        public GraphicsPath CreateRoundedRectangle(RectangleF rect, float radius)
         {
-            using var brush = new SolidBrush(Color.FromArgb(90, 0, 0, 0));
-            Graphics.FillEllipse(brush, centerX - radiusX, groundY - radiusY, radiusX * 2, radiusY * 2);
+            var path = new GraphicsPath();
+            float d = radius * 2f;
+            path.AddArc(rect.X, rect.Y, d, d, 180, 90);
+            path.AddArc(rect.Right - d, rect.Y, d, d, 270, 90);
+            path.AddArc(rect.Right - d, rect.Bottom - d, d, d, 0, 90);
+            path.AddArc(rect.X, rect.Bottom - d, d, d, 90, 90);
+            path.CloseFigure();
+            return path;
+        }
+
+        public void FillRoundedRect(float x, float y, float w, float h, float radius, Color color)
+        {
+            using var path = CreateRoundedRectangle(new RectangleF(x, y, w, h), radius);
+            using var brush = new SolidBrush(color);
+            Graphics.FillPath(brush, path);
+        }
+
+        public void DrawRoundedRect(float x, float y, float w, float h, float radius, Color color, float lineWidth = 1.5f)
+        {
+            using var path = CreateRoundedRectangle(new RectangleF(x, y, w, h), radius);
+            using var pen = new Pen(color, lineWidth);
+            Graphics.DrawPath(pen, path);
+        }
+
+        public void DrawShadow(int logicCenterX, int logicGroundY, int logicRadiusX, int logicRadiusY)
+        {
+            int scx = logicCenterX * Scale;
+            int scy = logicGroundY * Scale;
+            int srx = logicRadiusX * Scale;
+            int sry = logicRadiusY * Scale;
+
+            using var brush = new SolidBrush(Color.FromArgb(80, 0, 0, 0));
+            Graphics.FillEllipse(brush, scx - srx, scy - sry, srx * 2, sry * 2);
+        }
+
+        public void DrawOutlinedText(string text, float x, float y, Color textColor, Color outlineColor, Font font, float outlineWidth = 2.5f)
+        {
+            using var outlinePen = new Pen(outlineColor, outlineWidth) { LineJoin = LineJoin.Round };
+            using var path = new GraphicsPath();
+            path.AddString(text, font.FontFamily, (int)font.Style, font.SizeInPoints * 1.333f, new PointF(x, y), StringFormat.GenericTypographic);
+            Graphics.DrawPath(outlinePen, path);
+            using var fillBrush = new SolidBrush(textColor);
+            Graphics.FillPath(fillBrush, path);
+        }
+
+        public void DrawOutlinedTextCentered(string text, float y, Color textColor, Color outlineColor, Font font, float outlineWidth = 2.5f)
+        {
+            var size = Graphics.MeasureString(text, font);
+            float x = (Width - size.Width) / 2f;
+            DrawOutlinedText(text, x, y, textColor, outlineColor, font, outlineWidth);
         }
 
         public void DrawText(string text, int x, int y, Color color, bool large = false, bool tiny = false)
         {
-            Font font = large ? _titleFont : (tiny ? _tinyFont : _smallFont);
+            Font font = large ? FontSubtitle : (tiny ? FontSmall : FontHeader);
             
-            // 1픽셀 그림자 (레트로 아웃라인 효과)
-            using var shadowBrush = new SolidBrush(Color.FromArgb(200, 20, 20, 20));
-            Graphics.DrawString(text, font, shadowBrush, x + 1, y + 1);
+            // 고해상도 그림자
+            using var shadowBrush = new SolidBrush(Color.FromArgb(180, 10, 10, 10));
+            Graphics.DrawString(text, font, shadowBrush, x + 1.5f, y + 1.5f);
 
             // 본문 텍스트
             using var textBrush = new SolidBrush(color);
@@ -89,7 +154,7 @@ namespace HanlangGame.Engine
 
         public void DrawTextCentered(string text, int y, Color color, bool large = false, bool tiny = false)
         {
-            Font font = large ? _titleFont : (tiny ? _tinyFont : _smallFont);
+            Font font = large ? FontSubtitle : (tiny ? FontSmall : FontHeader);
             var size = Graphics.MeasureString(text, font);
             int x = (Width - (int)size.Width) / 2;
             DrawText(text, x, y, color, large, tiny);
@@ -97,26 +162,38 @@ namespace HanlangGame.Engine
 
         public void DrawScanlines()
         {
-            using var pen = new Pen(Color.FromArgb(35, 0, 0, 0), 1);
-            for (int y = 0; y < Height; y += 2)
-            {
-                Graphics.DrawLine(pen, 0, y, Width, y);
-            }
+            // 960x720 고해상도 모드에서는 화면 흐림을 유발하는 CRT 도트 스캔라인을 적용하지 않고
+            // 맑고 선명한 고해상도 그래픽을 온전히 출력합니다.
         }
 
-        public void DrawBitmap(Bitmap sprite, int x, int y, bool flipX = false)
+        // 오브젝트(캐릭터, 들 수 있는 물체, 음식, 돈)는 도트 그대로 3배 정수 확대 출력
+        public void DrawBitmap(Bitmap sprite, int logicX, int logicY, bool flipX = false)
         {
             if (sprite == null) return;
+
+            var prevInterp = Graphics.InterpolationMode;
+            var prevOffset = Graphics.PixelOffsetMode;
+
+            Graphics.InterpolationMode = InterpolationMode.NearestNeighbor;
+            Graphics.PixelOffsetMode = PixelOffsetMode.Half;
+
+            int sx = logicX * Scale;
+            int sy = logicY * Scale;
+            int sw = sprite.Width * Scale;
+            int sh = sprite.Height * Scale;
+
             if (!flipX)
             {
-                Graphics.DrawImage(sprite, x, y);
+                Graphics.DrawImage(sprite, sx, sy, sw, sh);
             }
             else
             {
                 // 좌우 반전 출력
-                var destRect = new Rectangle(x, y, sprite.Width, sprite.Height);
-                Graphics.DrawImage(sprite, new Rectangle(x + sprite.Width, y, -sprite.Width, sprite.Height));
+                Graphics.DrawImage(sprite, new Rectangle(sx + sw, sy, -sw, sh));
             }
+
+            Graphics.InterpolationMode = prevInterp;
+            Graphics.PixelOffsetMode = prevOffset;
         }
     }
 }

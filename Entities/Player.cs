@@ -561,60 +561,64 @@ namespace HanlangGame.Entities
 
         private void RenderHunminSpinGlow(PixelBuffer buffer, float cameraX)
         {
-            int cx = (int)(X - cameraX);
-            int cy = (int)(Y - Z - 15);
-            int groundY = (int)Y;
+            var g = buffer.Graphics;
+            buffer.SetHighQualityModes();
 
-            // 1. 지면 선풍 회오리 풍압륜 & 잔상 (Ground Wind Cyclone)
-            buffer.DrawShadow(cx, groundY, 22, 6);
-            int gwPulse = 18 + (int)(Math.Sin(StateTimer * 25f) * 4);
-            using (var pGroundWind = new Pen(Color.FromArgb(140, 120, 230, 255), 1.5f))
+            float scx = (X - cameraX) * PixelBuffer.Scale;
+            float scy = (Y - Z - 15f) * PixelBuffer.Scale;
+            float sGroundY = Y * PixelBuffer.Scale;
+
+            // 1. 지면 고해상도 선풍 회오리 풍압륜 (Ground Wind Cyclone)
+            float gwPulse = (24f + (float)Math.Sin(StateTimer * 25f) * 6f) * PixelBuffer.Scale;
+            using (var pGroundWind = new Pen(Color.FromArgb(160, 110, 230, 255), 3f))
             {
-                buffer.Graphics.DrawEllipse(pGroundWind, cx - gwPulse, groundY - 4, gwPulse * 2, 8);
+                g.DrawEllipse(pGroundWind, scx - gwPulse, sGroundY - 10f, gwPulse * 2f, 20f);
             }
 
-            // 2. 비기 천상 선풍 광륜 (Radiant Celestial Aura Rings)
-            int rx = 22 + (int)(Math.Sin(StateTimer * 30f) * 4);
-            int ry = 16 + (int)(Math.Cos(StateTimer * 30f) * 3);
-            using (var pGoldHalo = new Pen(Color.FromArgb(210, 255, 235, 70), 1.8f))
-            using (var pCyanHalo = new Pen(Color.FromArgb(190, 80, 220, 255), 1.2f))
+            // 2. 비기 천상 선풍 황금/청색 이중 광륜 (Radiant Celestial Aura Rings)
+            float rx = (24f + (float)Math.Sin(StateTimer * 30f) * 5f) * PixelBuffer.Scale;
+            float ry = (18f + (float)Math.Cos(StateTimer * 30f) * 4f) * PixelBuffer.Scale;
+            using (var pGoldHalo = new Pen(Color.FromArgb(230, 255, 230, 70), 4f))
+            using (var pCyanHalo = new Pen(Color.FromArgb(200, 80, 220, 255), 2.5f))
             {
-                buffer.Graphics.DrawEllipse(pGoldHalo, cx - rx, cy - ry, rx * 2, ry * 2);
-                buffer.Graphics.DrawEllipse(pCyanHalo, cx - (rx - 4), cy - (ry - 3), (rx - 4) * 2, (ry - 3) * 2);
+                g.DrawEllipse(pGoldHalo, scx - rx, scy - ry, rx * 2f, ry * 2f);
+                g.DrawEllipse(pCyanHalo, scx - (rx - 8f), scy - (ry - 6f), (rx - 8f) * 2f, (ry - 6f) * 2f);
             }
 
-            // 3. 고속 회전 4방향 광선 & 선풍 에너지도 (Rotating Radiant Light Blades)
-            float rotAngle = StateTimer * 35f;
-            for (int i = 0; i < 4; i++)
+            // 3. 고속 회전 6방향 고해상도 빛의 검무 (Rotating Radiant Light Blades)
+            float rotAngle = StateTimer * 36f;
+            for (int i = 0; i < 6; i++)
             {
-                float angle = rotAngle + i * ((float)Math.PI / 2f);
+                float angle = rotAngle + i * ((float)Math.PI / 3f);
                 float cosA = (float)Math.Cos(angle);
                 float sinA = (float)Math.Sin(angle);
 
-                int x1 = cx + (int)(cosA * 7f);
-                int y1 = cy + (int)(sinA * 5f);
-                int x2 = cx + (int)(cosA * 26f);
-                int y2 = cy + (int)(sinA * 18f);
+                float x1 = scx + cosA * 15f;
+                float y1 = scy + sinA * 10f;
+                float x2 = scx + cosA * (75f + (float)Math.Sin(StateTimer * 20f) * 10f);
+                float y2 = scy + sinA * (55f + (float)Math.Cos(StateTimer * 20f) * 8f);
 
-                // 코어 백색 광선 & 외곽 황금/하늘빛 잔광
-                buffer.DrawLine(x1, y1, x2, y2, Color.FromArgb(255, 250, 130));
-                buffer.DrawLine(x1, y1 - 1, x2, y2 - 1, Color.FromArgb(130, 230, 255));
+                using var coreBeam = new Pen(Color.FromArgb(255, 255, 250, 180), 3f);
+                using var cyanBeam = new Pen(Color.FromArgb(160, 100, 225, 255), 5f);
+                g.DrawLine(cyanBeam, x1, y1, x2, y2);
+                g.DrawLine(coreBeam, x1, y1, x2, y2);
             }
 
-            // 4. 회전 궤도를 도는 찬란한 별빛/비기 광채 파티클 (Swirling Radiant Sparks)
-            for (int p = 0; p < 6; p++)
+            // 4. 훈민정음 자모 비급(ㄱ, ㄴ, ㄷ, ㄹ, ㅁ, ㅅ, ㅇ, ㅈ) 궤도 공전 광채 텍스트
+            string[] jamo = { "ㄱ", "ㄴ", "ㄷ", "ㄹ", "ㅁ", "ㅅ", "ㅇ", "ㅈ" };
+            for (int p = 0; p < jamo.Length; p++)
             {
-                float sparkAngle = -rotAngle * 1.2f + p * ((float)Math.PI / 3f);
-                float sparkR = 18f + ((p % 2 == 0) ? 5f : -3f);
-                int px = cx + (int)(Math.Cos(sparkAngle) * sparkR);
-                int py = cy + (int)(Math.Sin(sparkAngle) * (sparkR * 0.7f));
-                Color sparkCol = (p % 3) switch
-                {
-                    0 => Color.FromArgb(255, 240, 90),  // 황금 광채
-                    1 => Color.FromArgb(110, 230, 255), // 청백색 풍압
-                    _ => Color.White                    // 순백의 섬광
-                };
-                buffer.FillRect(px - 1, py - 1, 2, 2, sparkCol);
+                float sparkAngle = -rotAngle * 1.1f + p * ((float)Math.PI * 2f / jamo.Length);
+                float sparkR = (22f + ((p % 2 == 0) ? 6f : -4f)) * PixelBuffer.Scale;
+                float px = scx + (float)Math.Cos(sparkAngle) * sparkR;
+                float py = scy + (float)Math.Sin(sparkAngle) * (sparkR * 0.72f);
+
+                Color jamoCol = (p % 2 == 0) ? Color.FromArgb(255, 245, 90) : Color.FromArgb(130, 240, 255);
+                buffer.DrawOutlinedText(jamo[p], px - 8f, py - 10f, jamoCol, Color.FromArgb(40, 20, 10), buffer.FontHeader, 2f);
+
+                // 반짝이는 별빛 파티클
+                using var starBrush = new SolidBrush(Color.White);
+                g.FillEllipse(starBrush, px - 2f, py - 2f, 4f, 4f);
             }
         }
     }

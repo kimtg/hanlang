@@ -1,5 +1,6 @@
 using System;
 using System.Drawing;
+using System.Drawing.Drawing2D;
 using HanlangGame.Engine;
 
 namespace HanlangGame.UI
@@ -30,24 +31,43 @@ namespace HanlangGame.UI
         {
             if (IsExpired) return;
 
-            int sx = (int)(X - cameraX);
-            int sy = (int)Y;
+            var g = buffer.Graphics;
+            buffer.SetHighQualityModes();
 
-            // 말풍선 배경 (레트로 노란색/흰색 박스 + 검정 테두리)
-            int textW = Text.Length * 12 + 8;
-            int textH = 14;
-            int boxX = sx - textW / 2;
-            int boxY = sy - textH;
+            int scx = (int)((X - cameraX) * PixelBuffer.Scale);
+            int scy = (int)(Y * PixelBuffer.Scale);
 
-            buffer.FillRect(boxX, boxY, textW, textH, Color.FromArgb(255, 255, 210));
-            buffer.DrawRect(boxX, boxY, textW, textH, Color.FromArgb(40, 40, 40));
+            var font = buffer.FontHeader;
+            var size = g.MeasureString(Text, font);
+            int boxW = (int)size.Width + 24;
+            int boxH = (int)size.Height + 10;
+            int boxX = scx - boxW / 2;
+            int boxY = scy - boxH - 10;
 
-            // 말풍선 꼬리
-            buffer.FillRect(sx - 1, sy, 3, 2, Color.FromArgb(255, 255, 210));
-            buffer.SetPixel(sx, sy + 2, Color.FromArgb(40, 40, 40));
+            // 말풍선 부드러운 그림자
+            buffer.FillRoundedRect(boxX + 2, boxY + 2, boxW, boxH, 8f, Color.FromArgb(70, 0, 0, 0));
 
-            // 텍스트 출력
-            buffer.DrawText(Text, boxX + 4, boxY + 1, Color.FromArgb(160, 20, 20));
+            // 말풍선 본체 (고해상도 둥근 사각형)
+            buffer.FillRoundedRect(boxX, boxY, boxW, boxH, 8f, Color.FromArgb(252, 250, 235));
+            buffer.DrawRoundedRect(boxX, boxY, boxW, boxH, 8f, Color.FromArgb(50, 40, 30), 2f);
+
+            // 말풍선 꼬리 삼각 폴리곤
+            Point[] tailPts =
+            {
+                new Point(scx - 7, boxY + boxH - 1),
+                new Point(scx + 7, boxY + boxH - 1),
+                new Point(scx, scy - 2)
+            };
+            using (var tailBrush = new SolidBrush(Color.FromArgb(252, 250, 235)))
+            using (var borderPen = new Pen(Color.FromArgb(50, 40, 30), 1.8f))
+            {
+                g.FillPolygon(tailBrush, tailPts);
+                g.DrawLine(borderPen, tailPts[0], tailPts[2]);
+                g.DrawLine(borderPen, tailPts[1], tailPts[2]);
+            }
+
+            // 안티앨리어싱 고해상도 텍스트 출력
+            buffer.DrawOutlinedText(Text, boxX + 12, boxY + 5, Color.FromArgb(170, 25, 25), Color.Transparent, font, 1f);
         }
     }
 }

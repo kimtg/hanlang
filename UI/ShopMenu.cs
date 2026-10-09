@@ -116,62 +116,70 @@ namespace HanlangGame.UI
 
         public void Render(PixelBuffer buffer, StatusSystem status)
         {
-            // 반투명 딤 처리
-            buffer.FillRect(0, 0, PixelBuffer.Width, PixelBuffer.Height, Color.FromArgb(180, 0, 0, 0));
+            var g = buffer.Graphics;
+            buffer.SetHighQualityModes();
 
-            int winX = 25;
-            int winY = 16;
-            int winW = 270;
-            int winH = 208;
+            // 1. 전체 화면 반투명 어두운 딤 처리
+            buffer.FillRect(0, 0, PixelBuffer.Width, PixelBuffer.Height, Color.FromArgb(195, 12, 10, 18));
 
-            // 한지 두루마리 질감 배경
-            buffer.FillRect(winX, winY, winW, winH, Color.FromArgb(246, 240, 226));
-            buffer.DrawRect(winX, winY, winW, winH, Color.FromArgb(60, 40, 20));
-            buffer.DrawRect(winX + 2, winY + 2, winW - 4, winH - 4, Color.FromArgb(190, 160, 110));
+            int winW = 800;
+            int winH = 580;
+            int winX = (PixelBuffer.Width - winW) / 2;
+            int winY = (PixelBuffer.Height - winH) / 2;
 
-            // 헤더
-            buffer.FillRect(winX + 4, winY + 4, winW - 8, 22, Color.FromArgb(90, 45, 25));
-            buffer.DrawTextCentered("【 저잣거리 주막 & 보제원 한약방 】", winY + 6, Color.FromArgb(255, 235, 170));
+            // 2. 한지 두루마리 질감 배경 및 목조 금장 테두리
+            buffer.FillRoundedRect(winX, winY, winW, winH, 14f, Color.FromArgb(248, 242, 228));
+            buffer.DrawRoundedRect(winX, winY, winW, winH, 14f, Color.FromArgb(65, 42, 22), 4f);
+            buffer.DrawRoundedRect(winX + 4, winY + 4, winW - 8, winH - 8, 10f, Color.FromArgb(200, 165, 110), 2f);
 
-            // 보유 엽전 표시
-            buffer.DrawText($"보유 엽전: {status.Gold} 냥", winX + 12, winY + 28, Color.FromArgb(190, 130, 20));
-            buffer.DrawText($"[HP {status.CurrentHp}/{status.MaxHp}] [MP {status.CurrentMp}/{status.MaxMp}]", winX + 140, winY + 28, Color.FromArgb(70, 70, 90));
-            buffer.DrawLine(winX + 8, winY + 42, winX + winW - 8, winY + 42, Color.FromArgb(180, 160, 130));
+            // 3. 상단 헤더 배너
+            int headH = 54;
+            buffer.FillRoundedRect(winX + 8, winY + 8, winW - 16, headH, 8f, Color.FromArgb(95, 45, 25));
+            buffer.DrawOutlinedTextCentered("【 저잣거리 주막 & 보제원 한약방 】", winY + 16, Color.FromArgb(255, 235, 175), Color.FromArgb(40, 20, 10), buffer.FontTitle, 2.5f);
 
-            // 아이템 목록
-            int listY = winY + 46;
+            // 4. 보유 엽전 및 현재 HP/MP 상태 바
+            int infoY = winY + 70;
+            buffer.DrawOutlinedText($"보유 엽전 : {status.Gold:N0} 냥", winX + 24, infoY, Color.FromArgb(205, 140, 20), Color.Transparent, buffer.FontSubtitle);
+            buffer.DrawOutlinedText($"[ 체력 HP : {status.CurrentHp} / {status.MaxHp} ]   [ 기력 MP : {status.CurrentMp} / {status.MaxMp} ]", winX + 380, infoY + 2, Color.FromArgb(70, 65, 85), Color.Transparent, buffer.FontHeader);
+            buffer.DrawLine(winX + 16, infoY + 34, winX + winW - 16, infoY + 34, Color.FromArgb(195, 175, 145), 2f);
+
+            // 5. 아이템 목록 (행 높이 42px)
+            int listY = infoY + 42;
             for (int i = 0; i < _items.Length; i++)
             {
                 var it = _items[i];
                 bool isSel = (i == _selectedIdx);
-                int itemY = listY + i * 16;
+                int itemY = listY + i * 44;
 
                 if (isSel)
                 {
-                    buffer.FillRect(winX + 8, itemY - 1, winW - 16, 15, Color.FromArgb(235, 210, 160));
-                    buffer.DrawRect(winX + 8, itemY - 1, winW - 16, 15, Color.FromArgb(180, 120, 60));
+                    buffer.FillRoundedRect(winX + 16, itemY - 2, winW - 32, 40, 6f, Color.FromArgb(238, 215, 165));
+                    buffer.DrawRoundedRect(winX + 16, itemY - 2, winW - 32, 40, 6f, Color.FromArgb(190, 130, 50), 2f);
+                    buffer.DrawOutlinedText("▶", winX + 22, itemY + 8, Color.FromArgb(180, 50, 20), Color.Transparent, buffer.FontHeader);
                 }
 
-                Color catCol = it.Category == "주막" ? Color.FromArgb(180, 60, 20) : Color.FromArgb(30, 100, 170);
-                buffer.DrawText($"[{it.Category}]", winX + 10, itemY, catCol);
+                Color catBg = it.Category == "주막" ? Color.FromArgb(195, 65, 25) : Color.FromArgb(35, 110, 185);
+                buffer.FillRoundedRect(winX + 46, itemY + 4, 90, 26, 4f, catBg);
+                buffer.DrawOutlinedText($"[{it.Category}]", winX + 58, itemY + 8, Color.White, Color.Transparent, buffer.FontSmall);
 
-                Color nameCol = (status.Gold >= it.Cost) ? Color.FromArgb(40, 30, 20) : Color.FromArgb(140, 130, 130);
-                buffer.DrawText(it.Name, winX + 60, itemY, nameCol);
+                Color nameCol = (status.Gold >= it.Cost) ? Color.FromArgb(45, 30, 20) : Color.FromArgb(150, 140, 140);
+                buffer.DrawOutlinedText(it.Name, winX + 155, itemY + 7, nameCol, Color.Transparent, buffer.FontHeader);
 
-                Color costCol = (status.Gold >= it.Cost) ? Color.FromArgb(180, 120, 10) : Color.FromArgb(180, 40, 40);
-                buffer.DrawText($"{it.Cost}냥", winX + 215, itemY, costCol);
+                Color costCol = (status.Gold >= it.Cost) ? Color.FromArgb(190, 125, 15) : Color.FromArgb(200, 45, 45);
+                buffer.DrawOutlinedText($"{it.Cost:N0} 냥", winX + winW - 140, itemY + 7, costCol, Color.Transparent, buffer.FontSubtitle);
             }
 
-            // 하단 선택된 아이템 설명 박스
-            int descY = winY + 162;
-            buffer.FillRect(winX + 8, descY, winW - 16, 22, Color.FromArgb(238, 230, 212));
-            buffer.DrawRect(winX + 8, descY, winW - 16, 22, Color.FromArgb(170, 140, 100));
+            // 6. 하단 선택된 아이템 상세 설명 박스
+            int descY = winY + 458;
+            buffer.FillRoundedRect(winX + 16, descY, winW - 32, 54, 8f, Color.FromArgb(240, 232, 215));
+            buffer.DrawRoundedRect(winX + 16, descY, winW - 32, 54, 8f, Color.FromArgb(180, 150, 115), 1.5f);
 
             var selItem = _items[_selectedIdx];
-            buffer.DrawText(selItem.Description, winX + 12, descY + 4, Color.FromArgb(50, 40, 30));
+            buffer.DrawOutlinedText(selItem.Description, winX + 28, descY + 16, Color.FromArgb(60, 45, 30), Color.Transparent, buffer.FontHeader);
 
-            // 피드백 메시지 / 조작 안내
-            buffer.DrawTextCentered(_feedbackMessage, winY + 188, _feedbackColor);
+            // 7. 피드백 메시지 및 조작 안내
+            buffer.DrawOutlinedTextCentered(_feedbackMessage, winY + 524, _feedbackColor, Color.Transparent, buffer.FontHeader, 1f);
+            buffer.DrawOutlinedTextCentered("[ 방향키 ↑↓ : 선택 | Z / Enter : 구매 | ESC / X / S : 닫기 ]", winY + 550, Color.FromArgb(120, 110, 100), Color.Transparent, buffer.FontSmall);
         }
     }
 }

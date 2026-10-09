@@ -21,6 +21,10 @@ namespace HanlangGame.Systems
         {
             var rand = new Random();
             Color[] sparkColors = { Color.FromArgb(255, 230, 80), Color.FromArgb(255, 255, 180), Color.FromArgb(255, 130, 60), Color.White };
+            
+            // 960x720 고해상도 충격파 링 생성
+            Particles.Add(new GameParticle(x, y, z, 0, 0, 0, 0.24f, Color.FromArgb(255, 235, 100), 10, "ring"));
+
             for (int i = 0; i < count; i++)
             {
                 float angle = (float)(rand.NextDouble() * Math.PI * 2);
@@ -387,10 +391,7 @@ namespace HanlangGame.Systems
 
         public void Render(PixelBuffer buffer, float cameraX)
         {
-            foreach (var item in Items)
-            {
-                item.Render(buffer, cameraX);
-            }
+            // 아이템은 GameScene의 2.5D 깊이 정렬에서 렌더링되므로 여기서는 파티클, 데미지, 말풍선 출력
             foreach (var p in Particles)
             {
                 p.Render(buffer, cameraX);
@@ -418,7 +419,7 @@ namespace HanlangGame.Systems
         public float MaxLife { get; set; }
         public Color Color { get; set; }
         public int Size { get; set; }
-        public string Type { get; set; } // "spark", "dust"
+        public string Type { get; set; } // "spark", "dust", "ring"
 
         public bool IsExpired => Life <= 0f;
 
@@ -451,24 +452,45 @@ namespace HanlangGame.Systems
 
         public void Render(PixelBuffer buffer, float cameraX)
         {
-            int sx = (int)(X - cameraX);
-            int sy = (int)(Y - Z);
-            if (sx < -10 || sx > PixelBuffer.Width + 10 || sy < -10 || sy > PixelBuffer.Height + 10) return;
+            int scx = (int)((X - cameraX) * PixelBuffer.Scale);
+            int scy = (int)((Y - Z) * PixelBuffer.Scale);
+            if (scx < -40 || scx > PixelBuffer.Width + 40 || scy < -40 || scy > PixelBuffer.Height + 40) return;
+
+            var g = buffer.Graphics;
+            float lifeRatio = Math.Clamp(Life / MaxLife, 0f, 1f);
 
             if (Type == "spark")
             {
-                buffer.FillRect(sx - Size / 2, sy - Size / 2, Size, Size, Color);
-                if (Size >= 2)
-                {
-                    buffer.FillRect(sx - Size, sy, Size * 2, 1, Color.White);
-                    buffer.FillRect(sx, sy - Size, 1, Size * 2, Color.White);
-                }
+                // 960x720 고해상도 섬광 스파크: 빛나는 4점 다이아몬드 별 및 광채
+                float radius = Size * PixelBuffer.Scale * 1.6f * lifeRatio;
+                int alpha = (int)(255 * lifeRatio);
+                Color glowCol = Color.FromArgb(alpha, Color);
+
+                using var coreBrush = new SolidBrush(Color.FromArgb(alpha, Color.White));
+                g.FillEllipse(coreBrush, scx - radius * 0.5f, scy - radius * 0.5f, radius, radius);
+
+                using var rayPen = new Pen(glowCol, 2.2f);
+                using var whiteRayPen = new Pen(Color.FromArgb(alpha, Color.White), 1.2f);
+                g.DrawLine(rayPen, scx - radius * 2.2f, scy, scx + radius * 2.2f, scy);
+                g.DrawLine(rayPen, scx, scy - radius * 2.2f, scx, scy + radius * 2.2f);
+                g.DrawLine(whiteRayPen, scx - radius * 1.1f, scy, scx + radius * 1.1f, scy);
+                g.DrawLine(whiteRayPen, scx, scy - radius * 1.1f, scx, scy + radius * 1.1f);
+            }
+            else if (Type == "ring")
+            {
+                // 960x720 고해상도 충격파 링 (Shockwave Ring)
+                float radius = ((1f - lifeRatio) * 65f + 14f);
+                int alpha = (int)(220 * lifeRatio);
+                using var ringPen = new Pen(Color.FromArgb(alpha, Color), 3.2f);
+                g.DrawEllipse(ringPen, scx - radius, scy - radius, radius * 2f, radius * 2f);
             }
             else // dust
             {
-                float alphaRatio = Math.Max(0f, Life / MaxLife);
-                Color dustCol = Color.FromArgb((int)(160 * alphaRatio), Color);
-                buffer.FillRect(sx, sy, Size, Size, dustCol);
+                // 960x720 고해상도 흙먼지: 부드러운 안티앨리어싱 반투명 구름
+                float radius = (Size * PixelBuffer.Scale * 1.8f) + (1f - lifeRatio) * 16f;
+                int alpha = (int)(110 * lifeRatio);
+                using var dustBrush = new SolidBrush(Color.FromArgb(alpha, Color));
+                g.FillEllipse(dustBrush, scx - radius, scy - radius, radius * 2f, radius * 2f);
             }
         }
     }
