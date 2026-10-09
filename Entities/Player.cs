@@ -545,9 +545,13 @@ namespace HanlangGame.Entities
             var sprite = RetroSprites.GetSprite(spriteKey);
             if (sprite != null)
             {
-                int sx = (int)(X - cameraX) - sprite.Width / 2;
-                int sy = (int)(Y - Z) - sprite.Height;
-                buffer.DrawBitmap(sprite, sx, sy, flipX: !FacingRight);
+                float projX = Perspective.ProjectX(X, cameraX, Y);
+                float p = Perspective.GetScale(Y);
+                float w = sprite.Width * p;
+                float h = sprite.Height * p;
+                float sx = projX - w / 2f;
+                float sy = (Y - Z) - h;
+                buffer.DrawBitmap(sprite, sx, sy, flipX: !FacingRight, scaleFactor: p);
             }
 
             // ==========================================
@@ -564,9 +568,9 @@ namespace HanlangGame.Entities
             var g = buffer.Graphics;
             buffer.SetHighQualityModes();
 
-            float scx = (X - cameraX) * PixelBuffer.Scale;
-            float scy = (Y - Z - 15f) * PixelBuffer.Scale;
-            float sGroundY = Y * PixelBuffer.Scale;
+            float scx = Perspective.ProjectScreenX(X, cameraX, Y);
+            float scy = Perspective.ProjectScreenY(Y - 15f, Z);
+            float sGroundY = Perspective.ProjectScreenY(Y, 0f);
 
             // 1. 지면 고해상도 선풍 회오리 풍압륜 (Ground Wind Cyclone)
             float gwPulse = (24f + (float)Math.Sin(StateTimer * 25f) * 6f) * PixelBuffer.Scale;

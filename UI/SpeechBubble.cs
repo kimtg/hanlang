@@ -34,15 +34,15 @@ namespace HanlangGame.UI
             var g = buffer.Graphics;
             buffer.SetHighQualityModes();
 
-            int scx = (int)((X - cameraX) * PixelBuffer.Scale);
-            int scy = (int)(Y * PixelBuffer.Scale);
+            float scx = Perspective.ProjectScreenX(X, cameraX, Y);
+            float scy = Y * PixelBuffer.Scale;
 
             var font = buffer.FontHeader;
             var size = g.MeasureString(Text, font);
             int boxW = (int)size.Width + 24;
             int boxH = (int)size.Height + 10;
-            int boxX = scx - boxW / 2;
-            int boxY = scy - boxH - 10;
+            int boxX = (int)(scx - boxW / 2);
+            int boxY = (int)(scy - boxH - 10);
 
             // 말풍선 부드러운 그림자
             buffer.FillRoundedRect(boxX + 2, boxY + 2, boxW, boxH, 8f, Color.FromArgb(70, 0, 0, 0));
@@ -52,11 +52,13 @@ namespace HanlangGame.UI
             buffer.DrawRoundedRect(boxX, boxY, boxW, boxH, 8f, Color.FromArgb(50, 40, 30), 2f);
 
             // 말풍선 꼬리 삼각 폴리곤
+            int tailX = (int)scx;
+            int tailY = (int)scy;
             Point[] tailPts =
             {
-                new Point(scx - 7, boxY + boxH - 1),
-                new Point(scx + 7, boxY + boxH - 1),
-                new Point(scx, scy - 2)
+                new Point(tailX - 7, boxY + boxH - 1),
+                new Point(tailX + 7, boxY + boxH - 1),
+                new Point(tailX, tailY - 2)
             };
             using (var tailBrush = new SolidBrush(Color.FromArgb(252, 250, 235)))
             using (var borderPen = new Pen(Color.FromArgb(50, 40, 30), 1.8f))

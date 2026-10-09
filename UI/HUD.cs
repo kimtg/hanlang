@@ -117,7 +117,7 @@ namespace HanlangGame.UI
             int shopBtnX = 705;
             buffer.FillRoundedRect(shopBtnX, 16, 100, 40, 6f, Color.FromArgb(180, 50, 30, 15));
             buffer.DrawRoundedRect(shopBtnX, 16, 100, 40, 6f, Color.FromArgb(235, 170, 50), 1.5f);
-            buffer.DrawOutlinedText("[S : 주막]", shopBtnX + 18, 26, Color.FromArgb(255, 230, 120), Color.FromArgb(40, 25, 10), buffer.FontHeader, 1.5f);
+            buffer.DrawOutlinedText("[S: 주막]", shopBtnX + 18, 26, Color.FromArgb(255, 230, 120), Color.FromArgb(40, 25, 10), buffer.FontHeader, 1.5f);
 
             // 현재 장 표시
             int stageX = 820;
@@ -132,7 +132,7 @@ namespace HanlangGame.UI
                 int guideX = (PixelBuffer.Width - guideW) / 2;
                 buffer.FillRoundedRect(guideX, 82, guideW, 32, 6f, Color.FromArgb(230, 25, 20, 35));
                 buffer.DrawRoundedRect(guideX, 82, guideW, 32, 6f, Color.FromArgb(255, 210, 60), 1.5f);
-                buffer.DrawOutlinedText("들기 상태 [ Z : 들고 때리기 | X : 던지기 ]", guideX + 16, 88, Color.FromArgb(255, 235, 130), Color.Black, buffer.FontBody, 1.2f);
+                buffer.DrawOutlinedText("들기 상태 [ Z: 들고 때리기 | X: 던지기 ]", guideX + 16, 88, Color.FromArgb(255, 235, 130), Color.Black, buffer.FontBody, 1.2f);
             }
 
             // ========================================================

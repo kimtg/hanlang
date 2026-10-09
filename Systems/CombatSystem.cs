@@ -452,25 +452,26 @@ namespace HanlangGame.Systems
 
         public void Render(PixelBuffer buffer, float cameraX)
         {
-            int scx = (int)((X - cameraX) * PixelBuffer.Scale);
-            int scy = (int)((Y - Z) * PixelBuffer.Scale);
-            if (scx < -40 || scx > PixelBuffer.Width + 40 || scy < -40 || scy > PixelBuffer.Height + 40) return;
+            float p = Perspective.GetScale(Y);
+            float scx = Perspective.ProjectScreenX(X, cameraX, Y);
+            float scy = Perspective.ProjectScreenY(Y, Z);
+            if (scx < -60 || scx > PixelBuffer.Width + 60 || scy < -60 || scy > PixelBuffer.Height + 60) return;
 
             var g = buffer.Graphics;
             float lifeRatio = Math.Clamp(Life / MaxLife, 0f, 1f);
 
             if (Type == "spark")
             {
-                // 960x720 고해상도 섬광 스파크: 빛나는 4점 다이아몬드 별 및 광채
-                float radius = Size * PixelBuffer.Scale * 1.6f * lifeRatio;
+                // 960x720 고해상도 섬광 스파크: 빛나는 4점 다이아몬드 별 및 광채 (원근 스케일 p 반영)
+                float radius = Size * PixelBuffer.Scale * 1.6f * lifeRatio * p;
                 int alpha = (int)(255 * lifeRatio);
                 Color glowCol = Color.FromArgb(alpha, Color);
 
                 using var coreBrush = new SolidBrush(Color.FromArgb(alpha, Color.White));
                 g.FillEllipse(coreBrush, scx - radius * 0.5f, scy - radius * 0.5f, radius, radius);
 
-                using var rayPen = new Pen(glowCol, 2.2f);
-                using var whiteRayPen = new Pen(Color.FromArgb(alpha, Color.White), 1.2f);
+                using var rayPen = new Pen(glowCol, 2.2f * p);
+                using var whiteRayPen = new Pen(Color.FromArgb(alpha, Color.White), 1.2f * p);
                 g.DrawLine(rayPen, scx - radius * 2.2f, scy, scx + radius * 2.2f, scy);
                 g.DrawLine(rayPen, scx, scy - radius * 2.2f, scx, scy + radius * 2.2f);
                 g.DrawLine(whiteRayPen, scx - radius * 1.1f, scy, scx + radius * 1.1f, scy);
@@ -478,16 +479,16 @@ namespace HanlangGame.Systems
             }
             else if (Type == "ring")
             {
-                // 960x720 고해상도 충격파 링 (Shockwave Ring)
-                float radius = ((1f - lifeRatio) * 65f + 14f);
+                // 960x720 고해상도 충격파 링 (Shockwave Ring, 원근 스케일 p 반영)
+                float radius = ((1f - lifeRatio) * 65f + 14f) * p;
                 int alpha = (int)(220 * lifeRatio);
-                using var ringPen = new Pen(Color.FromArgb(alpha, Color), 3.2f);
+                using var ringPen = new Pen(Color.FromArgb(alpha, Color), 3.2f * p);
                 g.DrawEllipse(ringPen, scx - radius, scy - radius, radius * 2f, radius * 2f);
             }
             else // dust
             {
-                // 960x720 고해상도 흙먼지: 부드러운 안티앨리어싱 반투명 구름
-                float radius = (Size * PixelBuffer.Scale * 1.8f) + (1f - lifeRatio) * 16f;
+                // 960x720 고해상도 흙먼지: 부드러운 안티앨리어싱 반투명 구름 (원근 스케일 p 반영)
+                float radius = ((Size * PixelBuffer.Scale * 1.8f) + (1f - lifeRatio) * 16f) * p;
                 int alpha = (int)(110 * lifeRatio);
                 using var dustBrush = new SolidBrush(Color.FromArgb(alpha, Color));
                 g.FillEllipse(dustBrush, scx - radius, scy - radius, radius * 2f, radius * 2f);

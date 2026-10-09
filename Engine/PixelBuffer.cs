@@ -111,16 +111,20 @@ namespace HanlangGame.Engine
             Graphics.DrawPath(pen, path);
         }
 
-        public void DrawShadow(int logicCenterX, int logicGroundY, int logicRadiusX, int logicRadiusY)
+        public void DrawShadow(float logicCenterX, float logicGroundY, float logicRadiusX, float logicRadiusY)
         {
-            int scx = logicCenterX * Scale;
-            int scy = logicGroundY * Scale;
-            int srx = logicRadiusX * Scale;
-            int sry = logicRadiusY * Scale;
+            float scx = logicCenterX * Scale;
+            float scy = logicGroundY * Scale;
+            float srx = logicRadiusX * Scale;
+            float sry = logicRadiusY * Scale;
 
             using var brush = new SolidBrush(Color.FromArgb(80, 0, 0, 0));
             Graphics.FillEllipse(brush, scx - srx, scy - sry, srx * 2, sry * 2);
         }
+
+        public void DrawShadow(int logicCenterX, int logicGroundY, int logicRadiusX, int logicRadiusY)
+            => DrawShadow((float)logicCenterX, (float)logicGroundY, (float)logicRadiusX, (float)logicRadiusY);
+
 
         public void DrawOutlinedText(string text, float x, float y, Color textColor, Color outlineColor, Font font, float outlineWidth = 2.5f)
         {
@@ -166,8 +170,8 @@ namespace HanlangGame.Engine
             // 맑고 선명한 고해상도 그래픽을 온전히 출력합니다.
         }
 
-        // 오브젝트(캐릭터, 들 수 있는 물체, 음식, 돈)는 도트 그대로 3배 정수 확대 출력
-        public void DrawBitmap(Bitmap sprite, int logicX, int logicY, bool flipX = false)
+        // 오브젝트(캐릭터, 들 수 있는 물체, 음식, 돈)는 도트 그대로 NearestNeighbor 확대 출력 (원근 스케일 지원)
+        public void DrawBitmap(Bitmap sprite, float logicX, float logicY, bool flipX = false, float scaleFactor = 1.0f)
         {
             if (sprite == null) return;
 
@@ -177,10 +181,10 @@ namespace HanlangGame.Engine
             Graphics.InterpolationMode = InterpolationMode.NearestNeighbor;
             Graphics.PixelOffsetMode = PixelOffsetMode.Half;
 
-            int sx = logicX * Scale;
-            int sy = logicY * Scale;
-            int sw = sprite.Width * Scale;
-            int sh = sprite.Height * Scale;
+            float sx = logicX * Scale;
+            float sy = logicY * Scale;
+            float sw = sprite.Width * Scale * scaleFactor;
+            float sh = sprite.Height * Scale * scaleFactor;
 
             if (!flipX)
             {
@@ -189,11 +193,15 @@ namespace HanlangGame.Engine
             else
             {
                 // 좌우 반전 출력
-                Graphics.DrawImage(sprite, new Rectangle(sx + sw, sy, -sw, sh));
+                Graphics.DrawImage(sprite, sx + sw, sy, -sw, sh);
             }
 
             Graphics.InterpolationMode = prevInterp;
             Graphics.PixelOffsetMode = prevOffset;
         }
+
+        public void DrawBitmap(Bitmap sprite, int logicX, int logicY, bool flipX = false)
+            => DrawBitmap(sprite, (float)logicX, (float)logicY, flipX, 1.0f);
+
     }
 }

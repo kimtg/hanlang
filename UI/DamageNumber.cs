@@ -36,8 +36,9 @@ namespace HanlangGame.UI
 
             buffer.SetHighQualityModes();
 
-            int scx = (int)((X - cameraX) * PixelBuffer.Scale);
-            int scy = (int)(Y * PixelBuffer.Scale);
+            float p = Perspective.GetScale(Y);
+            float scx = Perspective.ProjectScreenX(X, cameraX, Y);
+            float scy = Y * PixelBuffer.Scale;
 
             string text = $"-{Value}";
 

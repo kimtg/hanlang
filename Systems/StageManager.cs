@@ -594,11 +594,11 @@ namespace HanlangGame.Systems
         {
             var g = buffer.Graphics;
 
-            // 바닥 수직 깊이 그라데이션 (시점 원근감)
+            // 바닥 수직 깊이 그라데이션 (시점 원근감: 전면으로 올수록 짙고 중후한 명암)
             Color darkGround = Color.FromArgb(
-                Math.Max(0, groundCol.R - 35),
-                Math.Max(0, groundCol.G - 35),
-                Math.Max(0, groundCol.B - 35));
+                Math.Max(0, groundCol.R - 40),
+                Math.Max(0, groundCol.G - 40),
+                Math.Max(0, groundCol.B - 40));
 
             using (var groundBrush = new System.Drawing.Drawing2D.LinearGradientBrush(
                 new Point(0, groundY), new Point(0, PixelBuffer.Height), groundCol, darkGround))
@@ -606,63 +606,124 @@ namespace HanlangGame.Systems
                 g.FillRectangle(groundBrush, 0, groundY, PixelBuffer.Width, PixelBuffer.Height - groundY);
             }
 
-            // 도로 경계석 엣지 라인
-            using (var curbPen = new Pen(groundLine, 3f))
-            using (var highlightPen = new Pen(Color.FromArgb(120, 255, 255, 255), 1.5f))
+            // 지평선 도로 경계석 엣지 라인
+            using (var curbPen = new Pen(groundLine, 3.5f))
+            using (var highlightPen = new Pen(Color.FromArgb(140, 255, 255, 255), 1.5f))
             {
                 g.DrawLine(curbPen, 0, groundY, PixelBuffer.Width, groundY);
                 g.DrawLine(highlightPen, 0, groundY + 1.5f, PixelBuffer.Width, groundY + 1.5f);
             }
 
-            float floorCam = cameraX * PixelBuffer.Scale;
-
             if (stage == 1 || stage == 2 || stage == 5)
             {
-                // 저잣거리 흙길 (풍부한 질감의 자갈과 수레바퀴 자국)
-                using (var trackPen = new Pen(Color.FromArgb(40, groundLine.R, groundLine.G, groundLine.B), 6f))
+                // 1, 2, 5장: 저잣거리 흙길 (원근 패럴랙스 차등 스크롤)
+                // 1) 수레바퀴 자국 (깊이 Y = 168f, 212f): 소실점 원근 트랙
+                float trackY1 = 168f;
+                float trackY2 = 212f;
+                float sTrackY1 = trackY1 * PixelBuffer.Scale;
+                float sTrackY2 = trackY2 * PixelBuffer.Scale;
+
+                using (var trackPen1 = new Pen(Color.FromArgb(35, groundLine.R, groundLine.G, groundLine.B), 4.5f))
+                using (var trackPen2 = new Pen(Color.FromArgb(50, groundLine.R, groundLine.G, groundLine.B), 7.5f))
                 {
-                    g.DrawLine(trackPen, 0, groundY + 70, PixelBuffer.Width, groundY + 70);
-                    g.DrawLine(trackPen, 0, groundY + 190, PixelBuffer.Width, groundY + 190);
+                    g.DrawLine(trackPen1, 0, sTrackY1, PixelBuffer.Width, sTrackY1);
+                    g.DrawLine(trackPen2, 0, sTrackY2, PixelBuffer.Width, sTrackY2);
                 }
 
-                // 바닥 자갈 디테일
-                int step = 75;
-                int offset = (int)(floorCam % step);
-                using (var pebbleBrush = new SolidBrush(Color.FromArgb(70, groundLine.R, groundLine.G, groundLine.B)))
+                // 수레바퀴 바큇자국 마디 텍스처 (하단 바큇자국이 더 빠르게 스크롤됨!)
+                using (var rutPen = new Pen(Color.FromArgb(45, groundLine.R, groundLine.G, groundLine.B), 2f))
                 {
-                    for (int x = -step; x < PixelBuffer.Width + step; x += step)
+                    float rutStep1 = 28f;
+                    float minX1 = cameraX - 40f;
+                    float maxX1 = cameraX + PixelBuffer.VirtualWidth + 40f;
+                    for (float wx = (float)Math.Floor(minX1 / rutStep1) * rutStep1; wx <= maxX1; wx += rutStep1)
                     {
-                        int px = x - offset;
-                        g.FillEllipse(pebbleBrush, px + 20, groundY + 45, 8, 5);
-                        g.FillEllipse(pebbleBrush, px + 55, groundY + 120, 11, 7);
-                        g.FillEllipse(pebbleBrush, px + 35, groundY + 210, 14, 8);
+                        float rx = Perspective.ProjectScreenX(wx, cameraX, trackY1);
+                        g.DrawLine(rutPen, rx - 3, sTrackY1 - 2, rx + 3, sTrackY1 + 2);
+                    }
+
+                    float rutStep2 = 36f;
+                    float minX2 = cameraX - 60f;
+                    float maxX2 = cameraX + PixelBuffer.VirtualWidth + 60f;
+                    for (float wx = (float)Math.Floor(minX2 / rutStep2) * rutStep2; wx <= maxX2; wx += rutStep2)
+                    {
+                        float rx = Perspective.ProjectScreenX(wx, cameraX, trackY2);
+                        g.DrawLine(rutPen, rx - 5, sTrackY2 - 3, rx + 5, sTrackY2 + 3);
+                    }
+                }
+
+                // 2) 4단계 깊이별 자갈/모래알 (화면 아래쪽 자갈이 더 크고 훨씬 빠르게 이동!)
+                (float bandY, float step, int w, int h, int alpha)[] bands =
+                {
+                    (152f, 45f, 6, 4, 60),   // 원경 자갈: 작고 느리게 스크롤
+                    (175f, 60f, 10, 6, 75),  // 중경 자갈: 보통 속도
+                    (198f, 75f, 14, 8, 90),  // 근경 자갈: 빠르고 큼
+                    (225f, 90f, 18, 10, 110) // 최전면 자갈: 가장 크고 초고속 스크롤
+                };
+
+                foreach (var (by, bStep, bw, bh, bAlpha) in bands)
+                {
+                    float sy = by * PixelBuffer.Scale;
+                    float minWx = cameraX - 50f;
+                    float maxWx = cameraX + PixelBuffer.VirtualWidth + 50f;
+                    using var bandBrush = new SolidBrush(Color.FromArgb(bAlpha, groundLine.R, groundLine.G, groundLine.B));
+
+                    for (float wx = (float)Math.Floor(minWx / bStep) * bStep; wx <= maxWx; wx += bStep)
+                    {
+                        float seed = (float)Math.Sin(wx * 12.3f + by * 7.7f);
+                        float px = Perspective.ProjectScreenX(wx + seed * 8f, cameraX, by);
+                        g.FillEllipse(bandBrush, px - bw / 2f, sy - bh / 2f, bw, bh);
                     }
                 }
             }
             else
             {
-                // 돌길 및 궁궐 박석 (원근감이 살아있는 정교한 석재 타일)
-                using (var stonePen = new Pen(Color.FromArgb(80, groundLine.R, groundLine.G, groundLine.B), 1.8f))
+                // 3, 4, 6, 7, 8, 9장: 돌길 및 궁궐 박석 (원근 소실점 방사형 줄눈 & 행별 차등 스크롤)
+                using (var stonePen = new Pen(Color.FromArgb(85, groundLine.R, groundLine.G, groundLine.B), 1.8f))
+                using (var shadowPen = new Pen(Color.FromArgb(40, 0, 0, 0), 1.2f))
                 {
-                    // 가로 줄눈
-                    for (int y = groundY + 45; y < PixelBuffer.Height; y += 45)
+                    // 1) 가로 줄눈: 전면으로 올수록 간격이 기하급수적으로 넓어지는 원근 깊이 배열
+                    float[] depthRatios = { 0.0f, 0.08f, 0.18f, 0.31f, 0.47f, 0.66f, 0.84f, 1.0f };
+                    float totalFloorH = PixelBuffer.Height - groundY; // 300px
+                    float[] rowY = new float[depthRatios.Length];
+
+                    for (int i = 0; i < depthRatios.Length; i++)
                     {
-                        g.DrawLine(stonePen, 0, y, PixelBuffer.Width, y);
+                        rowY[i] = groundY + totalFloorH * depthRatios[i];
+                        if (i > 0 && i < depthRatios.Length - 1)
+                        {
+                            g.DrawLine(shadowPen, 0, rowY[i] + 1f, PixelBuffer.Width, rowY[i] + 1f);
+                            g.DrawLine(stonePen, 0, rowY[i], PixelBuffer.Width, rowY[i]);
+                        }
                     }
 
-                    // 세로 엇갈림 줄눈
-                    int tileW = 90;
-                    int tileOffset = (int)(floorCam % (tileW * 2));
-                    int row = 0;
-                    for (int y = groundY; y < PixelBuffer.Height; y += 45)
+                    // 2) 세로 줄눈: 소실점을 향해 뻗어가는 방사형 라인 및 각 행별 차등 스크롤
+                    float tileWidthLogic = 34f; // 가상 좌표 기준 타일 폭
+                    float minX = cameraX - 100f;
+                    float maxX = cameraX + PixelBuffer.VirtualWidth + 100f;
+
+                    for (int r = 0; r < depthRatios.Length - 1; r++)
                     {
-                        int shift = (row % 2 == 0) ? 0 : tileW;
-                        for (int x = -tileW * 2; x < PixelBuffer.Width + tileW * 2; x += tileW)
+                        float yTop = rowY[r];
+                        float yBot = rowY[r + 1];
+                        float logicYTop = yTop / PixelBuffer.Scale;
+                        float logicYBot = yBot / PixelBuffer.Scale;
+
+                        // 벽돌식 엇갈림(running bond) 패턴
+                        float shift = (r % 2 == 1) ? (tileWidthLogic * 0.5f) : 0f;
+
+                        for (float wx = (float)Math.Floor(minX / tileWidthLogic) * tileWidthLogic; wx <= maxX; wx += tileWidthLogic)
                         {
-                            int sx = x - tileOffset + shift;
-                            g.DrawLine(stonePen, sx, y, sx, y + 45);
+                            float tileWorldX = wx + shift;
+                            float sxTop = Perspective.ProjectScreenX(tileWorldX, cameraX, logicYTop);
+                            float sxBot = Perspective.ProjectScreenX(tileWorldX, cameraX, logicYBot);
+
+                            // 화면 내에 보이는 선만 렌더링
+                            if ((sxTop >= -20 && sxTop <= PixelBuffer.Width + 20) || (sxBot >= -20 && sxBot <= PixelBuffer.Width + 20))
+                            {
+                                g.DrawLine(stonePen, sxTop, yTop, sxBot, yBot);
+                            }
                         }
-                        row++;
                     }
                 }
             }
@@ -682,7 +743,7 @@ namespace HanlangGame.Systems
 
                     buffer.FillRoundedRect(x, y, btnW, btnH, 12f, Color.FromArgb(235, 20, 20, 30));
                     buffer.DrawRoundedRect(x, y, btnW, btnH, 12f, Color.FromArgb(255, 215, 60), 2.5f);
-                    buffer.DrawOutlinedTextCentered("다음 장으로! GO ▶", y + 10, Color.FromArgb(255, 240, 80), Color.FromArgb(30, 20, 10), buffer.FontHeader, 2f);
+                    buffer.DrawOutlinedText("다음 장으로! GO ▶", x + 20, y + 10, Color.FromArgb(255, 240, 80), Color.FromArgb(30, 20, 10), buffer.FontHeader, 2f);
                 }
             }
         }

@@ -59,8 +59,12 @@ namespace HanlangGame.Entities
 
             RenderShadow(buffer, cameraX);
 
-            int sx = (int)(X - cameraX) - Width / 2;
-            int sy = (int)(Y - Z) - Height;
+            float projX = Perspective.ProjectX(X, cameraX, Y);
+            float p = Perspective.GetScale(Y);
+            float drawW = Width * p;
+            float drawH = Height * p;
+            float sx = projX - drawW / 2f;
+            float sy = (Y - Z) - drawH;
 
             Bitmap? sprite = Type switch
             {
@@ -72,7 +76,7 @@ namespace HanlangGame.Entities
 
             if (sprite != null)
             {
-                buffer.DrawBitmap(sprite, sx, sy);
+                buffer.DrawBitmap(sprite, sx, sy, flipX: false, scaleFactor: p);
             }
         }
     }

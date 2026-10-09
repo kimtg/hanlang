@@ -3,6 +3,7 @@ using System.IO;
 using HanlangGame.Entities;
 using HanlangGame.Systems;
 using HanlangGame.Visuals;
+using HanlangGame.Engine;
 
 namespace HanlangGame.Tests
 {
@@ -487,6 +488,31 @@ namespace HanlangGame.Tests
             HanlangGame.Engine.SoundSynth.SetBgmEnabled(false);
             HanlangGame.Engine.SoundSynth.StopBgm();
             Assert("BGM 중지 및 설정 호출 시 예외 없이 안정적 작동", true);
+
+            // Test 23: 전체 그래픽 원근(Perspective) 및 깊이별 차등 이동 속도 검증
+            float scaleHorizon = Perspective.GetScale(140f);
+            float scaleBottom = Perspective.GetScale(240f);
+            Assert("지평선(Y=140) 원근 계수는 약 0.72", Math.Abs(scaleHorizon - 0.72f) < 0.01f);
+            Assert("화면 최하단(Y=240) 원근 계수는 약 1.28", Math.Abs(scaleBottom - 1.28f) < 0.01f);
+            Assert("화면 아래쪽(근경)의 원근 계수가 위쪽(원경)보다 큼", scaleBottom > scaleHorizon);
+
+            // 화면 정중앙(월드X = 카메라X + 160)에서는 Y 깊이와 무관하게 정확히 중앙(160) 유지
+            float centerProjTop = Perspective.ProjectX(160f, 0f, 140f);
+            float centerProjBottom = Perspective.ProjectX(160f, 0f, 240f);
+            Assert("화면 중앙 위치는 지평선에서도 정확히 160", Math.Abs(centerProjTop - 160f) < 0.001f);
+            Assert("화면 중앙 위치는 최하단에서도 정확히 160", Math.Abs(centerProjBottom - 160f) < 0.001f);
+
+            // 동일한 월드 이동 변위(dx = 20) 시 화면 상 이동 거리 비교: 아래쪽이 약 1.78배 빠르게 이동!
+            float dispHorizon = Perspective.ProjectX(180f, 0f, 140f) - Perspective.ProjectX(160f, 0f, 140f);
+            float dispBottom = Perspective.ProjectX(180f, 0f, 240f) - Perspective.ProjectX(160f, 0f, 240f);
+            Assert("화면 아래쪽(근경) 이동 거리가 위쪽(원경)보다 큼", dispBottom > dispHorizon);
+            float speedRatio = dispBottom / dispHorizon;
+            Assert("화면 아래쪽이 위쪽보다 약 1.78배 빠르게 이동", Math.Abs(speedRatio - (1.28f / 0.72f)) < 0.05f);
+
+            // 960x720 고해상도 캔버스 X 투영 좌표 일치 검증
+            float screenXHorizon = Perspective.ProjectScreenX(180f, 0f, 140f);
+            Assert("고해상도 캔버스 스케일(3배) 정밀 반영", Math.Abs(screenXHorizon - (dispHorizon + 160f) * 3f) < 0.01f);
+
 
             Console.WriteLine("----------------------------------------------------");
             Console.WriteLine($" 총 테스트 결과: {passed} / {total} 통과 ({(passed == total ? "100% 성공" : "실패 항목 있음")})");

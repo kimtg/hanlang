@@ -94,12 +94,12 @@ namespace HanlangGame.Entities
 
         public virtual void RenderShadow(PixelBuffer buffer, float cameraX)
         {
-            int screenX = (int)(X - cameraX);
-            int screenY = (int)Y;
-            // 공중에 높이 뜰수록 그림자가 약간 작아짐
-            int rX = Math.Max(4, 12 - (int)(Z * 0.1f));
-            int rY = Math.Max(2, 4 - (int)(Z * 0.05f));
-            buffer.DrawShadow(screenX, screenY, rX, rY);
+            float projX = Perspective.ProjectX(X, cameraX, Y);
+            float p = Perspective.GetScale(Y);
+            // 공중에 높이 뜰수록 그림자가 약간 작아지며, 원근 계수에 따라 크기 비례
+            float rX = Math.Max(3f, (12f - Z * 0.1f) * p);
+            float rY = Math.Max(1.5f, (4f - Z * 0.05f) * p);
+            buffer.DrawShadow(projX, Y, rX, rY);
         }
 
         public abstract void Render(PixelBuffer buffer, float cameraX);

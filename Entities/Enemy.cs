@@ -446,9 +446,13 @@ namespace HanlangGame.Entities
                 var downSprite = RetroSprites.GetSprite($"{prefix}_down");
                 if (downSprite != null)
                 {
-                    int dx = (int)(X - cameraX) - downSprite.Width / 2;
-                    int dy = (int)(Y - Z) - downSprite.Height;
-                    buffer.DrawBitmap(downSprite, dx, dy, flipX: !FacingRight);
+                    float projX = Perspective.ProjectX(X, cameraX, Y);
+                    float p = Perspective.GetScale(Y);
+                    float w = downSprite.Width * p;
+                    float h = downSprite.Height * p;
+                    float dx = projX - w / 2f;
+                    float dy = (Y - Z) - h;
+                    buffer.DrawBitmap(downSprite, dx, dy, flipX: !FacingRight, scaleFactor: p);
                     return;
                 }
             }
@@ -464,20 +468,22 @@ namespace HanlangGame.Entities
             };
 
             var sprite = RetroSprites.GetSprite(spriteKey);
-            int drawW = sprite != null ? sprite.Width : Width;
-            int drawH = sprite != null ? sprite.Height : Height;
-            int sx = (int)(X - cameraX) - drawW / 2;
-            int sy = (int)(Y - Z) - drawH;
+            float pNorm = Perspective.GetScale(Y);
+            float drawW = (sprite != null ? sprite.Width : Width) * pNorm;
+            float drawH = (sprite != null ? sprite.Height : Height) * pNorm;
+            float projBaseX = Perspective.ProjectX(X, cameraX, Y);
+            float sx = projBaseX - drawW / 2f;
+            float sy = (Y - Z) - drawH;
 
             if (sprite != null)
             {
                 // 960x720 고해상도 광폭화 붉은 투기 아우라 렌더링
                 if (IsBossType && IsRaging && !IsDead)
                 {
-                    int scx = sx * PixelBuffer.Scale;
-                    int scy = sy * PixelBuffer.Scale;
-                    int sdrawW = drawW * PixelBuffer.Scale;
-                    int sdrawH = drawH * PixelBuffer.Scale;
+                    float scx = sx * PixelBuffer.Scale;
+                    float scy = sy * PixelBuffer.Scale;
+                    float sdrawW = drawW * PixelBuffer.Scale;
+                    float sdrawH = drawH * PixelBuffer.Scale;
 
                     bool blink = ((int)(DateTime.UtcNow.Millisecond / 160) % 2 == 0);
                     int auraAlpha = blink ? 90 : 50;
@@ -485,20 +491,20 @@ namespace HanlangGame.Entities
                     buffer.DrawRoundedRect(scx - 8, scy - 8, sdrawW + 16, sdrawH + 16, 12f, Color.FromArgb(210, 255, 60, 50), 2.5f);
                 }
 
-                buffer.DrawBitmap(sprite, sx, sy, flipX: !FacingRight);
+                buffer.DrawBitmap(sprite, sx, sy, flipX: !FacingRight, scaleFactor: pNorm);
             }
 
-            // 960x720 고해상도 적 머리 위 체력바 표시 (활동 중인 적 상시 표시)
+            // 960x720 고해상도 적 머리 위 체력바 표시 (원근 머리 위치 정밀 추적)
             if (!IsDead && State != "down" && !IsCarried)
             {
-                int scx = sx * PixelBuffer.Scale;
-                int scy = sy * PixelBuffer.Scale;
-                int sdrawW = drawW * PixelBuffer.Scale;
+                float scx = sx * PixelBuffer.Scale;
+                float scy = sy * PixelBuffer.Scale;
+                float sdrawW = drawW * PixelBuffer.Scale;
 
-                int barW = IsBossType ? 90 : 66;
+                int barW = (int)((IsBossType ? 90 : 66) * pNorm);
                 int barH = 7;
-                int barX = scx + (sdrawW - barW) / 2;
-                int barY = scy - 18;
+                int barX = (int)(scx + (sdrawW - barW) / 2);
+                int barY = (int)(scy - 18);
 
                 buffer.FillRoundedRect(barX - 1, barY - 1, barW + 2, barH + 2, 3f, Color.FromArgb(200, 20, 20, 20));
                 buffer.FillRoundedRect(barX, barY, barW, barH, 2f, Color.FromArgb(220, 60, 20, 20));
