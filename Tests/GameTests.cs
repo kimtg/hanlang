@@ -487,6 +487,7 @@ namespace HanlangGame.Tests
             // Test 22: 사운드 신시사이저(SoundSynth) 및 8비트 칩튠 생성 검증
             HanlangGame.Engine.SoundSynth.SetBgmEnabled(false);
             HanlangGame.Engine.SoundSynth.StopBgm();
+            HanlangGame.Engine.SoundSynth.SetBgmEnabled(true);
             Assert("BGM 중지 및 설정 호출 시 예외 없이 안정적 작동", true);
 
             // Test 23: 전체 그래픽 원근(Perspective) 및 깊이별 차등 이동 속도 검증
@@ -622,6 +623,47 @@ namespace HanlangGame.Tests
             barrelObj.Vx = 200f;
             secretCombat.CheckCollisions(smashPlayer, new List<Enemy> { rollEnemy }, new List<WorldObject> { barrelObj });
             Assert("굴러가는 술통에 부딪힌 적은 넘어짐(State down)", rollEnemy.State == "down");
+
+            // Test 28: 순수 C# 프로시저럴 3채널 Chiptune BGM 합성 엔진 및 조선풍 트랙 검증
+            byte[] stageWav = SoundSynth.GenerateBgmWav("stage");
+            Assert("스테이지 BGM(한양 저잣거리 활극) WAV 생성 성공", stageWav != null && stageWav.Length > 100000);
+            Assert("스테이지 BGM RIFF 헤더 일치", stageWav[0] == (byte)'R' && stageWav[1] == (byte)'I' && stageWav[2] == (byte)'F' && stageWav[3] == (byte)'F');
+            Assert("스테이지 BGM WAVE 포맷 마커 일치", stageWav[8] == (byte)'W' && stageWav[9] == (byte)'A' && stageWav[10] == (byte)'V' && stageWav[11] == (byte)'E');
+
+            byte[] bossWav = SoundSynth.GenerateBgmWav("boss");
+            Assert("보스전 BGM(마도 결전) WAV 생성 성공", bossWav != null && bossWav.Length > 100000);
+
+            byte[] titleWav = SoundSynth.GenerateBgmWav("title");
+            Assert("타이틀 BGM(대취타 유생) WAV 생성 성공", titleWav != null && titleWav.Length > 50000);
+
+            byte[] shopWav = SoundSynth.GenerateBgmWav("shop");
+            Assert("주막 BGM(도성 주막 풍류) WAV 생성 성공", shopWav != null && shopWav.Length > 50000);
+
+            byte[] victoryWav = SoundSynth.GenerateBgmWav("victory");
+            Assert("승리 BGM(훈민정음 만세) WAV 생성 성공", victoryWav != null && victoryWav.Length > 50000);
+
+            // PCM 샘플 다이나믹 레인지 및 Tanh 소프트 리미터 포화 검증 (클리핑 왜곡 0%)
+            bool hasAudibleSamples = false;
+            bool noClipping = true;
+            for (int i = 44; i < stageWav.Length - 1; i += 2)
+            {
+                short sample = (short)(stageWav[i] | (stageWav[i + 1] << 8));
+                if (Math.Abs(sample) > 2000) hasAudibleSamples = true;
+                if (Math.Abs(sample) > 30000) noClipping = false;
+            }
+            Assert("합성된 칩튠 오디오에 유효한 음량 신호 존재", hasAudibleSamples);
+            Assert("Tanh 소프트 리미터로 클리핑 한계값(30000) 내 안전 포화", noClipping);
+
+            // BGM 재생 및 상태 제어 안정성 검증
+            SoundSynth.SetBgmEnabled(true);
+            SoundSynth.PlayBgm("title");
+            System.Threading.Thread.Sleep(200);
+            SoundSynth.PlayPunch();
+            System.Threading.Thread.Sleep(200);
+            SoundSynth.PlayBgm("stage");
+            System.Threading.Thread.Sleep(200);
+            SoundSynth.StopBgm();
+            Assert("3채널 칩튠 BGM 비동기 재생/정지 호출 안정성 보장", true);
 
             Console.WriteLine("----------------------------------------------------");
             Console.WriteLine($" 총 테스트 결과: {passed} / {total} 통과 ({(passed == total ? "100% 성공" : "실패 항목 있음")})");

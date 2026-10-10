@@ -15,6 +15,9 @@ namespace HanlangGame.Engine
         private static bool _enabled = true;
         private static bool _bgmEnabled = true;
         private static string _currentBgmTrack = "";
+        private static int _bgmSessionId = 0;
+        private static readonly object _bgmLock = new();
+        private static readonly System.Collections.Generic.Dictionary<string, byte[]> _bgmBytesCache = new();
 
         public static void SetEnabled(bool enabled) => _enabled = enabled;
         public static void SetBgmEnabled(bool enabled)
@@ -25,39 +28,85 @@ namespace HanlangGame.Engine
 
         public static void StopBgm()
         {
-            try
+            lock (_bgmLock)
             {
-                if (!string.IsNullOrEmpty(_currentBgmTrack))
+                _bgmSessionId++;
+                _currentBgmTrack = "";
+                try
                 {
                     mciSendString("stop hanlang_bgm", null, 0, IntPtr.Zero);
                     mciSendString("close hanlang_bgm", null, 0, IntPtr.Zero);
-                    _currentBgmTrack = "";
                 }
+                catch { }
             }
-            catch { }
         }
 
         public static void PlayBgm(string trackName)
         {
             if (!_bgmEnabled || !_enabled) return;
-            if (_currentBgmTrack == trackName) return;
 
-            Task.Run(() =>
+            int session;
+            lock (_bgmLock)
+            {
+                if (_currentBgmTrack == trackName) return;
+                _currentBgmTrack = trackName;
+                session = ++_bgmSessionId;
+            }
+
+            Task.Run(async () =>
             {
                 try
                 {
-                    StopBgm();
-
-                    string tempPath = Path.Combine(Path.GetTempPath(), $"hanlang_bgm_{trackName}.wav");
-                    if (!File.Exists(tempPath))
+                    lock (_bgmLock)
                     {
-                        byte[] wavBytes = GenerateBgmWav(trackName);
+                        if (_bgmSessionId != session) return;
+                        mciSendString("stop hanlang_bgm", null, 0, IntPtr.Zero);
+                        mciSendString("close hanlang_bgm", null, 0, IntPtr.Zero);
+                    }
+
+                    if (!_bgmBytesCache.TryGetValue(trackName, out byte[]? wavBytes))
+                    {
+                        wavBytes = GenerateBgmWav(trackName);
+                        _bgmBytesCache[trackName] = wavBytes;
+                    }
+
+                    string tempPath = Path.Combine(Path.GetTempPath(), $"hanlang_bgm_v3_{trackName}.wav");
+                    if (!File.Exists(tempPath) || new FileInfo(tempPath).Length != wavBytes.Length)
+                    {
                         File.WriteAllBytes(tempPath, wavBytes);
                     }
 
-                    mciSendString($"open \"{tempPath}\" type waveaudio alias hanlang_bgm", null, 0, IntPtr.Zero);
-                    mciSendString("play hanlang_bgm repeat", null, 0, IntPtr.Zero);
-                    _currentBgmTrack = trackName;
+                    lock (_bgmLock)
+                    {
+                        if (_bgmSessionId != session) return;
+                        mciSendString($"open \"{tempPath}\" type waveaudio alias hanlang_bgm", null, 0, IntPtr.Zero);
+                        mciSendString("play hanlang_bgm from 0", null, 0, IntPtr.Zero);
+                    }
+
+                    // 심리스 BGM 무한 루프 모니터링 (트랙 완주 시 처음부터 자동 재연주)
+                    var sbMode = new StringBuilder(64);
+                    while (_bgmEnabled && _enabled)
+                    {
+                        await Task.Delay(250);
+
+                        lock (_bgmLock)
+                        {
+                            if (_bgmSessionId != session || _currentBgmTrack != trackName) break;
+                        }
+
+                        sbMode.Clear();
+                        mciSendString("status hanlang_bgm mode", sbMode, 64, IntPtr.Zero);
+                        string mode = sbMode.ToString().Trim().ToLowerInvariant();
+
+                        if (mode == "stopped")
+                        {
+                            lock (_bgmLock)
+                            {
+                                if (_bgmSessionId != session || _currentBgmTrack != trackName) break;
+                                mciSendString("play hanlang_bgm from 0", null, 0, IntPtr.Zero);
+                            }
+                        }
+                    }
                 }
                 catch
                 {
@@ -430,140 +479,367 @@ namespace HanlangGame.Engine
             PlayAsync(CreateWav(samples, sampleRate));
         }
 
-        private static byte[] GenerateBgmWav(string trackName)
+        private static double NoteFreq(string note)
+        {
+            if (string.IsNullOrEmpty(note) || note == "-" || note == "=" || note == ".") return 0.0;
+
+            char pitchChar = char.ToUpperInvariant(note[0]);
+            int semitone = pitchChar switch
+            {
+                'C' => 0,
+                'D' => 2,
+                'E' => 4,
+                'F' => 5,
+                'G' => 7,
+                'A' => 9,
+                'B' => 11,
+                _ => -1
+            };
+            if (semitone < 0) return 0.0;
+
+            int octaveIdx = 1;
+            if (note.Length > 1 && (note[1] == '#' || note[1] == 's' || note[1] == 'S'))
+            {
+                semitone += 1;
+                octaveIdx = 2;
+            }
+            else if (note.Length > 1 && (note[1] == 'b' || note[1] == 'f' || note[1] == 'F'))
+            {
+                semitone -= 1;
+                octaveIdx = 2;
+            }
+
+            if (octaveIdx < note.Length && int.TryParse(note.Substring(octaveIdx), out int octave))
+            {
+                int midi = (octave + 1) * 12 + semitone;
+                return 440.0 * Math.Pow(2.0, (midi - 69) / 12.0);
+            }
+            return 0.0;
+        }
+
+        public static byte[] GenerateBgmWav(string trackName)
         {
             int sampleRate = 22050;
-            float bpm = trackName switch
-            {
-                "boss" => 165f,
-                "title" => 125f,
-                _ => 142f // stage
-            };
+            float bpm;
+            int totalSteps;
+            double duty;
+            string[] melody;
+            string[] bass;
+            string[] drums;
 
-            float stepDuration = 60f / bpm / 4f; // 16th note
-            int totalSteps = 64; // 4 measures
+            switch (trackName.ToLowerInvariant())
+            {
+                case "boss":
+                    // 「마도 결전」 (168 BPM, D 계면조 / Phrygian 모드, 128 스텝 16비트 배틀 비트)
+                    bpm = 168f;
+                    totalSteps = 128;
+                    duty = 0.125;
+                    melody = new string[]
+                    {
+                        "D4", "F4", "A4", "D5", "Eb5", "D5", "Bb4", "A4", "F4", "G4", "A4", "Bb4", "A4", "G4", "F4", "Eb4",
+                        "D4", "D4", "F4", "G4", "A4", "Bb4", "C5", "D5", "Eb5", "D5", "C5", "Bb4", "A4", "G4", "F4", "Eb4",
+                        "D5", "D5", "Eb5", "D5", "C5", "Bb4", "A4", "G4", "F4", "G4", "A4", "F4", "Eb4", "D4", "C4", "D4",
+                        "A4", "Bb4", "C5", "D5", "Eb5", "F5", "G5", "F5", "Eb5", "D5", "C5", "Bb4", "A4", "Bb4", "A4", "-",
+                        "D5", "F5", "A5", "D6", "C6", "Bb5", "A5", "G5", "F5", "G5", "A5", "Bb5", "A5", "G5", "F5", "Eb5",
+                        "D5", "Eb5", "D5", "C5", "Bb4", "C5", "D5", "Eb5", "F5", "G5", "A5", "Bb5", "C6", "Bb5", "A5", "G5",
+                        "F5", "G5", "A5", "F5", "Eb5", "F5", "G5", "Eb5", "D5", "Eb5", "F5", "D5", "C5", "D5", "Eb5", "C5",
+                        "D4", "F4", "A4", "D5", "Eb5", "D5", "A4", "F4", "D4", "D4", "F4", "A4", "D5", "-", "D5", "-"
+                    };
+                    bass = new string[]
+                    {
+                        "D2", "D2", "D2", "D2", "Eb2", "Eb2", "D2", "D2", "F2", "F2", "G2", "G2", "A2", "G2", "F2", "Eb2",
+                        "D2", "D2", "D2", "D2", "F2", "F2", "D2", "D2", "G2", "G2", "A2", "A2", "Bb2", "A2", "G2", "F2",
+                        "D2", "D2", "D2", "D2", "Eb2", "Eb2", "D2", "D2", "C2", "C2", "C2", "C2", "D2", "D2", "Eb2", "D2",
+                        "A1", "A1", "Bb1", "Bb1", "C2", "C2", "D2", "D2", "Eb2", "Eb2", "F2", "F2", "G2", "G2", "A2", "A2",
+                        "D2", "D2", "D2", "D2", "D2", "D2", "D2", "D2", "Eb2", "Eb2", "Eb2", "Eb2", "D2", "D2", "D2", "D2",
+                        "Bb1", "Bb1", "Bb1", "Bb1", "C2", "C2", "C2", "C2", "D2", "D2", "D2", "D2", "Eb2", "Eb2", "Eb2", "Eb2",
+                        "F2", "F2", "F2", "F2", "Eb2", "Eb2", "Eb2", "Eb2", "D2", "D2", "D2", "D2", "C2", "C2", "C2", "C2",
+                        "D2", "D2", "D2", "D2", "D2", "D2", "D2", "D2", "D2", "D2", "D2", "D2", "D2", "-", "D2", "-"
+                    };
+                    drums = new string[]
+                    {
+                        "C", ".", "H", "H", "S", ".", "H", "H", "K", "K", "H", "H", "S", ".", "H", "O",
+                        "K", ".", "H", "H", "S", ".", "H", "H", "K", "K", "H", "H", "S", "H", "S", "O",
+                        "K", "K", "H", "H", "S", ".", "H", "H", "K", "K", "H", "H", "S", ".", "H", "O",
+                        "K", "H", "K", "H", "S", "H", "S", "H", "K", "K", "H", "H", "S", "S", "S", "C",
+                        "C", "K", "H", "H", "S", "H", "H", "H", "K", "K", "H", "H", "S", "H", "H", "O",
+                        "K", "K", "H", "H", "S", "H", "H", "H", "K", "K", "H", "H", "S", "H", "S", "O",
+                        "K", "H", "K", "H", "S", "H", "H", "H", "K", "K", "H", "H", "S", "H", "H", "O",
+                        "K", "K", "K", "K", "S", "S", "S", "S", "K", "K", "H", "H", "S", "S", "C", "C"
+                    };
+                    break;
+
+                case "title":
+                    // 「대취타 유생」 (122 BPM, C 우조 대취타 궁중 행진곡, 64 스텝)
+                    bpm = 122f;
+                    totalSteps = 64;
+                    duty = 0.50;
+                    melody = new string[]
+                    {
+                        "C4", "C4", "G4", "G4", "A4", "A4", "C5", "A4", "G4", "G4", "F4", "D4", "C4", "D4", "F4", "G4",
+                        "A4", "A4", "C5", "D5", "C5", "A4", "G4", "F4", "G4", "A4", "G4", "F4", "D4", "C4", "D4", "-",
+                        "C5", "C5", "D5", "C5", "A4", "G4", "A4", "C5", "D5", "D5", "C5", "A4", "G4", "F4", "D4", "C4",
+                        "F4", "G4", "A4", "C5", "D5", "C5", "A4", "G4", "F4", "D4", "C4", "D4", "C4", "-", "C4", "-"
+                    };
+                    bass = new string[]
+                    {
+                        "C2", "-", "C2", "C2", "G2", "-", "G2", "G2", "A2", "-", "A2", "A2", "G2", "-", "F2", "G2",
+                        "A2", "-", "A2", "A2", "C3", "-", "C3", "C3", "G2", "-", "G2", "G2", "D2", "-", "D2", "G2",
+                        "C2", "-", "C2", "C2", "F2", "-", "F2", "F2", "G2", "-", "G2", "G2", "A2", "-", "G2", "F2",
+                        "F2", "-", "G2", "G2", "A2", "-", "C3", "C3", "G2", "-", "F2", "D2", "C2", "-", "C2", "-"
+                    };
+                    drums = new string[]
+                    {
+                        "C", ".", "H", ".", "K", ".", "H", ".", "S", ".", "H", ".", "K", ".", "H", "O",
+                        "K", ".", "H", ".", "S", ".", "H", ".", "K", "K", "H", ".", "S", ".", "H", "C",
+                        "K", ".", "H", ".", "S", ".", "H", ".", "K", ".", "H", ".", "S", ".", "H", "O",
+                        "K", "H", "K", ".", "S", ".", "H", ".", "K", "K", "S", ".", "C", ".", ".", "."
+                    };
+                    break;
+
+                case "shop":
+                    // 「도성 주막 풍류」 (130 BPM, A 경기민요 / 타령 스윙, 64 스텝)
+                    bpm = 130f;
+                    totalSteps = 64;
+                    duty = 0.25;
+                    melody = new string[]
+                    {
+                        "A4", "C5", "D5", "E5", "D5", "C5", "A4", "G4", "A4", "C5", "D5", "C5", "A4", "G4", "E4", "G4",
+                        "A4", "A4", "C5", "D5", "E5", "G5", "E5", "D5", "C5", "D5", "C5", "A4", "G4", "A4", "A4", "-",
+                        "E5", "E5", "G5", "E5", "D5", "C5", "D5", "E5", "G5", "E5", "D5", "C5", "A4", "C5", "D5", "E5",
+                        "D5", "C5", "A4", "G4", "A4", "C5", "D5", "C5", "A4", "G4", "E4", "G4", "A4", "-", "A4", "-"
+                    };
+                    bass = new string[]
+                    {
+                        "A2", "-", "C3", "-", "D3", "-", "E3", "-", "A2", "-", "C3", "-", "D3", "-", "E3", "-",
+                        "A2", "-", "A2", "C3", "D3", "-", "E3", "G3", "E3", "-", "D3", "C3", "A2", "-", "A2", "-",
+                        "E2", "-", "G2", "-", "A2", "-", "C3", "-", "D3", "-", "E3", "-", "C3", "-", "A2", "-",
+                        "D3", "-", "C3", "-", "A2", "-", "G2", "-", "A2", "-", "C3", "-", "A2", "-", "A2", "-"
+                    };
+                    drums = new string[]
+                    {
+                        "K", ".", "H", "K", "S", ".", "H", ".", "K", ".", "H", "K", "S", ".", "H", "O",
+                        "K", ".", "H", "K", "S", ".", "H", ".", "K", "K", "H", ".", "S", ".", "H", "O",
+                        "K", ".", "H", "K", "S", ".", "H", ".", "K", ".", "H", "K", "S", ".", "H", "O",
+                        "K", ".", "H", "K", "S", ".", "H", ".", "K", "K", "H", "H", "S", ".", "H", "C"
+                    };
+                    break;
+
+                case "victory":
+                    // 「훈민정음 만세」 (140 BPM, D 평조 환희의 피날레, 64 스텝)
+                    bpm = 140f;
+                    totalSteps = 64;
+                    duty = 0.50;
+                    melody = new string[]
+                    {
+                        "D4", "D4", "G4", "A4", "B4", "B4", "D5", "B4", "A4", "B4", "D5", "E5", "D5", "B4", "A4", "G4",
+                        "A4", "B4", "D5", "E5", "G5", "G5", "E5", "D5", "B4", "D5", "E5", "D5", "B4", "A4", "B4", "-",
+                        "D5", "D5", "E5", "D5", "B4", "A4", "B4", "D5", "E5", "E5", "D5", "B4", "A4", "G4", "E4", "D4",
+                        "G4", "A4", "B4", "D5", "E5", "G5", "A5", "G5", "E5", "D5", "B4", "A4", "G4", "-", "G4", "-"
+                    };
+                    bass = new string[]
+                    {
+                        "D2", "-", "D2", "D2", "G2", "-", "G2", "G2", "B2", "-", "B2", "B2", "G2", "-", "A2", "G2",
+                        "A2", "-", "A2", "A2", "D3", "-", "D3", "D3", "G2", "-", "G2", "G2", "E2", "-", "G2", "A2",
+                        "D2", "-", "D2", "D2", "G2", "-", "G2", "G2", "A2", "-", "A2", "A2", "B2", "-", "A2", "G2",
+                        "G2", "-", "A2", "A2", "B2", "-", "D3", "D3", "B2", "-", "A2", "G2", "D2", "-", "D2", "-"
+                    };
+                    drums = new string[]
+                    {
+                        "C", ".", "H", ".", "S", ".", "H", ".", "K", ".", "H", ".", "S", ".", "H", "O",
+                        "K", ".", "H", ".", "S", ".", "H", ".", "K", "K", "H", ".", "S", ".", "H", "C",
+                        "K", ".", "H", ".", "S", ".", "H", ".", "K", ".", "H", ".", "S", ".", "H", "O",
+                        "K", "H", "K", "H", "S", ".", "H", "H", "K", "K", "S", "S", "C", ".", ".", "."
+                    };
+                    break;
+
+                default: // "stage" - 「한양 저잣거리 활극」 (148 BPM, E 계면조 / G 평조, 자진모리/휘모리 장단, 128 스텝)
+                    bpm = 148f;
+                    totalSteps = 128;
+                    duty = 0.25;
+                    melody = new string[]
+                    {
+                        "E4", "E4", "G4", "A4", "B4", "B4", "A4", "G4", "E4", "G4", "A4", "B4", "D5", "B4", "A4", "G4",
+                        "A4", "A4", "B4", "D5", "E5", "E5", "D5", "B4", "A4", "B4", "A4", "G4", "E4", "E4", "E4", "-",
+                        "B4", "D5", "E5", "G5", "E5", "D5", "B4", "A4", "B4", "D5", "B4", "A4", "G4", "E4", "D4", "E4",
+                        "G4", "A4", "B4", "D5", "E5", "G5", "A5", "G5", "E5", "D5", "B4", "A4", "G4", "A4", "B4", "-",
+                        "E5", "E5", "D5", "B4", "A4", "B4", "D5", "B4", "A4", "G4", "E4", "D4", "E4", "G4", "A4", "B4",
+                        "D5", "D5", "B4", "A4", "G4", "A4", "B4", "D5", "E5", "D5", "B4", "A4", "G4", "E4", "G4", "A4",
+                        "B4", "B4", "D5", "E5", "G5", "G5", "E5", "D5", "B4", "D5", "E5", "D5", "B4", "A4", "G4", "E4",
+                        "G4", "A4", "B4", "D5", "B4", "A4", "G4", "E4", "D4", "E4", "G4", "E4", "E4", "-", "E4", "-"
+                    };
+                    bass = new string[]
+                    {
+                        "E2", "-", "E2", "E2", "G2", "-", "G2", "G2", "A2", "-", "A2", "A2", "B2", "A2", "G2", "E2",
+                        "A2", "-", "A2", "A2", "B2", "-", "B2", "B2", "D3", "-", "B2", "A2", "E2", "E2", "G2", "E2",
+                        "E2", "E2", "G2", "E2", "A2", "A2", "B2", "A2", "G2", "E2", "D2", "E2", "G2", "A2", "B2", "G2",
+                        "E2", "-", "G2", "A2", "B2", "-", "D3", "B2", "A2", "G2", "E2", "D2", "E2", "E2", "B2", "E2",
+                        "E2", "E2", "B2", "E2", "G2", "G2", "D3", "G2", "A2", "A2", "E3", "A2", "B2", "B2", "A2", "G2",
+                        "D2", "D2", "A2", "D2", "G2", "G2", "D3", "G2", "E2", "E2", "B2", "E2", "A2", "B2", "D3", "B2",
+                        "E2", "-", "E2", "G2", "A2", "-", "A2", "B2", "D3", "-", "B2", "A2", "G2", "E2", "D2", "E2",
+                        "G2", "A2", "B2", "D3", "B2", "A2", "G2", "E2", "D2", "E2", "G2", "E2", "E2", "-", "E2", "-"
+                    };
+                    drums = new string[]
+                    {
+                        "C", ".", "H", ".", "S", ".", "H", ".", "K", ".", "H", ".", "S", ".", "H", "O",
+                        "K", ".", "H", ".", "S", ".", "H", ".", "K", "K", "H", ".", "S", ".", "H", "O",
+                        "K", ".", "H", ".", "S", ".", "H", "H", "K", ".", "H", ".", "S", ".", "H", "O",
+                        "K", "H", "K", "H", "S", ".", "H", "H", "K", "K", "H", ".", "S", "H", "S", "O",
+                        "C", ".", "H", ".", "S", ".", "H", ".", "K", ".", "H", ".", "S", ".", "H", "O",
+                        "K", ".", "H", ".", "S", ".", "H", ".", "K", "K", "H", ".", "S", ".", "H", "O",
+                        "K", ".", "H", ".", "S", ".", "H", "H", "K", ".", "H", ".", "S", ".", "H", "O",
+                        "K", "H", "K", "H", "S", ".", "H", "H", "K", "K", "H", "H", "S", "S", "S", "C"
+                    };
+                    break;
+            }
+
+            double stepDuration = 60.0 / bpm / 4.0; // 16th note step duration
             int totalSamples = (int)(sampleRate * stepDuration * totalSteps);
             short[] samples = new short[totalSamples];
 
-            // Scales: Pentatonic / Minor martial arts modes
-            double[] melodyNotes;
-            double[] bassNotes;
+            // Chiptune generator states
+            double mPhase = 0.0;
+            double bPhase = 0.0;
+            uint lfsr = 0x7FFF;
 
-            if (trackName == "boss")
-            {
-                // D minor / Phrygian rapid battle arpeggios
-                melodyNotes = new double[]
-                {
-                    293.66, 349.23, 440.00, 587.33, 440.00, 349.23, 293.66, 261.63,
-                    293.66, 349.23, 440.00, 523.25, 587.33, 523.25, 440.00, 349.23,
-                    220.00, 293.66, 349.23, 440.00, 415.30, 349.23, 293.66, 220.00,
-                    246.94, 293.66, 349.23, 440.00, 587.33, 659.25, 587.33, 440.00,
-                    293.66, 349.23, 440.00, 587.33, 659.25, 698.46, 659.25, 587.33,
-                    523.25, 440.00, 349.23, 293.66, 261.63, 293.66, 349.23, 440.00,
-                    220.00, 261.63, 329.63, 440.00, 392.00, 329.63, 261.63, 220.00,
-                    246.94, 293.66, 370.00, 440.00, 587.33, 440.00, 293.66, 220.00
-                };
-                bassNotes = new double[]
-                {
-                    146.83, 146.83, 146.83, 146.83, 146.83, 146.83, 174.61, 196.00,
-                    146.83, 146.83, 146.83, 146.83, 220.00, 196.00, 174.61, 146.83,
-                    110.00, 110.00, 110.00, 110.00, 110.00, 110.00, 130.81, 146.83,
-                    123.47, 123.47, 123.47, 123.47, 146.83, 164.81, 146.83, 123.47,
-                    146.83, 146.83, 146.83, 146.83, 174.61, 174.61, 196.00, 196.00,
-                    130.81, 130.81, 130.81, 130.81, 146.83, 146.83, 174.61, 174.61,
-                    110.00, 110.00, 110.00, 110.00, 130.81, 130.81, 146.83, 146.83,
-                    123.47, 123.47, 123.47, 123.47, 146.83, 146.83, 110.00, 110.00
-                };
-            }
-            else if (trackName == "title")
-            {
-                // Heroic pentatonic Joseon march
-                melodyNotes = new double[]
-                {
-                    261.63, 261.63, 329.63, 392.00, 440.00, 440.00, 523.25, 440.00,
-                    392.00, 392.00, 329.63, 261.63, 293.66, 293.66, 329.63, 293.66,
-                    261.63, 261.63, 329.63, 392.00, 440.00, 523.25, 587.33, 523.25,
-                    440.00, 440.00, 392.00, 329.63, 261.63, 261.63, 261.63, 261.63,
-                    329.63, 392.00, 440.00, 523.25, 587.33, 523.25, 440.00, 392.00,
-                    329.63, 392.00, 440.00, 392.00, 329.63, 293.66, 261.63, 220.00,
-                    261.63, 293.66, 329.63, 392.00, 440.00, 523.25, 659.25, 523.25,
-                    440.00, 392.00, 329.63, 293.66, 261.63, 261.63, 261.63, 261.63
-                };
-                bassNotes = new double[]
-                {
-                    130.81, 130.81, 196.00, 196.00, 220.00, 220.00, 196.00, 196.00,
-                    196.00, 196.00, 164.81, 164.81, 146.83, 146.83, 196.00, 146.83,
-                    130.81, 130.81, 196.00, 196.00, 220.00, 220.00, 261.63, 220.00,
-                    196.00, 196.00, 164.81, 164.81, 130.81, 130.81, 196.00, 130.81,
-                    164.81, 164.81, 220.00, 220.00, 261.63, 261.63, 220.00, 196.00,
-                    164.81, 164.81, 220.00, 196.00, 164.81, 146.83, 130.81, 110.00,
-                    130.81, 146.83, 164.81, 196.00, 220.00, 261.63, 329.63, 261.63,
-                    220.00, 196.00, 164.81, 146.83, 130.81, 130.81, 196.00, 130.81
-                };
-            }
-            else // "stage" - Upbeat Joseon martial arts theme
-            {
-                melodyNotes = new double[]
-                {
-                    329.63, 329.63, 392.00, 440.00, 493.88, 440.00, 392.00, 329.63,
-                    440.00, 493.88, 587.33, 659.25, 587.33, 493.88, 440.00, 392.00,
-                    659.25, 659.25, 587.33, 493.88, 440.00, 493.88, 587.33, 493.88,
-                    440.00, 392.00, 329.63, 392.00, 440.00, 392.00, 329.63, 293.66,
-                    329.63, 392.00, 440.00, 493.88, 587.33, 493.88, 440.00, 392.00,
-                    329.63, 392.00, 440.00, 493.88, 587.33, 659.25, 587.33, 493.88,
-                    440.00, 493.88, 587.33, 493.88, 440.00, 392.00, 329.63, 293.66,
-                    329.63, 329.63, 392.00, 440.00, 493.88, 440.00, 392.00, 329.63
-                };
-                bassNotes = new double[]
-                {
-                    164.81, 164.81, 164.81, 164.81, 220.00, 220.00, 196.00, 164.81,
-                    220.00, 220.00, 246.94, 246.94, 293.66, 246.94, 220.00, 196.00,
-                    164.81, 164.81, 164.81, 164.81, 220.00, 220.00, 293.66, 246.94,
-                    220.00, 196.00, 164.81, 196.00, 220.00, 196.00, 164.81, 146.83,
-                    164.81, 164.81, 196.00, 220.00, 293.66, 246.94, 220.00, 196.00,
-                    164.81, 164.81, 220.00, 246.94, 293.66, 329.63, 293.66, 246.94,
-                    220.00, 246.94, 293.66, 246.94, 220.00, 196.00, 164.81, 146.83,
-                    164.81, 164.81, 196.00, 220.00, 246.94, 220.00, 196.00, 164.81
-                };
-            }
-
-            double mPhase = 0;
-            double bPhase = 0;
-            var rand = new Random(42);
+            int prevStep = -1;
+            double kickTime = 999.0, kickPhase = 0.0;
+            double snareTime = 999.0, snarePhase = 0.0;
+            double hatTime = 999.0;
+            double openHatTime = 999.0;
+            double jingTime = 999.0, jingPhase = 0.0;
+            double tapTime = 999.0, tapPhase = 0.0;
 
             for (int i = 0; i < totalSamples; i++)
             {
-                float timeSec = (float)i / sampleRate;
+                double timeSec = (double)i / sampleRate;
                 int step = (int)(timeSec / stepDuration) % totalSteps;
-                float stepT = (timeSec % stepDuration) / stepDuration;
+                double stepLocalTime = timeSec - ((int)(timeSec / stepDuration) * stepDuration);
+                double stepProgress = Math.Clamp(stepLocalTime / stepDuration, 0.0, 1.0);
 
-                // 1. Ch 1: Melody (Square wave with 25% or 50% duty cycle)
-                double mFreq = melodyNotes[step % melodyNotes.Length];
-                mPhase += mFreq / sampleRate;
-                double mVal = ((mPhase % 1.0) < 0.4) ? 0.35 : -0.35;
-                double mEnv = Math.Max(0.0, 1.0 - stepT * 0.4);
-
-                // 2. Ch 2: Bass (Triangle wave)
-                double bFreq = bassNotes[step % bassNotes.Length];
-                bPhase += bFreq / sampleRate;
-                double bVal = (Math.Abs((bPhase % 1.0) * 4.0 - 2.0) - 1.0) * 0.35;
-                double bEnv = Math.Max(0.0, 1.0 - stepT * 0.3);
-
-                // 3. Ch 3: Percussion (Noise snare / hi-hat)
-                double nVal = 0;
-                if (step % 4 == 2) // Snare on 2 and 4
+                // Step transition trigger for authentic percussion
+                if (step != prevStep)
                 {
-                    double snareEnv = Math.Max(0.0, 1.0 - stepT * 3.0);
-                    nVal = (rand.NextDouble() * 2.0 - 1.0) * 0.30 * snareEnv;
-                }
-                else if (step % 2 == 0) // Closed hi-hat
-                {
-                    double hatEnv = Math.Max(0.0, 1.0 - stepT * 6.0);
-                    nVal = (rand.NextDouble() * 2.0 - 1.0) * 0.12 * hatEnv;
+                    prevStep = step;
+                    string dStr = drums[step % drums.Length];
+                    if (dStr.Contains('K')) { kickTime = 0.0; kickPhase = 0.0; }
+                    if (dStr.Contains('S')) { snareTime = 0.0; snarePhase = 0.0; }
+                    if (dStr.Contains('H')) { hatTime = 0.0; }
+                    if (dStr.Contains('O')) { openHatTime = 0.0; }
+                    if (dStr.Contains('C')) { jingTime = 0.0; jingPhase = 0.0; }
+                    if (dStr.Contains('T')) { tapTime = 0.0; tapPhase = 0.0; }
                 }
 
-                double mixed = (mVal * mEnv + bVal * bEnv + nVal) * 11500;
-                samples[i] = (short)Math.Clamp(mixed, -32768, 32767);
+                // 15-bit Galois LFSR Hardware Noise Generator
+                uint bit = (lfsr & 1u) ^ ((lfsr >> 1) & 1u);
+                lfsr = (lfsr >> 1) | (bit << 14);
+                double noiseSample = ((lfsr & 1u) == 1u) ? 1.0 : -1.0;
+
+                // Channel 1: Pulse Wave (Melody) with Joseon Sigimsae (농현 / 요성 vibrato & articulation)
+                string mNoteStr = melody[step % melody.Length];
+                double mFreq = NoteFreq(mNoteStr);
+                double mVal = 0.0;
+                if (mFreq > 0.0)
+                {
+                    // Sigimsae vibrato onset past 25% of step
+                    if (stepProgress > 0.25)
+                    {
+                        double vib = Math.Sin((stepProgress - 0.25) * Math.PI * 2.0 * (bpm / 24.0));
+                        mFreq *= (1.0 + vib * 0.032);
+                    }
+                    mPhase += mFreq / sampleRate;
+
+                    double pulse = ((mPhase % 1.0) < duty) ? 0.75 : -0.75;
+                    double mEnv = (stepProgress < 0.05) ? (stepProgress / 0.05) : (1.0 - 0.22 * stepProgress);
+                    if (stepProgress > 0.85)
+                    {
+                        int nextStep = (step + 1) % totalSteps;
+                        if (melody[nextStep] != "=")
+                        {
+                            mEnv *= Math.Max(0.0, 1.0 - (stepProgress - 0.85) / 0.15);
+                        }
+                    }
+                    mVal = pulse * mEnv;
+                }
+
+                // Channel 2: NES 16-Step Quantized Triangle Wave (Bass)
+                string bNoteStr = bass[step % bass.Length];
+                double bFreq = NoteFreq(bNoteStr);
+                double bVal = 0.0;
+                if (bFreq > 0.0)
+                {
+                    bPhase += bFreq / sampleRate;
+                    double tri = Math.Abs((bPhase % 1.0) * 4.0 - 2.0) - 1.0;
+                    int quantLevel = (int)Math.Round((tri + 1.0) * 7.5);
+                    quantLevel = Math.Clamp(quantLevel, 0, 15);
+                    double quantTri = (quantLevel / 7.5) - 1.0;
+
+                    double bEnv = Math.Max(0.0, 1.0 - stepProgress * 0.45);
+                    if (stepProgress > 0.88)
+                    {
+                        int nextStep = (step + 1) % totalSteps;
+                        if (bass[nextStep] != "=")
+                        {
+                            bEnv *= Math.Max(0.0, 1.0 - (stepProgress - 0.88) / 0.12);
+                        }
+                    }
+                    bVal = quantTri * bEnv;
+                }
+
+                // Channel 3: Joseon Percussion & Noise Drums (Buk, Janggu Chae, Kkwaenggwari, Jing)
+                double dVal = 0.0;
+                if (kickTime < 0.22)
+                {
+                    double kFreq = 42.0 + 115.0 * Math.Exp(-kickTime / 0.026);
+                    kickPhase += kFreq / sampleRate;
+                    double kAmp = Math.Exp(-kickTime / 0.045);
+                    dVal += Math.Sin(kickPhase * Math.PI * 2.0) * kAmp * 0.95;
+                    kickTime += 1.0 / sampleRate;
+                }
+                if (snareTime < 0.18)
+                {
+                    double sAmp = Math.Exp(-snareTime / 0.035);
+                    double sNoise = noiseSample * sAmp * 0.65;
+                    double sToneFreq = 120.0 + 100.0 * Math.Exp(-snareTime / 0.018);
+                    snarePhase += sToneFreq / sampleRate;
+                    double sTone = Math.Sin(snarePhase * Math.PI * 2.0) * sAmp * 0.40;
+                    dVal += (sNoise + sTone) * 0.72;
+                    snareTime += 1.0 / sampleRate;
+                }
+                if (hatTime < 0.08)
+                {
+                    double hAmp = Math.Exp(-hatTime / 0.018);
+                    dVal += noiseSample * hAmp * 0.32;
+                    hatTime += 1.0 / sampleRate;
+                }
+                if (openHatTime < 0.30)
+                {
+                    double oAmp = Math.Exp(-openHatTime / 0.085);
+                    dVal += noiseSample * oAmp * 0.45;
+                    openHatTime += 1.0 / sampleRate;
+                }
+                if (jingTime < 0.85)
+                {
+                    double jAmp = Math.Exp(-jingTime / 0.24);
+                    double jFreq = 65.0 + 55.0 * Math.Exp(-jingTime / 0.05);
+                    jingPhase += jFreq / sampleRate;
+                    double jTone = Math.Sin(jingPhase * Math.PI * 2.0) * 0.38;
+                    dVal += (noiseSample * 0.60 + jTone) * jAmp * 0.65;
+                    jingTime += 1.0 / sampleRate;
+                }
+                if (tapTime < 0.18)
+                {
+                    double tAmp = Math.Exp(-tapTime / 0.050);
+                    double tFreq = 60.0 + 65.0 * Math.Exp(-tapTime / 0.018);
+                    tapPhase += tFreq / sampleRate;
+                    dVal += Math.Sin(tapPhase * Math.PI * 2.0) * tAmp * 0.55;
+                    tapTime += 1.0 / sampleRate;
+                }
+
+                // 3-Channel Master Mixing & Tanh Soft Saturation Limiter
+                double mix = (mVal * 0.44) + (bVal * 0.40) + (dVal * 0.38);
+                double limited = Math.Tanh(mix / 1.15);
+                samples[i] = (short)(limited * 28000.0);
             }
 
             return CreateWav(samples, sampleRate);

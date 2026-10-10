@@ -157,8 +157,13 @@ namespace HanlangGame
                     break;
 
                 case GameState.ShopMenu:
+                    SoundSynth.PlayBgm("shop");
                     _shopMenu.HandleInput(_input, _status, _player, out bool closeShop);
-                    if (closeShop) State = GameState.Playing;
+                    if (closeShop)
+                    {
+                        State = GameState.Playing;
+                        SoundSynth.PlayBgm((_stageManager.CurrentBoss != null && _stageManager.CurrentBoss.IsAlive) ? "boss" : "stage");
+                    }
                     break;
 
                 case GameState.GameOver:
@@ -175,11 +180,12 @@ namespace HanlangGame
                     break;
 
                 case GameState.GameWon:
-                    SoundSynth.PlayBgm("title");
+                    SoundSynth.PlayBgm("victory");
                     if (_input.IsJustPressed(Keys.Z) || _input.IsJustPressed(Keys.Enter) || _input.IsJustPressed(Keys.Escape))
                     {
                         _stageManager.GameWon = false;
                         State = GameState.Title;
+                        SoundSynth.PlayBgm("title");
                     }
                     break;
 
