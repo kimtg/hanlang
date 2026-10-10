@@ -111,7 +111,7 @@ namespace HanlangGame.UI
                 return;
             }
 
-            if (input.IsJustPressed(Keys.Z) || input.IsJustPressed(Keys.Enter) || input.IsJustPressed(Keys.Space))
+            if (input.IsJustPressed(Keys.Enter) || input.IsJustPressed(Keys.Space))
             {
                 _currentIndex++;
                 _charRevealTimer = 0f;
