@@ -87,12 +87,13 @@ namespace HanlangGame.UI
                 ("[ Z 키 (길게 유지) ]", "철벽 가드 (Iron Guard)", Color.FromArgb(30, 130, 140)),
                 ("", "ㆍ받는 피해 70% 대폭 감소!", Color.FromArgb(170, 40, 40)),
                 ("", "ㆍ피격 경직 및 쓰러짐 방지", Color.FromArgb(70, 70, 70)),
-                ("", "ㆍ단단한 가드로 콤보 버티기", Color.FromArgb(70, 70, 70)),
                 ("[ 피격 직전 Z ]", "순간 쳐내기 (Just Parry)", Color.FromArgb(20, 80, 200)),
-                ("", "ㆍ0.22초 이내 정확한 타이밍!", Color.FromArgb(200, 40, 40)),
-                ("", "ㆍ데미지 0 완벽 무효화!", Color.FromArgb(30, 130, 40)),
-                ("", "ㆍ적 1.25초 완전 기절 스턴!", Color.FromArgb(170, 100, 20)),
-                ("", "ㆍ기력 MP +10 즉시 회복!", Color.FromArgb(20, 70, 180)),
+                ("", "ㆍ피격 직전 0.14초 정밀 탭!", Color.FromArgb(200, 40, 40)),
+                ("", "ㆍ적 1.25초 스턴 & 기력+10", Color.FromArgb(30, 130, 40)),
+                ("", "ㆍ공격/후딜 중 불가(연타 방지)", Color.FromArgb(190, 50, 40)),
+                ("[ 공격 후딜레이 ]", "격투 공방 빈틈 (Delay)", Color.FromArgb(160, 50, 50)),
+                ("", "ㆍ공격 후 빈틈엔 가드/패링 불가", Color.FromArgb(70, 70, 70)),
+                ("", "ㆍ빈틈 피격 시 카운터 피해(+25%)", Color.FromArgb(180, 40, 40)),
                 ("[ 피격/다운 중 C ]", "비상 낙법 (Ukemi)", Color.FromArgb(160, 90, 20)),
                 ("", "ㆍ착지 전 즉시 기상 & 무적", Color.FromArgb(60, 60, 60))
             });

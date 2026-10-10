@@ -18,9 +18,18 @@ namespace HanlangGame.Entities
         // 방어 및 순간 쳐내기 (Guard & Just Parry)
         public float ZHoldTimer { get; set; } = 0f;
         public float ParryWindowTimer { get; set; } = 0f;
+        public float ParryCooldownTimer { get; set; } = 0f;
+        public float PostAttackDelayTimer { get; set; } = 0f;
         public bool JustParried { get; set; } = false;
         public float JustParryVisualTimer { get; set; } = 0f;
         public bool IsGuarding => State == "guard";
+
+        // 격투 게임식 공격 동작 및 후딜레이 판정
+        public bool IsAttackingOrRecovering =>
+            State == "punch" || State == "kick" || State == "jumpkick" ||
+            State == "dashpunch" || State == "dashkick" || State == "spin" ||
+            State == "dragon" || State == "wave" || State == "swing" ||
+            PostAttackDelayTimer > 0f;
 
         // 들기 시스템 (물체 및 쓰러진 적)
         public WorldObject? CarriedObject { get; set; }
@@ -143,11 +152,39 @@ namespace HanlangGame.Entities
 
             if (State == "hit" || State == "down" || Status.CurrentHp <= 0) return;
 
+            // 0. 격투 게임식 공격 후딜레이(Recovery Delay): 딜레이 중에는 이동, 공격, 가드, 패링 불가
+            if (PostAttackDelayTimer > 0f)
+            {
+                Vx *= 0.5f;
+                Vy *= 0.5f;
+                ParryWindowTimer = 0f;
+                return;
+            }
+
+            // 공격 동작 진행 중에는 이동 및 추가 액션/패링 불가
+            if (State == "punch" || State == "kick" || State == "dashpunch" || State == "dashkick" ||
+                State == "swing" || State == "spin" || State == "dragon" || State == "wave")
+            {
+                Vx *= 0.5f;
+                Vy *= 0.5f;
+                ParryWindowTimer = 0f;
+                return;
+            }
+
             // Z키 누름 시간 및 순간 쳐내기(Just Parry) 입력 타이머 계측
             if (input.IsJustPressed(Keys.Z))
             {
                 ZHoldTimer = 0f;
-                ParryWindowTimer = 0.22f; // 피격 직전 0.22초 이내 입력 시 순간 쳐내기 발동!
+                // 중립(대기/이동/가드) 상태에서 적의 공격을 예측하고 타이밍 맞춰 눌렀을 때만 0.14초 저스트 패링 발동!
+                if (!IsAttackingOrRecovering && ParryCooldownTimer <= 0f)
+                {
+                    ParryWindowTimer = 0.14f;
+                    ParryCooldownTimer = 0.28f; // 헛패링 연타 방지 쿨다운
+                }
+                else
+                {
+                    ParryWindowTimer = 0f;
+                }
             }
             else if (input.IsHeld(Keys.Z))
             {
@@ -531,6 +568,14 @@ namespace HanlangGame.Entities
             {
                 ParryWindowTimer -= dt;
             }
+            if (ParryCooldownTimer > 0)
+            {
+                ParryCooldownTimer -= dt;
+            }
+            if (PostAttackDelayTimer > 0)
+            {
+                PostAttackDelayTimer -= dt;
+            }
             if (JustParryVisualTimer > 0)
             {
                 JustParryVisualTimer -= dt;
@@ -539,20 +584,36 @@ namespace HanlangGame.Entities
             if (State == "dashpunch")
             {
                 Vx *= 0.94f;
-                if (StateTimer > 0.28f) State = "idle";
+                if (StateTimer > 0.28f)
+                {
+                    State = "idle";
+                    ParryCooldownTimer = 0.24f;
+                }
             }
             else if (State == "dashkick")
             {
                 Vx *= 0.94f;
-                if (StateTimer > 0.32f) State = "idle";
+                if (StateTimer > 0.32f)
+                {
+                    State = "idle";
+                    ParryCooldownTimer = 0.24f;
+                }
             }
             else if (State == "punch")
             {
-                if (StateTimer > 0.22f) State = "idle";
+                if (StateTimer > 0.22f)
+                {
+                    State = "idle";
+                    ParryCooldownTimer = 0.24f;
+                }
             }
             else if (State == "kick")
             {
-                if (StateTimer > 0.28f) State = "idle";
+                if (StateTimer > 0.28f)
+                {
+                    State = "idle";
+                    ParryCooldownTimer = 0.24f;
+                }
             }
             else if (State == "swing")
             {
@@ -561,21 +622,34 @@ namespace HanlangGame.Entities
                 {
                     State = "idle";
                     HasDealtDamage = false;
+                    ParryCooldownTimer = 0.24f;
                 }
             }
             else if (State == "spin")
             {
                 Vx = (FacingRight ? 1f : -1f) * 60f;
-                if (StateTimer > 0.45f) State = "idle";
+                if (StateTimer > 0.45f)
+                {
+                    State = "idle";
+                    ParryCooldownTimer = 0.28f;
+                }
             }
             else if (State == "dragon")
             {
-                if (StateTimer > 0.42f && IsGrounded) State = "idle";
+                if (StateTimer > 0.42f && IsGrounded)
+                {
+                    State = "idle";
+                    ParryCooldownTimer = 0.28f;
+                }
             }
             else if (State == "wave")
             {
                 Vx *= 0.7f;
-                if (StateTimer > 0.50f) State = "idle";
+                if (StateTimer > 0.50f)
+                {
+                    State = "idle";
+                    ParryCooldownTimer = 0.28f;
+                }
             }
             else if (State == "hit")
             {
@@ -604,6 +678,16 @@ namespace HanlangGame.Entities
         {
             if (State != "punch" && State != "kick" && State != "jumpkick" && State != "spin" && State != "swing" && State != "dashpunch" && State != "dashkick" && State != "dragon" && State != "wave")
                 return null;
+
+            // 격투 게임식 판정: 공격 후딜레이(Recovery) 구간에는 타격 판정 소멸
+            if (State == "punch" && StateTimer > 0.16f) return null;
+            if (State == "kick" && StateTimer > 0.20f) return null;
+            if (State == "dashpunch" && StateTimer > 0.20f) return null;
+            if (State == "dashkick" && StateTimer > 0.22f) return null;
+            if (State == "swing" && StateTimer > 0.20f) return null;
+            if (State == "spin" && StateTimer > 0.32f) return null;
+            if (State == "dragon" && StateTimer > 0.30f) return null;
+            if (State == "wave" && StateTimer > 0.36f) return null;
 
             if (State == "dragon")
             {
@@ -644,18 +728,27 @@ namespace HanlangGame.Entities
 
         public void TakeDamage(int damage, float knockbackDir)
         {
-            TakeDamage(damage, knockbackDir, out _, out _);
+            TakeDamage(damage, knockbackDir, out _, out _, out _);
         }
 
         public void TakeDamage(int damage, float knockbackDir, out bool parried, out bool guarded)
         {
+            TakeDamage(damage, knockbackDir, out parried, out guarded, out _);
+        }
+
+        public void TakeDamage(int damage, float knockbackDir, out bool parried, out bool guarded, out bool counterHit)
+        {
             parried = false;
             guarded = false;
+            counterHit = false;
 
             if (InvincibleTimer > 0 || State == "down") return;
 
-            // 1. 순간 쳐내기 (Just Parry): 공격 직전(0.22초 이내) Z키를 타이밍 맞게 입력했을 때!
-            if (ParryWindowTimer > 0)
+            // 격투 게임식 카운터 판정: 공격 동작 중이거나 공격 후딜레이(PostAttackDelay) 중에는 패링/가드 불가!
+            bool isAttackingOrInRecovery = IsAttackingOrRecovering;
+
+            // 1. 순간 쳐내기 (Just Parry): 중립/가드 상태에서 적 피격 직전(0.14초 이내) Z키를 타이밍 맞게 입력했을 때만 발동!
+            if (!isAttackingOrInRecovery && ParryWindowTimer > 0)
             {
                 parried = true;
                 JustParried = true;
@@ -667,8 +760,8 @@ namespace HanlangGame.Entities
                 return;
             }
 
-            // 2. 가드 (Guard): Z키를 길게 홀드하여 방어 자세를 유지하고 있을 때
-            if (State == "guard")
+            // 2. 가드 (Guard): Z키를 길게 홀드하여 방어 자세를 유지하고 있을 때 (공격/후딜 중에는 가드 불가)
+            if (!isAttackingOrInRecovery && State == "guard")
             {
                 guarded = true;
                 damage = Math.Max(1, (int)(damage * 0.30f)); // 피격 데미지 70% 대폭 감소!
@@ -687,11 +780,21 @@ namespace HanlangGame.Entities
                 return;
             }
 
-            // 3. 일반 피격
+            // 3. 일반 피격 및 카운터 피격
             DropCarried(); // 피격 시 들고 있던 물체/적을 놓침
+
+            if (isAttackingOrInRecovery)
+            {
+                counterHit = true;
+                damage = (int)(damage * 1.25f); // 공격 중 피격 시 25% 추가 카운터 데미지!
+            }
 
             Status.CurrentHp -= damage;
             SoundSynth.PlayHit();
+
+            // 공격 및 딜레이 강제 캔슬
+            PostAttackDelayTimer = 0f;
+            ParryWindowTimer = 0f;
 
             if (Status.CurrentHp <= 0)
             {
@@ -699,14 +802,14 @@ namespace HanlangGame.Entities
                 State = "down";
                 StateTimer = 0f;
                 Vz = 120f;
-                Vx = knockbackDir * 100f;
+                Vx = knockbackDir * (counterHit ? 120f : 100f);
             }
             else
             {
                 State = "hit";
                 StateTimer = 0f;
-                InvincibleTimer = 0.6f;
-                Vx = knockbackDir * 80f;
+                InvincibleTimer = counterHit ? 0.45f : 0.6f;
+                Vx = knockbackDir * (counterHit ? 110f : 80f);
             }
         }
 

@@ -443,7 +443,7 @@ namespace HanlangGame.Systems
                         {
                             enemy.HasDealtDamage = true;
                             float knockDir = enemy.FacingRight ? 1f : -1f;
-                            player.TakeDamage(enemy.AttackPower, knockDir, out bool parried, out bool guarded);
+                            player.TakeDamage(enemy.AttackPower, knockDir, out bool parried, out bool guarded, out bool counterHit);
 
                             if (parried)
                             {
@@ -467,10 +467,20 @@ namespace HanlangGame.Systems
                                 DamageNumbers.Add(new DamageNumber(reducedDmg, player.X, player.Y - player.Z - player.Height - 8f, isPlayerHit: true));
                                 Bubbles.Add(new SpeechBubble("가드!", player.X, player.Y - player.Z - player.Height - 18f));
                             }
+                            else if (counterHit)
+                            {
+                                // 카운터 피격! (공격 동작 중 또는 공격 후딜레이 중 피격 시 +25% 증폭 데미지, 큰 화면 흔들림)
+                                int counterDmg = (int)(enemy.AttackPower * 1.25f);
+                                OnScreenShake?.Invoke(4.5f, 0.24f);
+                                OnHitStop?.Invoke(0.065f);
+                                AddHitSparks(player.X, player.Y - player.Z - 16f, count: 10);
+                                DamageNumbers.Add(new DamageNumber(counterDmg, player.X, player.Y - player.Z - player.Height - 8f, isPlayerHit: true));
+                                Bubbles.Add(new SpeechBubble("카운터!", player.X, player.Y - player.Z - player.Height - 18f));
+                            }
                             else
                             {
                                 // 통상 피격
-                                OnScreenShake?.Invoke(0.24f, 4.2f);
+                                OnScreenShake?.Invoke(2.4f, 0.14f);
                                 OnHitStop?.Invoke(0.045f);
                                 AddHitSparks(player.X, player.Y - player.Z - 16f, count: 7);
 

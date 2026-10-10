@@ -346,6 +346,8 @@ namespace HanlangGame.Tests
             Assert("시간 경과 시 데미지 숫자가 위로 올라감 (Y 감소)", dmgNum.Y < initialDmgY);
 
             // Test 15: 플레이어 피격 시 선홍색 데미지 숫자(IsPlayerHit true) 생성 검증
+            testP.State = "idle";
+            testP.PostAttackDelayTimer = 0f;
             testE.FacingRight = false; // X=100에 있는 플레이어를 향해 왼쪽을 봄
             testE.State = "punch"; testE.HasDealtDamage = false;
             testP.InvincibleTimer = 0f;
@@ -813,6 +815,42 @@ namespace HanlangGame.Tests
             int usPerBeat = (slowedMid[tempoIdx] << 16) | (slowedMid[tempoIdx + 1] << 8) | slowedMid[tempoIdx + 2];
             // 원래 148 BPM일 때 약 405,405 us -> 80% 감속 시 118.4 BPM이 되어 약 506,756 us
             Assert("BGM 템포가 기존 대비 80% 수준으로 감속됨 (usPerBeat > 500000)", usPerBeat > 500000);
+
+            // Test 32: 공격 후딜레이(Recovery Delay) 및 카운터 피격/패링 불가 검증
+            var fightingPlayer = new Player(new StatusSystem());
+            fightingPlayer.State = "punch";
+            fightingPlayer.StateTimer = 0.10f; // 펀치 동작 중
+            Assert("공격 중에는 IsAttackingOrRecovering이 true", fightingPlayer.IsAttackingOrRecovering);
+
+            // 공격 중 피격 시 패링 타이머가 있어도 패링/가드 불가 및 카운터 피격(+25% 피해)
+            fightingPlayer.ParryWindowTimer = 0.14f;
+            int hpBeforeCounter = fightingPlayer.Status.CurrentHp;
+            fightingPlayer.TakeDamage(20, 1f, out bool counterParried, out bool counterGuarded, out bool wasCounter);
+            Assert("공격 중 피격 시 패링 불가 (counterParried false)", !counterParried);
+            Assert("공격 중 피격 시 가드 불가 (counterGuarded false)", !counterGuarded);
+            Assert("공격 중 피격 시 카운터 판정 (wasCounter true)", wasCounter);
+            Assert("카운터 피격 시 25% 추가 피해 적용 (20 -> 25 피해)", fightingPlayer.Status.CurrentHp == hpBeforeCounter - 25);
+
+            // 공격 후딜레이(PostAttackDelayTimer > 0) 중 입력 락 및 카운터 피격 검증
+            var delayPlayer = new Player(new StatusSystem());
+            delayPlayer.State = "idle";
+            delayPlayer.PostAttackDelayTimer = 0.10f;
+            Assert("공격 후딜레이 중에도 IsAttackingOrRecovering이 true", delayPlayer.IsAttackingOrRecovering);
+
+            var attackInput = new Input();
+            attackInput.OnKeyDown(Keys.Z);
+            delayPlayer.HandleInput(attackInput);
+            Assert("공격 후딜레이 중에는 새로운 공격/패링 입력 불가(State 유지)", delayPlayer.State == "idle");
+            Assert("공격 후딜레이 중 패링 윈도우 생성 안 됨 (ParryWindowTimer == 0)", delayPlayer.ParryWindowTimer == 0f);
+
+            // 공격 판정 지속시간(Active Frames) 종료 후 후딜레이 구간에서는 히트박스 소멸 검증
+            var activePlayer = new Player(new StatusSystem());
+            activePlayer.State = "punch";
+            activePlayer.StateTimer = 0.10f;
+            Assert("공격 판정 유효 구간(Active Frames)에는 히트박스 존재", activePlayer.GetAttackHitbox().HasValue);
+
+            activePlayer.StateTimer = 0.25f; // 0.18초 초과 후딜레이 구간
+            Assert("공격 후딜레이(Recovery Frames) 구간에서는 타격 판정 자동 소멸", !activePlayer.GetAttackHitbox().HasValue);
 
             Console.WriteLine("----------------------------------------------------");
             Console.WriteLine($" 총 테스트 결과: {passed} / {total} 통과 ({(passed == total ? "100% 성공" : "실패 항목 있음")})");
