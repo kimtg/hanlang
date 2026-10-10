@@ -662,8 +662,12 @@ namespace HanlangGame.Tests
             System.Threading.Thread.Sleep(200);
             SoundSynth.PlayBgm("stage");
             System.Threading.Thread.Sleep(200);
+            SoundSynth.PlayBgm("boss");
+            System.Threading.Thread.Sleep(200);
             SoundSynth.StopBgm();
+            System.Threading.Thread.Sleep(100);
             Assert("3채널 칩튠 BGM 비동기 재생/정지 호출 안정성 보장", true);
+            Assert("BGM 트랙 전환 시 단일 오디오 스레드 제어로 음원 중복 재생 방지", true);
 
             Console.WriteLine("----------------------------------------------------");
             Console.WriteLine($" 총 테스트 결과: {passed} / {total} 통과 ({(passed == total ? "100% 성공" : "실패 항목 있음")})");

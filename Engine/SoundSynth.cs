@@ -14,12 +14,19 @@ namespace HanlangGame.Engine
 
         private static bool _enabled = true;
         private static bool _bgmEnabled = true;
-        private static string _currentBgmTrack = "";
-        private static int _bgmSessionId = 0;
+        private static string _targetBgmTrack = "";
         private static readonly object _bgmLock = new();
         private static readonly System.Collections.Generic.Dictionary<string, byte[]> _bgmBytesCache = new();
+        private static readonly System.Threading.AutoResetEvent _bgmWakeEvent = new(false);
+        private static System.Threading.Thread? _bgmThread;
+        private static bool _bgmWorkerStarted = false;
 
-        public static void SetEnabled(bool enabled) => _enabled = enabled;
+        public static void SetEnabled(bool enabled)
+        {
+            _enabled = enabled;
+            if (!enabled) StopBgm();
+        }
+
         public static void SetBgmEnabled(bool enabled)
         {
             _bgmEnabled = enabled;
@@ -30,89 +37,141 @@ namespace HanlangGame.Engine
         {
             lock (_bgmLock)
             {
-                _bgmSessionId++;
-                _currentBgmTrack = "";
-                try
-                {
-                    mciSendString("stop hanlang_bgm", null, 0, IntPtr.Zero);
-                    mciSendString("close hanlang_bgm", null, 0, IntPtr.Zero);
-                }
-                catch { }
+                _targetBgmTrack = "";
             }
+            _bgmWakeEvent.Set();
         }
 
         public static void PlayBgm(string trackName)
         {
             if (!_bgmEnabled || !_enabled) return;
 
-            int session;
+            EnsureBgmWorkerStarted();
+
             lock (_bgmLock)
             {
-                if (_currentBgmTrack == trackName) return;
-                _currentBgmTrack = trackName;
-                session = ++_bgmSessionId;
+                if (_targetBgmTrack == trackName) return;
+                _targetBgmTrack = trackName;
             }
+            _bgmWakeEvent.Set();
+        }
 
-            Task.Run(async () =>
+        private static void EnsureBgmWorkerStarted()
+        {
+            lock (_bgmLock)
             {
-                try
+                if (_bgmWorkerStarted) return;
+                _bgmWorkerStarted = true;
+                _bgmThread = new System.Threading.Thread(BgmWorkerLoop)
                 {
-                    lock (_bgmLock)
+                    IsBackground = true,
+                    Name = "HanlangBgmAudioThread"
+                };
+                _bgmThread.Start();
+            }
+        }
+
+        private static void BgmWorkerLoop()
+        {
+            string currentPlayingTrack = "";
+            var sbMode = new StringBuilder(64);
+
+            while (true)
+            {
+                string targetTrack;
+                bool isBgmActive;
+
+                lock (_bgmLock)
+                {
+                    targetTrack = _targetBgmTrack;
+                    isBgmActive = _bgmEnabled && _enabled;
+                }
+
+                if (!isBgmActive || string.IsNullOrEmpty(targetTrack))
+                {
+                    if (!string.IsNullOrEmpty(currentPlayingTrack))
                     {
-                        if (_bgmSessionId != session) return;
-                        mciSendString("stop hanlang_bgm", null, 0, IntPtr.Zero);
+                        try
+                        {
+                            mciSendString("stop hanlang_bgm", null, 0, IntPtr.Zero);
+                            mciSendString("close hanlang_bgm", null, 0, IntPtr.Zero);
+                        }
+                        catch { }
+                        currentPlayingTrack = "";
+                    }
+                    _bgmWakeEvent.WaitOne(500);
+                    continue;
+                }
+
+                // 트랙 전환 시 기존 트랙 정지 및 단일 스레드 컨텍스트에서 새 트랙 오픈
+                if (targetTrack != currentPlayingTrack)
+                {
+                    if (!string.IsNullOrEmpty(currentPlayingTrack))
+                    {
+                        try
+                        {
+                            mciSendString("stop hanlang_bgm", null, 0, IntPtr.Zero);
+                            mciSendString("close hanlang_bgm", null, 0, IntPtr.Zero);
+                        }
+                        catch { }
+                        currentPlayingTrack = "";
+                    }
+
+                    // 잔류 장치 방지
+                    try
+                    {
                         mciSendString("close hanlang_bgm", null, 0, IntPtr.Zero);
                     }
+                    catch { }
 
-                    if (!_bgmBytesCache.TryGetValue(trackName, out byte[]? wavBytes))
+                    if (!_bgmBytesCache.TryGetValue(targetTrack, out byte[]? wavBytes))
                     {
-                        wavBytes = GenerateBgmWav(trackName);
-                        _bgmBytesCache[trackName] = wavBytes;
-                    }
-
-                    string tempPath = Path.Combine(Path.GetTempPath(), $"hanlang_bgm_v3_{trackName}.wav");
-                    if (!File.Exists(tempPath) || new FileInfo(tempPath).Length != wavBytes.Length)
-                    {
-                        File.WriteAllBytes(tempPath, wavBytes);
-                    }
-
-                    lock (_bgmLock)
-                    {
-                        if (_bgmSessionId != session) return;
-                        mciSendString($"open \"{tempPath}\" type waveaudio alias hanlang_bgm", null, 0, IntPtr.Zero);
-                        mciSendString("play hanlang_bgm from 0", null, 0, IntPtr.Zero);
-                    }
-
-                    // 심리스 BGM 무한 루프 모니터링 (트랙 완주 시 처음부터 자동 재연주)
-                    var sbMode = new StringBuilder(64);
-                    while (_bgmEnabled && _enabled)
-                    {
-                        await Task.Delay(250);
-
+                        wavBytes = GenerateBgmWav(targetTrack);
                         lock (_bgmLock)
                         {
-                            if (_bgmSessionId != session || _currentBgmTrack != trackName) break;
+                            _bgmBytesCache[targetTrack] = wavBytes;
                         }
+                    }
 
+                    string tempPath = Path.Combine(Path.GetTempPath(), $"hanlang_bgm_v3_{targetTrack}.wav");
+                    if (!File.Exists(tempPath) || new FileInfo(tempPath).Length != wavBytes.Length)
+                    {
+                        try
+                        {
+                            File.WriteAllBytes(tempPath, wavBytes);
+                        }
+                        catch { }
+                    }
+
+                    try
+                    {
+                        mciSendString($"open \"{tempPath}\" type waveaudio alias hanlang_bgm", null, 0, IntPtr.Zero);
+                        mciSendString("play hanlang_bgm from 0", null, 0, IntPtr.Zero);
+                        currentPlayingTrack = targetTrack;
+                    }
+                    catch { }
+                }
+
+                // 새 트랙 요청 대기 (이벤트 발생 시 즉시 반응, 200ms 동안 없으면 타임아웃되어 루프 체크)
+                bool signaled = _bgmWakeEvent.WaitOne(200);
+                if (signaled) continue;
+
+                // 트랙 재생 완료 감지 및 심리스 무한 루프 재연주
+                if (!string.IsNullOrEmpty(currentPlayingTrack))
+                {
+                    try
+                    {
                         sbMode.Clear();
                         mciSendString("status hanlang_bgm mode", sbMode, 64, IntPtr.Zero);
                         string mode = sbMode.ToString().Trim().ToLowerInvariant();
-
                         if (mode == "stopped")
                         {
-                            lock (_bgmLock)
-                            {
-                                if (_bgmSessionId != session || _currentBgmTrack != trackName) break;
-                                mciSendString("play hanlang_bgm from 0", null, 0, IntPtr.Zero);
-                            }
+                            mciSendString("play hanlang_bgm from 0", null, 0, IntPtr.Zero);
                         }
                     }
+                    catch { }
                 }
-                catch
-                {
-                    // Fallback gracefully if audio device is unavailable
-                }
-            });
+            }
         }
 
         private static byte[] CreateWav(short[] samples, int sampleRate = 22050)

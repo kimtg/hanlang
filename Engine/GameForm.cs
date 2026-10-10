@@ -85,5 +85,11 @@ namespace HanlangGame.Engine
         {
             _scene.Input.OnKeyUp(e.KeyCode);
         }
+
+        protected override void OnFormClosing(FormClosingEventArgs e)
+        {
+            SoundSynth.StopBgm();
+            base.OnFormClosing(e);
+        }
     }
 }
