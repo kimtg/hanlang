@@ -42,6 +42,7 @@ namespace HanlangGame
         private float _cameraX = 0f;
         private string _notifyMessage = "";
         private float _notifyTimer = 0f;
+        private float _gameOverTimer = 0f;
 
         public float ScreenShakeTimer { get; private set; } = 0f;
         public float ScreenShakeIntensity { get; private set; } = 0f;
@@ -49,6 +50,9 @@ namespace HanlangGame
 
         public PixelBuffer Buffer => _buffer;
         public Input Input => _input;
+        public Player Player => _player;
+        public StatusSystem Status => _status;
+        public StageManager StageManager => _stageManager;
 
         public void Initialize()
         {
@@ -119,6 +123,49 @@ namespace HanlangGame
             }
         }
 
+        public void RespawnAtPreviousStage()
+        {
+            int originalStage = _stageManager.CurrentStage;
+            int prevStage = Math.Max(1, originalStage - 1);
+            _stageManager.LoadStage(prevStage);
+
+            // 체력과 기력 완전 회복
+            _status.CurrentHp = _status.MaxHp;
+            _status.CurrentMp = _status.MaxMp;
+
+            // 플레이어 위치 및 상태 초기화 (이전 스테이지 입구)
+            _player.X = 35f;
+            _player.Y = 180f;
+            _player.Z = 0f;
+            _player.Vx = 0f;
+            _player.Vy = 0f;
+            _player.Vz = 0f;
+            _player.State = "idle";
+            _player.StateTimer = 0f;
+            _player.InvincibleTimer = 2.0f; // 부활 후 2초간 안전 무적
+
+            // 카메라 및 필드 오브젝트 리셋
+            _cameraX = 0f;
+            _combatSystem.Items.Clear();
+            _combatSystem.Bubbles.Clear();
+            _combatSystem.DamageNumbers.Clear();
+            _dialogueBox.Reset(prevStage);
+
+            _gameOverTimer = 0f;
+            State = GameState.Playing;
+
+            SoundSynth.PlayBgm((_stageManager.CurrentBoss != null && _stageManager.CurrentBoss.IsAlive) ? "boss" : "stage");
+
+            if (originalStage > 1)
+            {
+                ShowNotification($"패배하여 이전 구역({_stageManager.GetStageName(prevStage)})으로 후퇴했습니다.");
+            }
+            else
+            {
+                ShowNotification("1장에서 다시 기운을 차리고 일어섰습니다!");
+            }
+        }
+
         public void ShowNotification(string msg)
         {
             _notifyMessage = msg;
@@ -168,9 +215,10 @@ namespace HanlangGame
 
                 case GameState.GameOver:
                     SoundSynth.StopBgm();
-                    if (_input.IsJustPressed(Keys.Z) || _input.IsJustPressed(Keys.Enter))
+                    _gameOverTimer += dt;
+                    if (_input.IsJustPressed(Keys.Z) || _input.IsJustPressed(Keys.Enter) || _gameOverTimer >= 2.5f)
                     {
-                        StartNewGame();
+                        RespawnAtPreviousStage();
                     }
                     else if (_input.IsJustPressed(Keys.Escape))
                     {
@@ -437,16 +485,25 @@ namespace HanlangGame
         {
             _buffer.FillRect(0, 0, PixelBuffer.Width, PixelBuffer.Height, Color.FromArgb(195, 10, 5, 15));
             _buffer.DrawOutlinedTextCentered("패 배 하 였 소", 180, Color.FromArgb(255, 65, 65), Color.Black, _buffer.FontHuge, 4f);
-            _buffer.DrawOutlinedTextCentered("유생 한랑이 저잣거리에서 쓰러졌습니다.", 270, Color.FromArgb(230, 230, 230), Color.Black, _buffer.FontSubtitle, 2f);
 
+            int currentStage = _stageManager.CurrentStage;
+            int prevStage = Math.Max(1, currentStage - 1);
+            string currentStageName = _stageManager.GetStageName(currentStage);
+            _buffer.DrawOutlinedTextCentered($"유생 한랑이 {currentStageName}에서 쓰러졌습니다.", 270, Color.FromArgb(230, 230, 230), Color.Black, _buffer.FontSubtitle, 2f);
+
+            string respawnLabel = currentStage > 1
+                ? $"[ Z 키 : {_stageManager.GetStageName(prevStage)}에서 부활 ]"
+                : "[ Z 키 : 1장에서 다시 도전 ]";
+
+            int btnW = 540;
             int btnY = 380;
-            _buffer.FillRoundedRect((PixelBuffer.Width - 360) / 2, btnY, 360, 50, 8f, Color.FromArgb(200, 40, 25, 25));
-            _buffer.DrawRoundedRect((PixelBuffer.Width - 360) / 2, btnY, 360, 50, 8f, Color.FromArgb(255, 215, 60), 2f);
-            _buffer.DrawOutlinedTextCentered("[ Z 키 : 다시 도전 ]", btnY + 11, Color.FromArgb(255, 240, 90), Color.Black, _buffer.FontHeader, 2f);
+            _buffer.FillRoundedRect((PixelBuffer.Width - btnW) / 2, btnY, btnW, 50, 8f, Color.FromArgb(200, 40, 25, 25));
+            _buffer.DrawRoundedRect((PixelBuffer.Width - btnW) / 2, btnY, btnW, 50, 8f, Color.FromArgb(255, 215, 60), 2f);
+            _buffer.DrawOutlinedTextCentered(respawnLabel, btnY + 11, Color.FromArgb(255, 240, 90), Color.Black, _buffer.FontHeader, 2f);
 
             int btn2Y = 450;
-            _buffer.FillRoundedRect((PixelBuffer.Width - 360) / 2, btn2Y, 360, 45, 8f, Color.FromArgb(160, 25, 25, 30));
-            _buffer.DrawRoundedRect((PixelBuffer.Width - 360) / 2, btn2Y, 360, 45, 8f, Color.FromArgb(150, 150, 170), 1.5f);
+            _buffer.FillRoundedRect((PixelBuffer.Width - btnW) / 2, btn2Y, btnW, 45, 8f, Color.FromArgb(160, 25, 25, 30));
+            _buffer.DrawRoundedRect((PixelBuffer.Width - btnW) / 2, btn2Y, btnW, 45, 8f, Color.FromArgb(150, 150, 170), 1.5f);
             _buffer.DrawOutlinedTextCentered("[ ESC 키 : 타이틀로 복귀 ]", btn2Y + 11, Color.FromArgb(200, 200, 210), Color.Black, _buffer.FontBody, 1.8f);
         }
 

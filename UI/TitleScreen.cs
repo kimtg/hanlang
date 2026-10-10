@@ -124,7 +124,7 @@ namespace HanlangGame.UI
 
             // 2. 타이틀 로고 (캘리그래피 명조 대형 타이포그래피)
             buffer.DrawOutlinedTextCentered("조선 무협 벨트스크롤 액션 RPG", 90, Color.FromArgb(255, 220, 120), Color.Black, buffer.FontSubtitle, 2f);
-            buffer.DrawOutlinedTextCentered("한 랑 (韓浪)", 135, Color.FromArgb(255, 75, 75), Color.Black, buffer.FontHuge, 5f);
+            buffer.DrawOutlinedTextCentered("한랑 (韓浪)", 135, Color.FromArgb(255, 75, 75), Color.Black, buffer.FontHuge, 5f);
             buffer.DrawOutlinedTextCentered("~ 훈민정음 탈환기 ~", 205, Color.FromArgb(255, 235, 160), Color.Black, buffer.FontTitle, 3f);
 
             // 3. 메뉴 목록 (고해상도 버튼 디자인)

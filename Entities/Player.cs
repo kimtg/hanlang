@@ -117,8 +117,8 @@ namespace HanlangGame.Entities
 
         public void HandleInput(Input input, System.Collections.Generic.List<WorldObject>? worldObjects = null, System.Collections.Generic.List<Enemy>? enemies = null)
         {
-            // 비상 낙법 (Ukemi): 공중 피격 또는 쓰러지는 도중(Z > 0 및 지면 28px 이내) C키 입력 시 즉시 착지 기상!
-            if ((State == "hit" || State == "down") && Z > 0 && Z < 28f)
+            // 비상 낙법 (Ukemi): 공중 피격 또는 쓰러지는 도중(Z > 0 및 지면 28px 이내) C키 입력 시 즉시 착지 기상! (사망 시 불가능)
+            if (Status.CurrentHp > 0 && (State == "hit" || State == "down") && Z > 0 && Z < 28f)
             {
                 if (input.IsJustPressed(Keys.C))
                 {
@@ -133,7 +133,7 @@ namespace HanlangGame.Entities
                 }
             }
 
-            if (State == "hit" || State == "down") return;
+            if (State == "hit" || State == "down" || Status.CurrentHp <= 0) return;
 
             // Z키 누름 시간 및 순간 쳐내기(Just Parry) 입력 타이머 계측
             if (input.IsJustPressed(Keys.Z))
@@ -577,7 +577,8 @@ namespace HanlangGame.Entities
             else if (State == "down")
             {
                 Vx *= 0.8f;
-                if (StateTimer > 0.75f)
+                // 체력이 남아있을 때만 0.75초 후 기상, HP가 0 이하로 사망한 상태면 누워있음
+                if (StateTimer > 0.75f && Status.CurrentHp > 0)
                 {
                     State = "idle";
                     InvincibleTimer = 1.0f; // 기상 후 1초 무적

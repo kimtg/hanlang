@@ -24,6 +24,19 @@ namespace HanlangGame.UI
 
         public bool HasTriggered(int stage) => _triggeredStages.Contains(stage);
 
+        public void Reset(int? upToStage = null)
+        {
+            _dialogueQueue.Clear();
+            _currentIndex = 0;
+            _charRevealTimer = 0f;
+            FinisherActive = false;
+            _finisherTimer = 0f;
+            if (upToStage.HasValue)
+            {
+                _triggeredStages.RemoveWhere(s => s >= upToStage.Value);
+            }
+        }
+
         public void TriggerStageDialogue(int stage)
         {
             if (_triggeredStages.Contains(stage)) return;

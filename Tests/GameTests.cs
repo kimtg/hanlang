@@ -695,6 +695,53 @@ namespace HanlangGame.Tests
             }
             Assert("국악 가야금(GM 107 Koto) 프로그램 체인지 이벤트 포함", hasKotoProgram);
 
+            // Test 30: 사망 시 제자리 부활 방지 및 이전 스테이지 후퇴 부활 검증
+            var testScene = new GameScene();
+            testScene.Initialize();
+            testScene.StartNewGame();
+
+            // 3장으로 이동
+            testScene.StageManager.LoadStage(3);
+            Assert("스테이지 3 설정 완료", testScene.StageManager.CurrentStage == 3);
+
+            // HP가 0으로 소진된 상태에서 쓰러짐(down)
+            testScene.Status.CurrentHp = 0;
+            testScene.Player.State = "down";
+            testScene.Player.StateTimer = 0.5f;
+
+            // 0.8초 경과 후에도 HP 0이므로 제자리에서 일어나지(idle) 않고 쓰러진 상태 유지
+            testScene.Player.Update(0.5f);
+            Assert("HP 0일 때 다운 상태 타이머 만료 후에도 제자리 기립 방지 (State 유지)", testScene.Player.State == "down");
+
+            // 사망 상태에서 낙법(C키)이나 이동 입력 불허
+            testScene.Input.OnKeyDown(System.Windows.Forms.Keys.C);
+            testScene.Player.HandleInput(testScene.Input);
+            Assert("HP 0일 때 낙법(Ukemi) 발동 불가", testScene.Player.State == "down");
+            testScene.Input.OnKeyUp(System.Windows.Forms.Keys.C);
+
+            // 씬 업데이트를 통해 게임 오버 상태 진입
+            testScene.Player.StateTimer = 0.9f;
+            testScene.Update(0.1f);
+            Assert("사망 후 GameOver 상태 정상 전환", testScene.State == GameState.GameOver);
+
+            // 이전 스테이지로 후퇴 부활 실행
+            testScene.RespawnAtPreviousStage();
+            Assert("3장에서 사망 시 이전 구역(2장)으로 후퇴", testScene.StageManager.CurrentStage == 2);
+            Assert("부활 시 최대 체력으로 완전 회복", testScene.Status.CurrentHp == testScene.Status.MaxHp);
+            Assert("부활 시 최대 기력으로 완전 회복", testScene.Status.CurrentMp == testScene.Status.MaxMp);
+            Assert("부활 후 플레이어 상태 idle 복귀", testScene.Player.State == "idle");
+            Assert("부활 후 플레이어 입구 좌표(X=35) 배치", testScene.Player.X == 35f);
+            Assert("부활 후 안전 무적 시간 부여", testScene.Player.InvincibleTimer > 0f);
+            Assert("부활 후 게임 플레이 상태 전환", testScene.State == GameState.Playing);
+
+            // 1장에서 사망 시 1장 미만으로 떨어지지 않고 1장에서 재도전
+            testScene.StageManager.LoadStage(1);
+            testScene.Status.CurrentHp = 0;
+            testScene.RespawnAtPreviousStage();
+            Assert("1장에서 사망 시 1장 유지 (음수/0장 방지)", testScene.StageManager.CurrentStage == 1);
+            Assert("1장 재도전 시 체력 완전 회복", testScene.Status.CurrentHp == testScene.Status.MaxHp);
+            Assert("1장 재도전 시 입구 좌표 배치", testScene.Player.X == 35f);
+
             Console.WriteLine("----------------------------------------------------");
             Console.WriteLine($" 총 테스트 결과: {passed} / {total} 통과 ({(passed == total ? "100% 성공" : "실패 항목 있음")})");
             Console.WriteLine("====================================================");
