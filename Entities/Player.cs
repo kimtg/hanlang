@@ -95,7 +95,15 @@ namespace HanlangGame.Entities
                 obj.X = X + (FacingRight ? 16f : -16f);
                 obj.Y = Y;
                 obj.Z = Z + 20f;
-                obj.Vx = (FacingRight ? 1f : -1f) * 270f;
+                float throwSpeed = obj.Type switch
+                {
+                    ObjectType.Cart => 230f,
+                    ObjectType.Table => 240f,
+                    ObjectType.Bench => 240f,
+                    ObjectType.RiceSack => 250f,
+                    _ => 270f
+                };
+                obj.Vx = (FacingRight ? 1f : -1f) * throwSpeed;
                 obj.Vz = 100f;
                 SoundSynth.PlaySpecial();
             }
@@ -249,8 +257,8 @@ namespace HanlangGame.Entities
                     // 1) 바닥에 있는 물체 줍기
                     if (worldObjects != null)
                     {
-                        var nearbyObj = worldObjects.Find(o => !o.IsDead && !o.IsCarried && !o.IsFlying &&
-                                                               Math.Abs(X - o.X) < 26f && Math.Abs(Y - o.Y) < 15f);
+                        var nearbyObj = worldObjects.Find(o => !o.IsDead && !o.IsCarried && !o.IsFlying && !o.IsRolling &&
+                                                               Math.Abs(X - o.X) < Math.Max(26f, o.Width / 2f + 14f) && Math.Abs(Y - o.Y) < 18f);
                         if (nearbyObj != null)
                         {
                             CarriedObject = nearbyObj;

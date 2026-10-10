@@ -267,6 +267,9 @@ namespace HanlangGame.Engine
                     break;
             }
 
+            // BGM 연주 속도를 기존의 80% 수준으로 조절 (BPM * 0.8)
+            bpm *= 0.8f;
+
             var events = new List<TimedEvent>();
             const int stepTicks = 24; // 96 ticks per quarter note -> 24 ticks per 16th note step
 

@@ -133,7 +133,7 @@ namespace HanlangGame.Engine
                         }
                     }
 
-                    string tempPath = Path.Combine(Path.GetTempPath(), $"hanlang_bgm_v4_{targetTrack}.mid");
+                    string tempPath = Path.Combine(Path.GetTempPath(), $"hanlang_bgm_v5_{targetTrack}.mid");
                     if (!File.Exists(tempPath) || new FileInfo(tempPath).Length != midBytes.Length)
                     {
                         try
@@ -751,6 +751,9 @@ namespace HanlangGame.Engine
                     };
                     break;
             }
+
+            // BGM 연주 속도를 기존의 80% 수준으로 조절 (BPM * 0.8)
+            bpm *= 0.8f;
 
             double stepDuration = 60.0 / bpm / 4.0; // 16th note step duration
             int totalSamples = (int)(sampleRate * stepDuration * totalSteps);

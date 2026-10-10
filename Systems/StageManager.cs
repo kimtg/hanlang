@@ -120,67 +120,69 @@ namespace HanlangGame.Systems
                     break;
             }
 
-            // 각 장별 길거리 투척/타격 오브젝트 배치 (목봉, 궤짝, 돌멩이, 옹기 항아리, 주막 술통)
+            // 각 장별 길거리 투척/타격 오브젝트 배치 (목봉, 궤짝, 돌멩이, 옹기 항아리, 주막 술통, 대형 수레, 대형 탁자, 평상, 쌀가마니)
             switch (stage)
             {
                 case 1:
-                    WorldObjects.Add(new WorldObject(ObjectType.Club, 290f, 175f));
-                    WorldObjects.Add(new WorldObject(ObjectType.Crate, 440f, 210f));
-                    WorldObjects.Add(new WorldObject(ObjectType.Jar, 550f, 185f));
-                    WorldObjects.Add(new WorldObject(ObjectType.Rock, 670f, 165f));
+                    WorldObjects.Add(new WorldObject(ObjectType.Cart, 270f, 175f));
+                    WorldObjects.Add(new WorldObject(ObjectType.Crate, 430f, 210f));
+                    WorldObjects.Add(new WorldObject(ObjectType.RiceSack, 540f, 185f));
+                    WorldObjects.Add(new WorldObject(ObjectType.Jar, 650f, 165f));
+                    WorldObjects.Add(new WorldObject(ObjectType.Rock, 760f, 195f));
                     break;
                 case 2:
-                    WorldObjects.Add(new WorldObject(ObjectType.Club, 280f, 190f));
-                    WorldObjects.Add(new WorldObject(ObjectType.Barrel, 420f, 175f));
-                    WorldObjects.Add(new WorldObject(ObjectType.Crate, 560f, 170f));
-                    WorldObjects.Add(new WorldObject(ObjectType.Jar, 680f, 205f));
+                    WorldObjects.Add(new WorldObject(ObjectType.Table, 270f, 180f));
+                    WorldObjects.Add(new WorldObject(ObjectType.Barrel, 410f, 175f));
+                    WorldObjects.Add(new WorldObject(ObjectType.Bench, 540f, 195f));
+                    WorldObjects.Add(new WorldObject(ObjectType.Jar, 670f, 205f));
                     WorldObjects.Add(new WorldObject(ObjectType.Club, 770f, 180f));
                     break;
                 case 3:
-                    WorldObjects.Add(new WorldObject(ObjectType.Crate, 310f, 180f));
-                    WorldObjects.Add(new WorldObject(ObjectType.Barrel, 460f, 190f));
-                    WorldObjects.Add(new WorldObject(ObjectType.Jar, 580f, 170f));
-                    WorldObjects.Add(new WorldObject(ObjectType.Rock, 670f, 200f));
+                    WorldObjects.Add(new WorldObject(ObjectType.Cart, 290f, 180f));
+                    WorldObjects.Add(new WorldObject(ObjectType.Bench, 440f, 190f));
+                    WorldObjects.Add(new WorldObject(ObjectType.Barrel, 570f, 170f));
+                    WorldObjects.Add(new WorldObject(ObjectType.Jar, 680f, 200f));
+                    WorldObjects.Add(new WorldObject(ObjectType.Rock, 770f, 175f));
                     break;
                 case 4:
-                    WorldObjects.Add(new WorldObject(ObjectType.Rock, 300f, 165f));
-                    WorldObjects.Add(new WorldObject(ObjectType.Jar, 440f, 180f));
-                    WorldObjects.Add(new WorldObject(ObjectType.Rock, 550f, 210f));
-                    WorldObjects.Add(new WorldObject(ObjectType.Club, 660f, 180f));
+                    WorldObjects.Add(new WorldObject(ObjectType.Cart, 280f, 165f));
+                    WorldObjects.Add(new WorldObject(ObjectType.RiceSack, 420f, 180f));
+                    WorldObjects.Add(new WorldObject(ObjectType.Rock, 540f, 210f));
+                    WorldObjects.Add(new WorldObject(ObjectType.Bench, 660f, 175f));
                     WorldObjects.Add(new WorldObject(ObjectType.Crate, 760f, 195f));
                     break;
                 case 5:
-                    WorldObjects.Add(new WorldObject(ObjectType.Barrel, 280f, 185f));
-                    WorldObjects.Add(new WorldObject(ObjectType.Jar, 420f, 170f));
-                    WorldObjects.Add(new WorldObject(ObjectType.Club, 530f, 175f));
-                    WorldObjects.Add(new WorldObject(ObjectType.Barrel, 640f, 205f));
-                    WorldObjects.Add(new WorldObject(ObjectType.Jar, 740f, 165f));
+                    WorldObjects.Add(new WorldObject(ObjectType.Table, 260f, 185f));
+                    WorldObjects.Add(new WorldObject(ObjectType.Bench, 390f, 170f));
+                    WorldObjects.Add(new WorldObject(ObjectType.Barrel, 510f, 200f));
+                    WorldObjects.Add(new WorldObject(ObjectType.RiceSack, 630f, 175f));
+                    WorldObjects.Add(new WorldObject(ObjectType.Cart, 750f, 190f));
                     break;
                 case 6:
-                    WorldObjects.Add(new WorldObject(ObjectType.Club, 310f, 170f));
-                    WorldObjects.Add(new WorldObject(ObjectType.Barrel, 470f, 190f));
-                    WorldObjects.Add(new WorldObject(ObjectType.Jar, 590f, 175f));
-                    WorldObjects.Add(new WorldObject(ObjectType.Crate, 710f, 180f));
+                    WorldObjects.Add(new WorldObject(ObjectType.Cart, 290f, 170f));
+                    WorldObjects.Add(new WorldObject(ObjectType.Table, 440f, 190f));
+                    WorldObjects.Add(new WorldObject(ObjectType.Barrel, 580f, 175f));
+                    WorldObjects.Add(new WorldObject(ObjectType.Bench, 700f, 185f));
                     break;
                 case 7:
-                    WorldObjects.Add(new WorldObject(ObjectType.Club, 290f, 190f));
-                    WorldObjects.Add(new WorldObject(ObjectType.Barrel, 430f, 175f));
-                    WorldObjects.Add(new WorldObject(ObjectType.Crate, 560f, 170f));
-                    WorldObjects.Add(new WorldObject(ObjectType.Jar, 680f, 205f));
-                    WorldObjects.Add(new WorldObject(ObjectType.Rock, 760f, 175f));
+                    WorldObjects.Add(new WorldObject(ObjectType.Cart, 270f, 185f));
+                    WorldObjects.Add(new WorldObject(ObjectType.Bench, 410f, 175f));
+                    WorldObjects.Add(new WorldObject(ObjectType.Table, 540f, 195f));
+                    WorldObjects.Add(new WorldObject(ObjectType.Jar, 670f, 205f));
+                    WorldObjects.Add(new WorldObject(ObjectType.Rock, 770f, 175f));
                     break;
                 case 8:
-                    WorldObjects.Add(new WorldObject(ObjectType.Jar, 290f, 180f));
-                    WorldObjects.Add(new WorldObject(ObjectType.Crate, 420f, 175f));
-                    WorldObjects.Add(new WorldObject(ObjectType.Rock, 540f, 195f));
-                    WorldObjects.Add(new WorldObject(ObjectType.Barrel, 660f, 165f));
-                    WorldObjects.Add(new WorldObject(ObjectType.Crate, 760f, 205f));
+                    WorldObjects.Add(new WorldObject(ObjectType.Table, 280f, 180f));
+                    WorldObjects.Add(new WorldObject(ObjectType.Bench, 420f, 175f));
+                    WorldObjects.Add(new WorldObject(ObjectType.Jar, 550f, 195f));
+                    WorldObjects.Add(new WorldObject(ObjectType.Cart, 670f, 170f));
+                    WorldObjects.Add(new WorldObject(ObjectType.Crate, 770f, 205f));
                     break;
                 case 9:
-                    WorldObjects.Add(new WorldObject(ObjectType.Rock, 320f, 185f));
-                    WorldObjects.Add(new WorldObject(ObjectType.Barrel, 460f, 190f));
-                    WorldObjects.Add(new WorldObject(ObjectType.Jar, 570f, 175f));
-                    WorldObjects.Add(new WorldObject(ObjectType.Club, 680f, 170f));
+                    WorldObjects.Add(new WorldObject(ObjectType.Table, 290f, 185f));
+                    WorldObjects.Add(new WorldObject(ObjectType.Cart, 440f, 180f));
+                    WorldObjects.Add(new WorldObject(ObjectType.Bench, 580f, 195f));
+                    WorldObjects.Add(new WorldObject(ObjectType.RiceSack, 700f, 170f));
                     break;
             }
 

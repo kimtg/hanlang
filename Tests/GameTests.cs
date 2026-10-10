@@ -742,6 +742,78 @@ namespace HanlangGame.Tests
             Assert("1장 재도전 시 체력 완전 회복", testScene.Status.CurrentHp == testScene.Status.MaxHp);
             Assert("1장 재도전 시 입구 좌표 배치", testScene.Player.X == 35f);
 
+            // Test 31: 대형 투척 무기(수레, 탁자, 평상, 쌀가마니) 및 80% 감속 BGM 템포 검증
+            var cartObj = new WorldObject(ObjectType.Cart, 100f, 170f);
+            var tableObj = new WorldObject(ObjectType.Table, 140f, 170f);
+            var benchObj = new WorldObject(ObjectType.Bench, 180f, 170f);
+            var riceSackObj = new WorldObject(ObjectType.RiceSack, 220f, 170f);
+
+            Assert("대형 수레 크기(폭 34) 및 내구도(4) 검증", cartObj.Width == 34 && cartObj.Durability == 4);
+            Assert("대형 탁자 크기(폭 30) 및 내구도(2) 검증", tableObj.Width == 30 && tableObj.Durability == 2);
+            Assert("대형 평상 크기(폭 32) 및 내구도(3) 검증", benchObj.Width == 32 && benchObj.Durability == 3);
+            Assert("쌀가마니 크기(폭 24) 및 내구도(1) 검증", riceSackObj.Width == 24 && riceSackObj.Durability == 1);
+
+            Assert("대형 수레 도트 스프라이트(obj_cart) 캐싱 일치", RetroSprites.GetSprite("obj_cart") != null);
+            Assert("대형 탁자 도트 스프라이트(obj_table) 캐싱 일치", RetroSprites.GetSprite("obj_table") != null);
+            Assert("대형 평상 도트 스프라이트(obj_bench) 캐싱 일치", RetroSprites.GetSprite("obj_bench") != null);
+            Assert("쌀가마니 도트 스프라이트(obj_ricesack) 캐싱 일치", RetroSprites.GetSprite("obj_ricesack") != null);
+
+            // 대형 수레를 들고 스윙 타격 시 강력한 데미지(+30) 및 내구도 감소
+            var heavyStatus = new StatusSystem();
+            var heavyPlayer = new Player(heavyStatus) { X = 100f, Y = 170f, FacingRight = true };
+            var heavyEnemy = new Enemy(EnemyType.Thug, 120f, 170f);
+            heavyPlayer.CarriedObject = cartObj;
+            cartObj.IsCarried = true;
+            heavyPlayer.State = "swing";
+            heavyPlayer.CurrentAttackType = "swing";
+            heavyPlayer.HasDealtDamage = false;
+
+            var heavyCombat = new CombatSystem();
+            heavyCombat.CheckCollisions(heavyPlayer, new System.Collections.Generic.List<Enemy> { heavyEnemy }, new System.Collections.Generic.List<WorldObject> { cartObj });
+            Assert("대형 수레 스윙 적중 시 대량 피해 입힘 (8+30=38 데미지)", heavyEnemy.CurrentHp == (45 - 38));
+            Assert("대형 수레 스윙 후 내구도 1 감소 (4 -> 3)", cartObj.Durability == 3);
+
+            // 대형 수레 투척 시 적을 즉시 다운(down)시키고 관성으로 계속 굴러감
+            var rollCartEnemy = new Enemy(EnemyType.Thug, 150f, 170f);
+            cartObj.X = 140f;
+            cartObj.Y = 170f;
+            cartObj.IsCarried = false;
+            cartObj.IsFlying = true;
+            cartObj.ThrownByPlayer = true;
+            cartObj.Vx = 220f;
+            heavyCombat.CheckCollisions(heavyPlayer, new System.Collections.Generic.List<Enemy> { rollCartEnemy }, new System.Collections.Generic.List<WorldObject> { cartObj });
+            Assert("날아온 수레에 피격된 적은 즉시 다운(down) 전이", rollCartEnemy.State == "down");
+
+            // 바닥의 쌀가마니를 타격하거나 던져 맞출 시 파쇄되며 아이템(주먹밥/엽전) 드롭 및 습득
+            var groundRiceSack = new WorldObject(ObjectType.RiceSack, 115f, 170f);
+            heavyPlayer.CarriedObject = null;
+            heavyPlayer.State = "punch";
+            heavyPlayer.CurrentAttackType = "punch";
+            heavyPlayer.HasDealtDamage = false;
+            heavyPlayer.Status.CurrentHp = 50; // 주먹밥 습득 시 회복 여부 검출을 위해 체력 감소 상태로 설정
+            int prevGold = heavyPlayer.Status.Gold;
+            int prevHp = heavyPlayer.Status.CurrentHp;
+            int prevItemCount = heavyCombat.Items.Count;
+            heavyCombat.CheckCollisions(heavyPlayer, new System.Collections.Generic.List<Enemy>(), new System.Collections.Generic.List<WorldObject> { groundRiceSack });
+            Assert("쌀가마니 피격 시 파쇄(IsDead true)", groundRiceSack.IsDead);
+            Assert("쌀가마니 파쇄 시 식량/엽전 아이템 드롭 및 습득 확인", heavyCombat.Items.Count > prevItemCount || heavyPlayer.Status.Gold > prevGold || heavyPlayer.Status.CurrentHp > prevHp);
+
+            // BGM 80% 속도 템포 검증 (MIDI usPerBeat 계측)
+            byte[] slowedMid = MidiGenerator.GenerateBgmMid("stage");
+            int tempoIdx = -1;
+            for (int i = 0; i < slowedMid.Length - 5; i++)
+            {
+                if (slowedMid[i] == 0xFF && slowedMid[i + 1] == 0x51 && slowedMid[i + 2] == 0x03)
+                {
+                    tempoIdx = i + 3;
+                    break;
+                }
+            }
+            Assert("MIDI Tempo 메타 이벤트 존재", tempoIdx > 0);
+            int usPerBeat = (slowedMid[tempoIdx] << 16) | (slowedMid[tempoIdx + 1] << 8) | slowedMid[tempoIdx + 2];
+            // 원래 148 BPM일 때 약 405,405 us -> 80% 감속 시 118.4 BPM이 되어 약 506,756 us
+            Assert("BGM 템포가 기존 대비 80% 수준으로 감속됨 (usPerBeat > 500000)", usPerBeat > 500000);
+
             Console.WriteLine("----------------------------------------------------");
             Console.WriteLine($" 총 테스트 결과: {passed} / {total} 통과 ({(passed == total ? "100% 성공" : "실패 항목 있음")})");
             Console.WriteLine("====================================================");

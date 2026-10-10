@@ -110,7 +110,18 @@ namespace HanlangGame.Systems
                             "kick" => player.Status.KickDamage,
                             "jumpkick" => player.Status.KickDamage + 4,
                             "swing" => player.Status.PunchDamage + (player.CarriedObject != null
-                                ? (player.CarriedObject.Type == ObjectType.Club ? 14 : (player.CarriedObject.Type == ObjectType.Crate ? 18 : (player.CarriedObject.Type == ObjectType.Barrel ? 24 : 16)))
+                                ? player.CarriedObject.Type switch
+                                {
+                                    ObjectType.Cart => 30,     // 대형 수레로 통쾌하게 후려치기
+                                    ObjectType.Table => 26,    // 대형 탁자로 내려찍기
+                                    ObjectType.Bench => 25,    // 평상으로 광역 휩쓸기
+                                    ObjectType.Barrel => 24,   // 주막 술통
+                                    ObjectType.RiceSack => 22, // 묵직한 쌀가마니 강타
+                                    ObjectType.Crate => 18,    // 나무 궤짝
+                                    ObjectType.Rock => 16,     // 돌멩이
+                                    ObjectType.Club => 14,     // 목봉
+                                    _ => 16
+                                }
                                 : (player.CarriedEnemy != null ? 16 : 10)),
                             _ => player.Status.PunchDamage
                         };
@@ -121,11 +132,24 @@ namespace HanlangGame.Systems
                             if (player.CarriedObject != null)
                             {
                                 player.CarriedObject.Durability--;
-                                if (player.CarriedObject.Durability <= 0)
+                                if (player.CarriedObject.Durability <= 0 || player.CarriedObject.Type == ObjectType.RiceSack)
                                 {
+                                    if (player.CarriedObject.Type == ObjectType.RiceSack)
+                                    {
+                                        var dropType = new Random().Next(100) < 70 ? ItemType.RiceBall : ItemType.Coin;
+                                        Items.Add(new Item(player.CarriedObject.X, player.CarriedObject.Y, dropType));
+                                        SoundSynth.PlayShatter();
+                                    }
+                                    else if (player.CarriedObject.Type == ObjectType.Table || player.CarriedObject.Type == ObjectType.Jar)
+                                    {
+                                        SoundSynth.PlayShatter();
+                                    }
+                                    else
+                                    {
+                                        SoundSynth.PlayHit();
+                                    }
                                     player.CarriedObject.IsDead = true;
                                     player.CarriedObject = null;
-                                    SoundSynth.PlayHit();
                                 }
                             }
                             else if (player.CarriedEnemy != null)
@@ -193,7 +217,7 @@ namespace HanlangGame.Systems
                         if (box.IntersectsWith(obj.GetBodyHitbox()))
                         {
                             player.HasDealtDamage = true;
-                            if (obj.Type == ObjectType.Jar)
+                            if (obj.Type == ObjectType.Jar || obj.Type == ObjectType.RiceSack)
                             {
                                 obj.Durability = 0;
                                 obj.IsDead = true;
@@ -201,19 +225,36 @@ namespace HanlangGame.Systems
                                 AddHitSparks(obj.X, obj.Y - 10f, count: 8);
                                 AddDust(obj.X, obj.Y, count: 6);
 
-                                // 옹기 항아리가 깨지며 아이템 드롭
+                                // 옹기 항아리나 쌀가마니가 깨지며 아이템 드롭
                                 var rand = new Random();
-                                var dropType = rand.Next(100) < 65 ? ItemType.Coin : ItemType.RiceBall;
+                                var dropType = (obj.Type == ObjectType.RiceSack)
+                                    ? (rand.Next(100) < 75 ? ItemType.RiceBall : ItemType.Coin)
+                                    : (rand.Next(100) < 65 ? ItemType.Coin : ItemType.RiceBall);
                                 Items.Add(new Item(obj.X, obj.Y, dropType));
                             }
-                            else if (obj.Type == ObjectType.Barrel)
+                            else if (obj.Type == ObjectType.Barrel || obj.Type == ObjectType.Cart)
                             {
                                 obj.IsFlying = true;
                                 obj.ThrownByPlayer = true;
-                                obj.Vx = (player.FacingRight ? 1f : -1f) * 230f;
+                                obj.Vx = (player.FacingRight ? 1f : -1f) * (obj.Type == ObjectType.Cart ? 250f : 230f);
                                 obj.Vz = 25f;
                                 SoundSynth.PlayWhoosh();
-                                AddDust(obj.X, obj.Y, count: 4);
+                                AddDust(obj.X, obj.Y, count: 5);
+                            }
+                            else
+                            {
+                                obj.Durability--;
+                                AddHitSparks(obj.X, obj.Y - 10f, count: 5);
+                                if (obj.Durability <= 0)
+                                {
+                                    obj.IsDead = true;
+                                    SoundSynth.PlayShatter();
+                                    AddDust(obj.X, obj.Y, count: 6);
+                                }
+                                else
+                                {
+                                    SoundSynth.PlayHit();
+                                }
                             }
                             break;
                         }
@@ -221,7 +262,7 @@ namespace HanlangGame.Systems
                 }
             }
 
-            // 1-2. 날아가거나 굴러가는 투척 오브젝트(목봉, 궤짝, 돌멩이, 항아리, 술통) 판정
+            // 1-2. 날아가거나 굴러가는 투척 오브젝트(수레, 탁자, 평상, 쌀가마니, 목봉, 궤짝, 돌멩이, 항아리, 술통) 판정
             if (worldObjects != null)
             {
                 foreach (var obj in worldObjects)
@@ -234,26 +275,30 @@ namespace HanlangGame.Systems
                         foreach (var enemy in enemies)
                         {
                             if (enemy.IsDead || enemy.State == "down") continue;
-                            if (Math.Abs(obj.Y - enemy.Y) > 16f) continue;
+                            if (Math.Abs(obj.Y - enemy.Y) > 18f) continue;
 
                             var enemyBody = enemy.GetBodyHitbox();
                             if (obj.GetBodyHitbox().IntersectsWith(enemyBody))
                             {
                                 int throwDamage = obj.Type switch
                                 {
-                                    ObjectType.Rock => 28,
-                                    ObjectType.Crate => 24,
-                                    ObjectType.Barrel => 30,
-                                    ObjectType.Jar => 18,
+                                    ObjectType.Cart => 36,     // 대형 수레 충돌 (최대 데미지)
+                                    ObjectType.Table => 32,    // 대형 탁자 투척
+                                    ObjectType.Bench => 30,    // 대형 평상 투척
+                                    ObjectType.Barrel => 30,   // 술통
+                                    ObjectType.Rock => 28,     // 돌멩이
+                                    ObjectType.RiceSack => 26, // 볏짚 쌀가마니
+                                    ObjectType.Crate => 24,    // 궤짝
+                                    ObjectType.Jar => 18,      // 항아리
                                     _ => 20
                                 };
                                 float dir = Math.Sign(obj.Vx);
                                 if (dir == 0) dir = 1f;
 
                                 enemy.TakeDamage(throwDamage, dir, out _);
-                                if (obj.Type == ObjectType.Barrel)
+                                if (obj.Type == ObjectType.Barrel || obj.Type == ObjectType.Cart || obj.Type == ObjectType.Bench)
                                 {
-                                    // 술통에 부딪힌 적은 바닥으로 굴러넘어짐
+                                    // 술통, 대형 수레, 평상에 부딪힌 적은 바닥으로 굴러넘어짐!
                                     enemy.State = "down";
                                     enemy.StateTimer = 0f;
                                 }
@@ -267,16 +312,19 @@ namespace HanlangGame.Systems
                                 }
 
                                 obj.Durability--;
-                                if (obj.Type == ObjectType.Jar)
+                                if (obj.Type == ObjectType.Jar || obj.Type == ObjectType.RiceSack)
                                 {
                                     obj.Durability = 0;
                                     obj.IsDead = true;
                                     SoundSynth.PlayShatter();
-                                    Items.Add(new Item(obj.X, obj.Y, ItemType.Coin));
+                                    var dropType = (obj.Type == ObjectType.RiceSack)
+                                        ? (new Random().Next(100) < 75 ? ItemType.RiceBall : ItemType.Coin)
+                                        : ItemType.Coin;
+                                    Items.Add(new Item(obj.X, obj.Y, dropType));
                                 }
-                                else if (obj.Type == ObjectType.Barrel)
+                                else if (obj.Type == ObjectType.Barrel || obj.Type == ObjectType.Cart)
                                 {
-                                    obj.Vx *= 0.65f;
+                                    obj.Vx *= (obj.Type == ObjectType.Cart ? 0.78f : 0.65f);
                                     SoundSynth.PlayHit();
                                     if (obj.Durability <= 0)
                                     {
@@ -292,6 +340,7 @@ namespace HanlangGame.Systems
                                     if (obj.Durability <= 0)
                                     {
                                         obj.IsDead = true;
+                                        if (obj.Type == ObjectType.Table) SoundSynth.PlayShatter();
                                     }
                                     SoundSynth.PlayHit();
                                 }
@@ -304,14 +353,18 @@ namespace HanlangGame.Systems
                         // 적이 던진 물체 -> 플레이어 피격 판정!
                         if (player.InvincibleTimer <= 0 && player.State != "down")
                         {
-                            if (Math.Abs(obj.Y - player.Y) <= 16f)
+                            if (Math.Abs(obj.Y - player.Y) <= 18f)
                             {
                                 var playerBody = player.GetBodyHitbox();
                                 if (obj.GetBodyHitbox().IntersectsWith(playerBody))
                                 {
                                     int throwDamage = obj.Type switch
                                     {
+                                        ObjectType.Cart => 24,
+                                        ObjectType.Table => 20,
+                                        ObjectType.Bench => 18,
                                         ObjectType.Rock => 16,
+                                        ObjectType.RiceSack => 16,
                                         ObjectType.Crate => 14,
                                         _ => 12
                                     };

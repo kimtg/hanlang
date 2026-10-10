@@ -7,11 +7,15 @@ namespace HanlangGame.Entities
 {
     public enum ObjectType
     {
-        Club,   // 목봉 (빠르고 사거리 긴 무기)
-        Crate,  // 나무 궤짝 (넓은 범위, 던지면 산산조각)
-        Rock,   // 돌멩이 (단단하고 묵직한 투척 무기)
-        Jar,    // 옹기 항아리 (깨지면 엽전이나 주먹밥 드롭)
-        Barrel  // 주막 술통 (굴러가며 적들을 차례로 넘어뜨림)
+        Club,     // 목봉 (빠르고 사거리 긴 무기)
+        Crate,    // 나무 궤짝 (넓은 범위, 던지면 산산조각)
+        Rock,     // 돌멩이 (단단하고 묵직한 투척 무기)
+        Jar,      // 옹기 항아리 (깨지면 엽전이나 주먹밥 드롭)
+        Barrel,   // 주막 술통 (굴러가며 적들을 차례로 넘어뜨림)
+        Cart,     // 대형 달구지 수레 (크고 무거움, 투척/타격 시 굴러가며 다수 적 분쇄)
+        Table,    // 대형 주막 탁자 / 서당 책상 (넓은 면적, 강력한 내려치기와 파쇄 투척)
+        Bench,    // 대형 주막 평상 / 긴 의자 (광역 가로 휩쓸기 및 적 다운)
+        RiceSack  // 볏짚 쌀가마니 (묵직한 타격, 충격 시 터지며 주먹밥/엽전 드롭)
     }
 
     public class WorldObject : Entity
@@ -57,6 +61,26 @@ namespace HanlangGame.Entities
                     Height = 22;
                     Durability = 3;
                     break;
+                case ObjectType.Cart:
+                    Width = 34;
+                    Height = 22;
+                    Durability = 4;
+                    break;
+                case ObjectType.Table:
+                    Width = 30;
+                    Height = 18;
+                    Durability = 2;
+                    break;
+                case ObjectType.Bench:
+                    Width = 32;
+                    Height = 16;
+                    Durability = 3;
+                    break;
+                case ObjectType.RiceSack:
+                    Width = 24;
+                    Height = 18;
+                    Durability = 1;
+                    break;
             }
         }
 
@@ -85,9 +109,9 @@ namespace HanlangGame.Entities
                 if (IsGrounded)
                 {
                     IsFlying = false;
-                    if (Type == ObjectType.Barrel)
+                    if (Type == ObjectType.Barrel || Type == ObjectType.Cart)
                     {
-                        // 술통은 착지 후 계속 굴러감
+                        // 술통과 수레는 착지 후 관성으로 계속 굴러감!
                         IsRolling = true;
                         Vz = 0f;
                     }
@@ -99,10 +123,10 @@ namespace HanlangGame.Entities
 
                     // 착지 시 내구도 감소
                     Durability--;
-                    if (Durability <= 0)
+                    if (Durability <= 0 || Type == ObjectType.RiceSack)
                     {
                         IsDead = true;
-                        if (Type == ObjectType.Jar)
+                        if (Type == ObjectType.Jar || Type == ObjectType.RiceSack || Type == ObjectType.Table)
                             SoundSynth.PlayShatter();
                         else
                             SoundSynth.PlayHit();
@@ -134,6 +158,10 @@ namespace HanlangGame.Entities
                 ObjectType.Rock => "obj_rock",
                 ObjectType.Jar => "obj_jar",
                 ObjectType.Barrel => "obj_barrel",
+                ObjectType.Cart => "obj_cart",
+                ObjectType.Table => "obj_table",
+                ObjectType.Bench => "obj_bench",
+                ObjectType.RiceSack => "obj_ricesack",
                 _ => "obj_club"
             };
 

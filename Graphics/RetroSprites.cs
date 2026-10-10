@@ -51,11 +51,15 @@ namespace HanlangGame.Visuals
             _cache["item_scroll"] = CreateScroll();
 
             // 주워서 때리거나 던질 수 있는 오브젝트
-            _cache["obj_club"]    = CreateClub();     // 몽둥이/목봉
-            _cache["obj_crate"]   = CreateCrate();    // 나무 궤짝
-            _cache["obj_rock"]    = CreateRock();     // 돌멩이/바위
-            _cache["obj_jar"]     = CreateJar();      // 옹기 항아리
-            _cache["obj_barrel"]  = CreateBarrel();   // 주막 술통
+            _cache["obj_club"]     = CreateClub();      // 몽둥이/목봉
+            _cache["obj_crate"]    = CreateCrate();     // 나무 궤짝
+            _cache["obj_rock"]     = CreateRock();      // 돌멩이/바위
+            _cache["obj_jar"]      = CreateJar();       // 옹기 항아리
+            _cache["obj_barrel"]   = CreateBarrel();    // 주막 술통
+            _cache["obj_cart"]     = CreateCart();      // 대형 달구지 수레
+            _cache["obj_table"]    = CreateTable();     // 대형 주막 탁자 / 서당 책상
+            _cache["obj_bench"]    = CreateBench();     // 대형 주막 평상 / 긴 의자
+            _cache["obj_ricesack"] = CreateRiceSack();  // 볏짚 쌀가마니
         }
 
         private static void RegisterChibiHeroSet(string prefix, Color robeColor, Color vestColor, Color beltColor, bool isEnemy = false, bool isBoss = false, int scaleW = 30, int scaleH = 34, HeadgearType headgear = HeadgearType.Topknot)
@@ -1170,6 +1174,185 @@ namespace HanlangGame.Visuals
 
             g.FillRectangle(bOut, 8, 7, 3, 3);
             g.FillRectangle(bWoodDk, 9, 8, 1, 1);
+            return bmp;
+        }
+
+        private static Bitmap CreateCart()
+        {
+            var bmp = new Bitmap(34, 24);
+            using var g = System.Drawing.Graphics.FromImage(bmp);
+            g.Clear(Color.Transparent);
+
+            using var bOut = new SolidBrush(Color.FromArgb(40, 24, 12));
+            using var bWood = new SolidBrush(Color.FromArgb(155, 98, 48));
+            using var bWoodDk = new SolidBrush(Color.FromArgb(108, 62, 28));
+            using var bWoodLt = new SolidBrush(Color.FromArgb(205, 145, 80));
+            using var bIron = new SolidBrush(Color.FromArgb(60, 65, 72));
+            using var bIronLt = new SolidBrush(Color.FromArgb(135, 142, 150));
+
+            // 대형 달구지 짐수레 (화물 적재함 + 손잡이 끌채 + 큼직한 바퀴살)
+            // 1. 적재함 본체
+            g.FillRectangle(bOut, 2, 4, 26, 12);
+            g.FillRectangle(bWood, 3, 5, 24, 10);
+
+            // 적재함 내부 나무 판자 살
+            g.FillRectangle(bWoodLt, 4, 6, 22, 2);
+            g.FillRectangle(bWoodDk, 4, 9, 22, 1);
+            g.FillRectangle(bWoodLt, 4, 11, 22, 2);
+
+            // 적재함 세로 지지 기둥
+            g.FillRectangle(bOut, 4, 3, 2, 13);
+            g.FillRectangle(bOut, 15, 3, 2, 13);
+            g.FillRectangle(bOut, 26, 3, 2, 13);
+
+            // 2. 앞쪽 끌채/손잡이
+            g.FillRectangle(bOut, 26, 9, 7, 3);
+            g.FillRectangle(bWoodLt, 27, 10, 6, 1);
+
+            // 3. 수레바퀴
+            // 좌측 뒷바퀴 약간 어둡게
+            g.FillEllipse(bOut, 3, 11, 10, 11);
+            g.FillEllipse(bWoodDk, 4, 12, 8, 9);
+
+            // 우측 앞바퀴 (중심 주 바퀴)
+            g.FillEllipse(bOut, 14, 11, 12, 12);
+            g.FillEllipse(bIron, 15, 12, 10, 10);
+            g.FillEllipse(bWood, 16, 13, 8, 8);
+
+            // 바퀴살 (Spokes) & 철제 축(Hub)
+            using var pSpoke = new Pen(bIronLt, 1);
+            g.DrawLine(pSpoke, 20, 13, 20, 21);
+            g.DrawLine(pSpoke, 16, 17, 24, 17);
+            g.DrawLine(pSpoke, 17, 14, 23, 20);
+            g.DrawLine(pSpoke, 17, 20, 23, 14);
+
+            g.FillEllipse(bIronLt, 18, 15, 4, 4);
+            g.FillEllipse(bOut, 19, 16, 2, 2);
+
+            return bmp;
+        }
+
+        private static Bitmap CreateTable()
+        {
+            var bmp = new Bitmap(30, 18);
+            using var g = System.Drawing.Graphics.FromImage(bmp);
+            g.Clear(Color.Transparent);
+
+            using var bOut = new SolidBrush(Color.FromArgb(42, 22, 12));
+            using var bWood = new SolidBrush(Color.FromArgb(145, 82, 38));
+            using var bWoodDk = new SolidBrush(Color.FromArgb(92, 48, 20));
+            using var bWoodLt = new SolidBrush(Color.FromArgb(195, 125, 68));
+            using var bShine = new SolidBrush(Color.FromArgb(235, 175, 115));
+
+            // 대형 주막 주안상 / 서당 서책 탁자
+            // 1. 넓은 상판
+            g.FillRectangle(bOut, 1, 2, 28, 7);
+            g.FillRectangle(bWood, 2, 3, 26, 5);
+            g.FillRectangle(bShine, 3, 3, 24, 1);
+            g.FillRectangle(bWoodLt, 3, 4, 24, 2);
+            g.FillRectangle(bWoodDk, 2, 6, 26, 2);
+
+            // 2. 탁자 뒷다리
+            g.FillRectangle(bOut, 5, 8, 3, 7);
+            g.FillRectangle(bWoodDk, 6, 8, 2, 6);
+            g.FillRectangle(bOut, 22, 8, 3, 7);
+            g.FillRectangle(bWoodDk, 22, 8, 2, 6);
+
+            // 가로 지지대 쇠목
+            g.FillRectangle(bOut, 4, 12, 22, 2);
+            g.FillRectangle(bWoodDk, 4, 12, 22, 1);
+
+            // 3. 탁자 앞다리
+            g.FillRectangle(bOut, 2, 8, 4, 9);
+            g.FillRectangle(bWood, 3, 8, 2, 8);
+            g.FillRectangle(bWoodLt, 3, 9, 1, 6);
+
+            g.FillRectangle(bOut, 24, 8, 4, 9);
+            g.FillRectangle(bWood, 25, 8, 2, 8);
+            g.FillRectangle(bWoodLt, 25, 9, 1, 6);
+
+            return bmp;
+        }
+
+        private static Bitmap CreateBench()
+        {
+            var bmp = new Bitmap(32, 16);
+            using var g = System.Drawing.Graphics.FromImage(bmp);
+            g.Clear(Color.Transparent);
+
+            using var bOut = new SolidBrush(Color.FromArgb(38, 24, 14));
+            using var bWood = new SolidBrush(Color.FromArgb(162, 110, 56));
+            using var bWoodDk = new SolidBrush(Color.FromArgb(110, 70, 32));
+            using var bWoodLt = new SolidBrush(Color.FromArgb(210, 158, 92));
+
+            // 대형 주막 평상 / 긴 목조 의자
+            // 1. 긴 널빤지 평상 판자
+            g.FillRectangle(bOut, 1, 2, 30, 6);
+            g.FillRectangle(bWood, 2, 3, 28, 4);
+
+            // 판자 틈새 표현
+            g.FillRectangle(bWoodLt, 2, 3, 28, 1);
+            g.FillRectangle(bWoodDk, 10, 3, 1, 4);
+            g.FillRectangle(bWoodDk, 20, 3, 1, 4);
+
+            // 2. 가로 지지 대들보
+            g.FillRectangle(bOut, 3, 7, 26, 3);
+            g.FillRectangle(bWoodDk, 4, 8, 24, 2);
+
+            // 3. 네 귀퉁이 굵은 다리
+            g.FillRectangle(bOut, 3, 9, 4, 6);
+            g.FillRectangle(bWood, 4, 9, 2, 5);
+            g.FillRectangle(bWoodLt, 4, 10, 1, 4);
+
+            g.FillRectangle(bOut, 25, 9, 4, 6);
+            g.FillRectangle(bWood, 26, 9, 2, 5);
+            g.FillRectangle(bWoodLt, 26, 10, 1, 4);
+
+            // 중앙 보강 기둥
+            g.FillRectangle(bOut, 14, 9, 4, 6);
+            g.FillRectangle(bWoodDk, 15, 9, 2, 5);
+
+            return bmp;
+        }
+
+        private static Bitmap CreateRiceSack()
+        {
+            var bmp = new Bitmap(24, 18);
+            using var g = System.Drawing.Graphics.FromImage(bmp);
+            g.Clear(Color.Transparent);
+
+            using var bOut = new SolidBrush(Color.FromArgb(48, 38, 18));
+            using var bStraw = new SolidBrush(Color.FromArgb(198, 162, 92));
+            using var bStrawLt = new SolidBrush(Color.FromArgb(232, 202, 134));
+            using var bStrawDk = new SolidBrush(Color.FromArgb(148, 116, 58));
+            using var bRope = new SolidBrush(Color.FromArgb(102, 74, 32));
+            using var bRed = new SolidBrush(Color.FromArgb(195, 35, 30));
+
+            // 전통 볏짚 쌀가마니 (곡물 포대)
+            // 1. 양쪽 묶음 매듭 술
+            g.FillRectangle(bOut, 0, 5, 3, 8);
+            g.FillRectangle(bStrawDk, 0, 6, 2, 6);
+            g.FillRectangle(bOut, 21, 5, 3, 8);
+            g.FillRectangle(bStrawDk, 22, 6, 2, 6);
+
+            // 2. 몸체 본체
+            g.FillEllipse(bOut, 2, 1, 20, 16);
+            g.FillEllipse(bStraw, 3, 2, 18, 14);
+
+            // 볏짚 격자 질감
+            g.FillRectangle(bStrawLt, 5, 4, 14, 3);
+            g.FillRectangle(bStrawDk, 4, 8, 16, 1);
+            g.FillRectangle(bStrawLt, 5, 10, 14, 2);
+            g.FillRectangle(bStrawDk, 4, 13, 16, 1);
+
+            // 3. 새끼줄 동여맴
+            g.FillRectangle(bRope, 7, 2, 2, 14);
+            g.FillRectangle(bRope, 15, 2, 2, 14);
+
+            // 4. 중앙 붉은 낙관 각인
+            g.FillRectangle(bRed, 11, 7, 3, 4);
+            g.FillRectangle(bStrawLt, 12, 8, 1, 2);
+
             return bmp;
         }
     }
