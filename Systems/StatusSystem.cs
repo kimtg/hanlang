@@ -31,7 +31,7 @@ namespace HanlangGame.Systems
 
         public int PunchDamage => 8 + (Power - 10) * 2;
         public int KickDamage => 14 + (Power - 10) * 3;
-        public int SpecialDamage => 25 + (Ki - 10) * 4 + (Power - 10) * 2;
+        public int SpecialDamage => (int)Math.Round((25 + (Ki - 10) * 4 + (Power - 10) * 2) * 1.5);
 
         public int CurrentHp { get; set; } = 100;
         public int CurrentMp { get; set; } = 50;

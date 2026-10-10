@@ -9,7 +9,9 @@ namespace HanlangGame.Entities
     {
         Club,   // 목봉 (빠르고 사거리 긴 무기)
         Crate,  // 나무 궤짝 (넓은 범위, 던지면 산산조각)
-        Rock    // 돌멩이 (단단하고 묵직한 투척 무기)
+        Rock,   // 돌멩이 (단단하고 묵직한 투척 무기)
+        Jar,    // 옹기 항아리 (깨지면 엽전이나 주먹밥 드롭)
+        Barrel  // 주막 술통 (굴러가며 적들을 차례로 넘어뜨림)
     }
 
     public class WorldObject : Entity
@@ -17,6 +19,7 @@ namespace HanlangGame.Entities
         public ObjectType Type { get; set; }
         public bool IsCarried { get; set; } = false;
         public bool IsFlying { get; set; } = false;
+        public bool IsRolling { get; set; } = false;
         public bool ThrownByPlayer { get; set; } = true;
         public int Durability { get; set; } = 3;
 
@@ -44,6 +47,16 @@ namespace HanlangGame.Entities
                     Height = 14;
                     Durability = 3;
                     break;
+                case ObjectType.Jar:
+                    Width = 16;
+                    Height = 18;
+                    Durability = 1;
+                    break;
+                case ObjectType.Barrel:
+                    Width = 20;
+                    Height = 22;
+                    Durability = 3;
+                    break;
             }
         }
 
@@ -55,20 +68,44 @@ namespace HanlangGame.Entities
 
             Y = Math.Clamp(Y, 145f, 225f);
 
+            if (IsRolling)
+            {
+                X += Vx * dt;
+                Vx *= 0.985f;
+                if (Math.Abs(Vx) < 15f)
+                {
+                    IsRolling = false;
+                    Vx = 0f;
+                }
+            }
+
             if (IsFlying)
             {
                 // 날아가는 동안 약간의 회전 또는 감속
                 if (IsGrounded)
                 {
                     IsFlying = false;
-                    Vx = 0f;
-                    Vy = 0f;
+                    if (Type == ObjectType.Barrel)
+                    {
+                        // 술통은 착지 후 계속 굴러감
+                        IsRolling = true;
+                        Vz = 0f;
+                    }
+                    else
+                    {
+                        Vx = 0f;
+                        Vy = 0f;
+                    }
+
                     // 착지 시 내구도 감소
                     Durability--;
                     if (Durability <= 0)
                     {
                         IsDead = true;
-                        SoundSynth.PlayHit();
+                        if (Type == ObjectType.Jar)
+                            SoundSynth.PlayShatter();
+                        else
+                            SoundSynth.PlayHit();
                     }
                 }
             }
@@ -95,6 +132,8 @@ namespace HanlangGame.Entities
                 ObjectType.Club => "obj_club",
                 ObjectType.Crate => "obj_crate",
                 ObjectType.Rock => "obj_rock",
+                ObjectType.Jar => "obj_jar",
+                ObjectType.Barrel => "obj_barrel",
                 _ => "obj_club"
             };
 

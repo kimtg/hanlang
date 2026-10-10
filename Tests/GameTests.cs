@@ -514,6 +514,115 @@ namespace HanlangGame.Tests
             Assert("고해상도 캔버스 스케일(3배) 정밀 반영", Math.Abs(screenXHorizon - (dispHorizon + 160f) * 3f) < 0.01f);
 
 
+            // Test 24: 삼대 삼한 비기(훈민선풍각, 용비어천격, 월인천강포) 1.5배 데미지 및 효과 검증
+            var secretStatus = new StatusSystem();
+            int baseFormula = 25 + (secretStatus.Ki - 10) * 4 + (secretStatus.Power - 10) * 2;
+            int expectedSpecialDmg = (int)Math.Round(baseFormula * 1.5);
+            Assert("비기 기본 위력은 기존 공식의 1.5배(38)", secretStatus.SpecialDamage == expectedSpecialDmg);
+
+            var secretPlayer = new Player(secretStatus);
+            secretPlayer.X = 100f;
+            secretPlayer.Y = 170f;
+            var secretEnemy = new Enemy(EnemyType.Thug, 115f, 170f);
+
+            // 제1 비기: 훈민선풍각 (spin)
+            secretPlayer.State = "spin";
+            secretPlayer.CurrentAttackType = "spin";
+            secretPlayer.HasDealtDamage = false;
+            var secretCombat = new CombatSystem();
+            secretCombat.CheckCollisions(secretPlayer, new List<Enemy> { secretEnemy });
+            Assert("훈민선풍각 적중 시 1.5배 상향 데미지(38) 반영", secretEnemy.CurrentHp == 45 - expectedSpecialDmg);
+
+            // 제2 비기: 용비어천격 (dragon - 공중 띄우기)
+            secretEnemy.CurrentHp = 100;
+            secretEnemy.State = "idle"; // 다운 상태 해제 후 기상 상태로 테스트
+            secretPlayer.State = "dragon";
+            secretPlayer.CurrentAttackType = "dragon";
+            secretPlayer.HasDealtDamage = false;
+            secretCombat.CheckCollisions(secretPlayer, new List<Enemy> { secretEnemy });
+            Assert("용비어천격 적중 시 적이 공중으로 솟구쳐 뜸 (Vz 240)", secretEnemy.Vz == 240f);
+            Assert("용비어천격 적중 시 적이 다운 상태로 전이", secretEnemy.State == "down");
+
+            // 제3 비기: 월인천강포 (wave - 관통 파동포 사거리 150px)
+            secretPlayer.State = "wave";
+            var waveHitbox = secretPlayer.GetAttackHitbox();
+            Assert("월인천강포 히트박스는 전방 150px 관통 광선 사거리 가짐", waveHitbox.HasValue && waveHitbox.Value.Width >= 150f);
+
+            // Test 25: 철벽 가드(Guard) 및 순간 쳐내기(Just Parry) 검증
+            var defPlayer = new Player(new StatusSystem());
+            defPlayer.State = "guard";
+            int hpBeforeGuard = defPlayer.Status.CurrentHp;
+            defPlayer.TakeDamage(20, 1f, out bool wasParried, out bool wasGuarded);
+            Assert("가드 상태에서 피격 시 wasGuarded는 true", wasGuarded);
+            Assert("가드 상태에서는 피해가 70% 감소(6 데미지만 입음)", defPlayer.Status.CurrentHp == hpBeforeGuard - 6);
+            Assert("가드 상태에서는 다운되지 않음", defPlayer.State == "guard");
+
+            // 순간 쳐내기 (Just Parry) 검증 (피격 직전 0.22초 이내 Z키 입력)
+            defPlayer.State = "idle";
+            defPlayer.InvincibleTimer = 0f; // 가드 후 무적 시간 초기화
+            defPlayer.ParryWindowTimer = 0.20f;
+            defPlayer.Status.CurrentMp = 10;
+            int hpBeforeParry = defPlayer.Status.CurrentHp;
+            defPlayer.TakeDamage(30, 1f, out bool justParried, out bool justGuarded);
+            Assert("0.22초 이내 Z입력 시 justParried는 true", justParried);
+            Assert("순간 쳐내기 성공 시 피격 데미지 0 (HP 보존)", defPlayer.Status.CurrentHp == hpBeforeParry);
+            Assert("순간 쳐내기 성공 시 기력 MP +10 회복 (10 -> 20)", defPlayer.Status.CurrentMp == 20);
+
+            // 적의 공격에 대한 순간 쳐내기 시 적 기절(Stun) 검증
+            defPlayer.X = 100f;
+            defPlayer.Y = 170f;
+            defPlayer.FacingRight = true;
+            defPlayer.InvincibleTimer = 0f;
+            defPlayer.ParryWindowTimer = 0.20f;
+            var attackingEnemy = new Enemy(EnemyType.Thug, 110f, 170f);
+            attackingEnemy.FacingRight = false; // 플레이어를 향해 주먹 공격
+            attackingEnemy.State = "punch";
+            attackingEnemy.HasDealtDamage = false;
+            secretCombat.CheckCollisions(defPlayer, new List<Enemy> { attackingEnemy });
+            Assert("쳐내기 성공 시 적이 기절(hit) 상태로 전이", attackingEnemy.State == "hit");
+            Assert("쳐내기 성공 시 적에게 1초 이상의 장기 스턴 타이머 부여", attackingEnemy.StateTimer < 0f);
+
+            // Test 26: 비상 낙법 (Ukemi) 검증
+            var ukemiPlayer = new Player(new StatusSystem());
+            ukemiPlayer.State = "down";
+            ukemiPlayer.Z = 16f; // 체공 중
+            var jumpInput = new Input();
+            jumpInput.OnKeyDown(Keys.C);
+            ukemiPlayer.HandleInput(jumpInput);
+            Assert("다운 체공 중 C키 입력 시 낙법 발동하여 idle 복귀", ukemiPlayer.State == "idle");
+            Assert("낙법 성공 시 즉시 착지(Z=0)", ukemiPlayer.Z == 0f);
+            Assert("낙법 성공 시 0.5초 무적 시간 획득", ukemiPlayer.InvincibleTimer == 0.5f);
+
+            // Test 27: 신규 오브젝트 옹기 항아리(Jar)와 주막 술통(Barrel) 검증
+            var jarObj = new WorldObject(ObjectType.Jar, 200f, 170f);
+            var barrelObj = new WorldObject(ObjectType.Barrel, 250f, 170f);
+            Assert("항아리 오브젝트 타입은 Jar", jarObj.Type == ObjectType.Jar);
+            Assert("술통 오브젝트 타입은 Barrel", barrelObj.Type == ObjectType.Barrel);
+
+            // 플레이어가 항아리 타격 시 깨지며 아이템 드롭/습득 검증
+            var smashPlayer = new Player(new StatusSystem());
+            smashPlayer.X = 195f;
+            smashPlayer.Y = 170f;
+            smashPlayer.Status.CurrentHp = 50; // 주먹밥 습득 시 HP 증가 측정을 위해 50으로 설정
+            smashPlayer.State = "punch";
+            smashPlayer.CurrentAttackType = "punch";
+            smashPlayer.HasDealtDamage = false;
+            int goldBeforeSmash = smashPlayer.Status.Gold;
+            int hpBeforeSmash = smashPlayer.Status.CurrentHp;
+            secretCombat.CheckCollisions(smashPlayer, new List<Enemy>(), new List<WorldObject> { jarObj });
+            Assert("항아리 타격 시 내구도가 0이 되어 파괴됨", jarObj.IsDead);
+            Assert("항아리 파괴 시 드롭 아이템(골드 또는 주먹밥) 즉시 습득", smashPlayer.Status.Gold > goldBeforeSmash || smashPlayer.Status.CurrentHp > hpBeforeSmash || secretCombat.Items.Count > 0);
+
+            // 술통 타격 시 굴러가며 적을 넘어뜨림 검증
+            var rollEnemy = new Enemy(EnemyType.Thug, 260f, 170f);
+            barrelObj.X = 250f;
+            barrelObj.Y = 170f;
+            barrelObj.IsFlying = true;
+            barrelObj.ThrownByPlayer = true;
+            barrelObj.Vx = 200f;
+            secretCombat.CheckCollisions(smashPlayer, new List<Enemy> { rollEnemy }, new List<WorldObject> { barrelObj });
+            Assert("굴러가는 술통에 부딪힌 적은 넘어짐(State down)", rollEnemy.State == "down");
+
             Console.WriteLine("----------------------------------------------------");
             Console.WriteLine($" 총 테스트 결과: {passed} / {total} 통과 ({(passed == total ? "100% 성공" : "실패 항목 있음")})");
             Console.WriteLine("====================================================");

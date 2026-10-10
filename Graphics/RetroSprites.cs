@@ -54,6 +54,8 @@ namespace HanlangGame.Visuals
             _cache["obj_club"]    = CreateClub();     // 몽둥이/목봉
             _cache["obj_crate"]   = CreateCrate();    // 나무 궤짝
             _cache["obj_rock"]    = CreateRock();     // 돌멩이/바위
+            _cache["obj_jar"]     = CreateJar();      // 옹기 항아리
+            _cache["obj_barrel"]  = CreateBarrel();   // 주막 술통
         }
 
         private static void RegisterChibiHeroSet(string prefix, Color robeColor, Color vestColor, Color beltColor, bool isEnemy = false, bool isBoss = false, int scaleW = 30, int scaleH = 34, HeadgearType headgear = HeadgearType.Topknot)
@@ -90,6 +92,20 @@ namespace HanlangGame.Visuals
             _cache[$"{prefix}_spin_2"]  = CreateSideChubbySD(2, "spin", robeColor, vestColor, beltColor, isEnemy, isBoss, scaleW, scaleH, headgear);
             _cache[$"{prefix}_spin_3"]  = CreateSideChubbySD(3, "spin", robeColor, vestColor, beltColor, isEnemy, isBoss, scaleW, scaleH, headgear);
             _cache[$"{prefix}_spin"]    = _cache[$"{prefix}_spin_0"];
+
+            // 방어(가드) 및 쳐내기(패링) 모션
+            _cache[$"{prefix}_guard"]   = CreateSideChubbySD(0, "guard", robeColor, vestColor, beltColor, isEnemy, isBoss, scaleW, scaleH, headgear);
+            _cache[$"{prefix}_parry"]   = CreateSideChubbySD(1, "guard", robeColor, vestColor, beltColor, isEnemy, isBoss, scaleW, scaleH, headgear);
+
+            // 제2 비기: 용비어천격 솟구침 승룡 어퍼컷 모션
+            _cache[$"{prefix}_dragon_0"] = CreateSideChubbySD(0, "dragon", robeColor, vestColor, beltColor, isEnemy, isBoss, scaleW, scaleH, headgear);
+            _cache[$"{prefix}_dragon_1"] = CreateSideChubbySD(1, "dragon", robeColor, vestColor, beltColor, isEnemy, isBoss, scaleW, scaleH, headgear);
+            _cache[$"{prefix}_dragon"]   = _cache[$"{prefix}_dragon_1"];
+
+            // 제3 비기: 월인천강포 달빛 태극 파동포 모션
+            _cache[$"{prefix}_wave_0"]   = CreateSideChubbySD(0, "wave", robeColor, vestColor, beltColor, isEnemy, isBoss, scaleW, scaleH, headgear);
+            _cache[$"{prefix}_wave_1"]   = CreateSideChubbySD(1, "wave", robeColor, vestColor, beltColor, isEnemy, isBoss, scaleW, scaleH, headgear);
+            _cache[$"{prefix}_wave"]     = _cache[$"{prefix}_wave_1"];
 
             // 물체/적을 들고 있는 모션 (대기, 이동 4프레임, 점프)
             _cache[$"{prefix}_carry"]        = CreateSideChubbySD(0, "carry_idle", robeColor, vestColor, beltColor, isEnemy, isBoss, scaleW, scaleH, headgear);
@@ -306,6 +322,40 @@ namespace HanlangGame.Visuals
                 g.FillRectangle(brOut, bx + legW - 1, legY - 1, legW, 5);
                 g.FillRectangle(brWhite, bx + legW, legY, legW - 2, 3);
             }
+            else if (action == "dragon")
+            {
+                // 용비어천격 솟구침 도약 다리 (승룡 자세)
+                g.FillRectangle(brOut, bx, legY - 2, legW, 6);
+                g.FillRectangle(brRobeDk, bx + 1, legY - 1, legW - 2, 3);
+                g.FillRectangle(brWhite, bx + 1, legY + 2, legW - 2, 2);
+                g.FillRectangle(brOut, bx + legW - 2, legY + 1, legW, 6);
+                g.FillRectangle(brRobe, bx + legW - 1, legY + 2, legW - 2, 3);
+                g.FillRectangle(brWhite, bx + legW - 1, legY + 5, legW - 2, 2);
+            }
+            else if (action == "wave")
+            {
+                // 월인천강포 단단한 기마자세 다리
+                int backX = bx - 2;
+                int frontX = bx + legW;
+                g.FillRectangle(brOut, backX, legY, legW, legH);
+                g.FillRectangle(brRobeDk, backX + 1, legY, legW - 2, 3);
+                g.FillRectangle(brWhite, backX + 1, legY + 3, legW - 2, 3);
+                g.FillRectangle(brOut, frontX, legY, legW, legH);
+                g.FillRectangle(brRobe, frontX + 1, legY, legW - 2, 3);
+                g.FillRectangle(brWhite, frontX + 1, legY + 3, legW - 2, 3);
+            }
+            else if (action == "guard")
+            {
+                // 방어/쳐내기 견고한 수비 보폭
+                int backX = bx - 1;
+                int frontX = bx + legW - 2;
+                g.FillRectangle(brOut, backX, legY, legW, legH);
+                g.FillRectangle(brRobeDk, backX + 1, legY, legW - 2, 3);
+                g.FillRectangle(brWhite, backX + 1, legY + 3, legW - 2, 3);
+                g.FillRectangle(brOut, frontX, legY, legW, legH);
+                g.FillRectangle(brRobe, frontX + 1, legY, legW - 2, 3);
+                g.FillRectangle(brWhite, frontX + 1, legY + 3, legW - 2, 3);
+            }
             else if (action == "walk" || action == "carry_walk")
             {
                 // 보행 및 들고 이동 시 4프레임 보행 다리 (다리 사이 1픽셀 외곽선)
@@ -354,6 +404,28 @@ namespace HanlangGame.Visuals
                 g.FillRectangle(brRobe, bx + 2, headY + 2, 4, 5);
                 g.FillRectangle(brSkin, bx + 2, headY - 1, 4, 3);
             }
+            else if (action == "guard")
+            {
+                // 방어 자세: 가슴 앞을 든든하게 받치는 뒷손 가드 팔 (가죽 아대)
+                g.FillRectangle(brOut, bx + 2, bodyY + 1, 6, 7);
+                g.FillRectangle(brRobe, bx + 3, bodyY + 2, 4, 5);
+                g.FillRectangle(brBelt, bx + 3, bodyY + 4, 4, 2); // 손목 아대
+                g.FillRectangle(brSkin, bx + 3, bodyY, 4, 3);     // 주먹
+            }
+            else if (action == "dragon")
+            {
+                // 용비어천격 솟구침 시 허리춤을 단단히 받치는 뒷손
+                g.FillRectangle(brOut, bx - 1, bodyY + 4, 6, 6);
+                g.FillRectangle(brRobe, bx, bodyY + 5, 4, 4);
+                g.FillRectangle(brSkin, bx + 3, bodyY + 5, 3, 3);
+            }
+            else if (action == "wave")
+            {
+                // 월인천강포 전방 장풍 방출 뒷손 손바닥
+                g.FillRectangle(brOut, bx + bodyW - 6, bodyY + 2, 7, 7);
+                g.FillRectangle(brRobe, bx + bodyW - 5, bodyY + 3, 4, 5);
+                g.FillRectangle(brSkin, bx + bodyW - 3, bodyY + 3, 4, 5);
+            }
             else if (action == "spin")
             {
                 // 회전 비기 시 좌측(뒤편) 팔의 역동적인 4프레임 회전
@@ -393,12 +465,30 @@ namespace HanlangGame.Visuals
             g.FillRectangle(brRobeDk, bx + 1, bodyY + 1, 3, bodyH - 2); // 등 뒤 그림자
             g.FillRectangle(brRobeLt, bx + bodyW - 4, bodyY + 1, 3, bodyH - 3); // 앞가슴 빛
 
-            // 쾌자
+            // 쾌자 (도포 위 걸치는 조끼)
             g.FillRectangle(brVest, bx + 3, bodyY + 1, bodyW - 6, bodyH - 3);
 
-            // 허리띠
+            // 보스/중간보스/특수 적 고유 장식
+            if (isBoss)
+            {
+                // 최종 보스 흑호: 가슴 황금 호랑이 흉배(Tiger Insignia)
+                using var brGoldEmblem = new SolidBrush(Color.FromArgb(255, 215, 60));
+                g.FillRectangle(brGoldEmblem, bx + bodyW - 6, bodyY + 3, 4, 4);
+                g.FillRectangle(new SolidBrush(Color.FromArgb(180, 25, 25)), bx + bodyW - 5, bodyY + 4, 2, 2);
+            }
+            else if (isEnemy && w >= 30)
+            {
+                // 중간보스 2 철웅: 강철 어깨 견갑(Pauldrons)
+                using var brSteel = new SolidBrush(Color.FromArgb(195, 205, 220));
+                g.FillRectangle(brSteel, bx + 1, bodyY, 3, 4);
+                g.FillRectangle(brSteel, bx + bodyW - 4, bodyY, 3, 4);
+            }
+
+            // 허리띠 및 멋스러운 술띠(Tassel)
             g.FillRectangle(brBelt, bx + 1, bodyY + 8, bodyW - 2, 2);
             g.FillRectangle(brOut, bx + bodyW - 2, bodyY + 8, 2, 3); // 앞쪽 매듭
+            g.FillRectangle(brBelt, bx + bodyW - 2, bodyY + 11, 2, 3); // 늘어뜨려진 술띠
+            g.FillRectangle(brWhite, bx + bodyW - 2, bodyY + 14, 2, 1);
 
             // ==========================================
             // 4. 머리 & 얼굴 표현 (몸통 다음에 그려 몸통에 가려지지 않음!)
@@ -423,7 +513,7 @@ namespace HanlangGame.Visuals
             g.FillRectangle(brCheek, hx + headW - 3, headY + 8, 4, 3);
             g.FillRectangle(brSkin, hx + headW - 2, headY + 7, 2, 2); // 코
 
-            // 눈 & 표정
+            // 눈 & 표정 (캐릭터별 개성 및 멋진 호걸 눈매)
             if (action == "hit")
             {
                 g.FillRectangle(brWhite, hx + headW - 5, headY + 5, 5, 5);
@@ -433,10 +523,37 @@ namespace HanlangGame.Visuals
             }
             else
             {
-                g.FillRectangle(brOut, hx + headW - 5, headY + 6, 4, 4);
-                g.FillRectangle(brWhite, hx + headW - 4, headY + 6, 1, 2);
-                g.FillRectangle(brOut, hx + headW - 6, headY + 5, 5, 1); // 눈썹
-                g.FillRectangle(brOut, hx + headW - 3, headY + 11, 3, 1); // 입
+                if (!isEnemy)
+                {
+                    // 주인공 유생 한랑: 결의에 찬 날카로운 호걸의 눈매와 눈빛 하이라이트!
+                    g.FillRectangle(brOut, hx + headW - 6, headY + 5, 5, 2); // 날렵한 무사 눈썹
+                    g.FillRectangle(brOut, hx + headW - 5, headY + 7, 4, 3); // 눈
+                    g.FillRectangle(brWhite, hx + headW - 4, headY + 7, 2, 2); // 반짝이는 눈빛 하이라이트!
+                    g.FillRectangle(brOut, hx + headW - 3, headY + 11, 3, 1); // 다문 입
+                }
+                else if (isBoss)
+                {
+                    // 마도학사 흑호: 불길하게 빛나는 붉은 안광(Evil Crimson Eyes)
+                    g.FillRectangle(brOut, hx + headW - 6, headY + 5, 5, 2);
+                    using var brEvilEye = new SolidBrush(Color.FromArgb(255, 50, 50));
+                    g.FillRectangle(brEvilEye, hx + headW - 5, headY + 7, 4, 3);
+                    g.FillRectangle(brWhite, hx + headW - 4, headY + 7, 1, 2);
+                    g.FillRectangle(brOut, hx + headW - 3, headY + 11, 4, 1);
+                }
+                else
+                {
+                    // 일반 적: 상투 깡패(흉터), 불량 훈도(수염), 결사대(복면)
+                    g.FillRectangle(brOut, hx + headW - 5, headY + 6, 4, 4);
+                    g.FillRectangle(brWhite, hx + headW - 4, headY + 6, 1, 2);
+                    g.FillRectangle(brOut, hx + headW - 6, headY + 5, 5, 1); // 눈썹
+                    g.FillRectangle(brOut, hx + headW - 3, headY + 11, 3, 1); // 입
+
+                    if (vestColor.R == 50 && vestColor.G == 25)
+                    {
+                        // 결사대: 닌자 복면
+                        g.FillRectangle(brOut, hx + headW - 4, headY + 9, 5, 3);
+                    }
+                }
             }
 
             // ==========================================
@@ -476,11 +593,12 @@ namespace HanlangGame.Visuals
                 g.FillRectangle(brGatBody, brimX + 1, brimY, brimW - 2, 1);
                 g.FillRectangle(brGatLt, brimX + 3, brimY, 6, 1);
 
-                // 3) 갓끈 (턱 밑과 가슴 도포 위로 시원하게 늘어뜨려진 구슬 갓끈)
+                // 3) 휘날리는 갓끈 (산호/금구슬 장식과 함께 바람에 유려하게 곡선을 그리며 휘날림!)
                 g.FillRectangle(brGatDark, hx + 4, headY + 6, 1, 5);
-                g.FillRectangle(brBeadR, hx + 4, headY + 11, 2, 2); // 턱 밑 산호 구슬
-                g.FillRectangle(brGatDark, hx + 4, headY + 13, 1, 3);
-                g.FillRectangle(brBeadG, hx + 4, headY + 16, 2, 2); // 가슴 앞 금구슬 장식
+                g.FillRectangle(brBeadR, hx + 4, headY + 11, 2, 2); // 산호 구슬
+                g.FillRectangle(brBeadG, hx + 3, headY + 13, 2, 2); // 금구슬
+                g.FillRectangle(brGatDark, hx + 2, headY + 15, 1, 3); // 바람에 뒤로 날리는 갓끈
+                g.FillRectangle(brBeadR, hx + 1, headY + 18, 2, 2);
             }
             else
             {
@@ -619,6 +737,41 @@ namespace HanlangGame.Visuals
                     g.FillRectangle(brWhiteLt, bx + bodyW + 2, legY + 3, 2, 2);
                 }
             }
+            else if (action == "guard")
+            {
+                // 방어/쳐내기: 가슴과 얼굴 앞을 단단히 가로막는 앞손 가드 (철벽 방어)
+                g.FillRectangle(brOut, bx + bodyW - 5, bodyY - 1, 7, 9);
+                g.FillRectangle(brRobe, bx + bodyW - 4, bodyY, 5, 7);
+                g.FillRectangle(brBelt, bx + bodyW - 4, bodyY + 3, 5, 2); // 튼튼한 가죽 아대
+                g.FillRectangle(brSkin, bx + bodyW - 4, bodyY - 1, 5, 4); // 주먹
+                g.FillRectangle(brWhite, bx + bodyW - 3, bodyY, 2, 2);
+            }
+            else if (action == "dragon")
+            {
+                // 용비어천격: 하늘을 찌르는 수직 승룡 어퍼컷 주먹!
+                int dArmX = bx + bodyW - 4;
+                int dArmY = headY - 6; // 머리 위로 높이 솟구친 주먹
+                g.FillRectangle(brOut, dArmX, dArmY, 7, 14);
+                g.FillRectangle(brRobe, dArmX + 1, dArmY + 5, 5, 8);
+                g.FillRectangle(brSkin, dArmX + 1, dArmY, 5, 6);
+                g.FillRectangle(brWhite, dArmX + 2, dArmY + 1, 2, 2); // 주먹 광채
+                // 승룡 황금빛 궤적선
+                using var brGoldGlow = new SolidBrush(Color.FromArgb(255, 220, 60));
+                g.FillRectangle(brGoldGlow, dArmX - 1, dArmY + 1, 1, 12);
+                g.FillRectangle(brGoldGlow, dArmX + 7, dArmY + 1, 1, 12);
+            }
+            else if (action == "wave")
+            {
+                // 월인천강포: 전방을 향해 뻗은 강력한 기공 파동 손바닥!
+                int wArmX = bx + bodyW - 2;
+                int wArmY = bodyY;
+                g.FillRectangle(brOut, wArmX, wArmY, 9, 8);
+                g.FillRectangle(brRobe, wArmX + 1, wArmY + 1, 4, 6);
+                g.FillRectangle(brSkin, wArmX + 4, wArmY, 5, 8);
+                // 손바닥 중심의 태극 기운 광채
+                using var brCyanOrb = new SolidBrush(Color.FromArgb(140, 230, 255));
+                g.FillEllipse(brCyanOrb, wArmX + 7, wArmY + 1, 5, 6);
+            }
             else
             {
                 // 기본 대기 및 보행: 1.5배 길고(7px) 3배 통통한(7px) 듬직한 앞쪽 팔뚝
@@ -736,6 +889,64 @@ namespace HanlangGame.Visuals
             g.FillRectangle(bOut, 1, 1, 12, 10);
             g.FillRectangle(bPaper, 2, 2, 10, 8);
             g.FillRectangle(bRed, 4, 4, 6, 4);
+            return bmp;
+        }
+
+        private static Bitmap CreateJar()
+        {
+            var bmp = new Bitmap(18, 18);
+            using var g = System.Drawing.Graphics.FromImage(bmp);
+            g.Clear(Color.Transparent);
+
+            using var bOut = new SolidBrush(Color.FromArgb(40, 22, 12));
+            using var bClay = new SolidBrush(Color.FromArgb(95, 52, 28));
+            using var bClayDk = new SolidBrush(Color.FromArgb(68, 36, 18));
+            using var bClayLt = new SolidBrush(Color.FromArgb(145, 82, 45));
+            using var bSheen = new SolidBrush(Color.FromArgb(200, 140, 90));
+
+            // 전통 옹기 항아리 (배가 부르고 뚜껑이 있는 질그릇)
+            g.FillRectangle(bOut, 7, 0, 4, 3);
+            g.FillRectangle(bClayLt, 8, 0, 2, 2);
+            g.FillRectangle(bOut, 4, 2, 10, 3);
+            g.FillRectangle(bClay, 5, 3, 8, 2);
+
+            g.FillEllipse(bOut, 1, 4, 16, 13);
+            g.FillEllipse(bClay, 2, 5, 14, 11);
+            g.FillEllipse(bClayDk, 2, 5, 5, 11);
+            g.FillEllipse(bClayLt, 7, 6, 7, 8);
+            g.FillRectangle(bSheen, 10, 7, 2, 4);
+
+            g.FillRectangle(bOut, 4, 16, 10, 2);
+            g.FillRectangle(bClayDk, 5, 16, 8, 1);
+            return bmp;
+        }
+
+        private static Bitmap CreateBarrel()
+        {
+            var bmp = new Bitmap(18, 16);
+            using var g = System.Drawing.Graphics.FromImage(bmp);
+            g.Clear(Color.Transparent);
+
+            using var bOut = new SolidBrush(Color.FromArgb(35, 20, 10));
+            using var bWood = new SolidBrush(Color.FromArgb(145, 95, 50));
+            using var bWoodDk = new SolidBrush(Color.FromArgb(105, 65, 30));
+            using var bWoodLt = new SolidBrush(Color.FromArgb(185, 125, 70));
+            using var bIron = new SolidBrush(Color.FromArgb(65, 70, 75));
+            using var bIronLt = new SolidBrush(Color.FromArgb(120, 130, 140));
+
+            // 주막 나무 술통 (철제 띠와 나무 결)
+            g.FillRectangle(bOut, 1, 1, 16, 14);
+            g.FillRectangle(bWood, 2, 2, 14, 12);
+            g.FillRectangle(bWoodDk, 2, 2, 4, 12);
+            g.FillRectangle(bWoodLt, 8, 2, 6, 12);
+
+            g.FillRectangle(bIron, 1, 4, 16, 2);
+            g.FillRectangle(bIronLt, 6, 4, 4, 1);
+            g.FillRectangle(bIron, 1, 10, 16, 2);
+            g.FillRectangle(bIronLt, 6, 10, 4, 1);
+
+            g.FillRectangle(bOut, 8, 7, 3, 3);
+            g.FillRectangle(bWoodDk, 9, 8, 1, 1);
             return bmp;
         }
     }

@@ -13,6 +13,7 @@ namespace HanlangGame
     {
         Title,
         Playing,
+        Paused,
         StatusMenu,
         ShopMenu,
         GameOver,
@@ -35,6 +36,8 @@ namespace HanlangGame
         private StatusMenu _statusMenu = null!;
         private ShopMenu _shopMenu = null!;
         private TitleScreen _titleScreen = null!;
+        private PauseMenu _pauseMenu = null!;
+        private DialogueBox _dialogueBox = null!;
 
         private float _cameraX = 0f;
         private string _notifyMessage = "";
@@ -58,6 +61,8 @@ namespace HanlangGame
             _statusMenu = new StatusMenu();
             _shopMenu = new ShopMenu();
             _titleScreen = new TitleScreen();
+            _pauseMenu = new PauseMenu();
+            _dialogueBox = new DialogueBox();
 
             _combatSystem.OnScreenShake = (intensity, duration) => TriggerScreenShake(intensity, duration);
             _combatSystem.OnHitStop = (duration) => TriggerHitStop(duration);
@@ -136,6 +141,16 @@ namespace HanlangGame
                     else if (titleAction == "load_game") LoadSavedGame();
                     break;
 
+                case GameState.Paused:
+                    _pauseMenu.HandleInput(_input, out bool resume, out bool quitToTitle);
+                    if (resume) State = GameState.Playing;
+                    else if (quitToTitle)
+                    {
+                        State = GameState.Title;
+                        SoundSynth.PlayBgm("title");
+                    }
+                    break;
+
                 case GameState.StatusMenu:
                     _statusMenu.HandleInput(_input, _status, out bool shouldClose);
                     if (shouldClose) State = GameState.Playing;
@@ -178,6 +193,40 @@ namespace HanlangGame
 
         private void UpdatePlaying(float dt)
         {
+            // 보스 조우 대화창 활성화 상태일 때는 대화 진행만 처리
+            if (_dialogueBox.IsActive)
+            {
+                _dialogueBox.HandleInput(_input);
+                _dialogueBox.Update(dt);
+                return;
+            }
+
+            // ESC 키로 일시 정지 및 무예 보감 열기
+            if (_input.IsJustPressed(Keys.Escape))
+            {
+                SoundSynth.PlayJump();
+                State = GameState.Paused;
+                return;
+            }
+
+            // 보스 조우 대화 검사 (플레이어가 보스 반경 180px 이내로 접근 시)
+            if (_stageManager.CurrentBoss != null && _stageManager.CurrentBoss.IsAlive && !_dialogueBox.HasTriggered(_stageManager.CurrentStage))
+            {
+                if (Math.Abs(_player.X - _stageManager.CurrentBoss.X) < 180f)
+                {
+                    _dialogueBox.TriggerStageDialogue(_stageManager.CurrentStage);
+                    return;
+                }
+            }
+
+            // 보스 격파 피니셔 배너 검사
+            if (_stageManager.CurrentBoss != null && _stageManager.CurrentBoss.CurrentHp <= 0 && !_dialogueBox.FinisherActive)
+            {
+                _dialogueBox.TriggerFinisher("격 파 (擊破)");
+            }
+
+            _dialogueBox.Update(dt);
+
             // BGM 전환 (보스 출현 여부)
             if (_stageManager.CurrentBoss != null && _stageManager.CurrentBoss.IsAlive)
             {
@@ -284,10 +333,15 @@ namespace HanlangGame
                     break;
 
                 case GameState.Playing:
+                case GameState.Paused:
                 case GameState.StatusMenu:
                 case GameState.ShopMenu:
                     RenderPlaying();
-                    if (State == GameState.StatusMenu)
+                    if (State == GameState.Paused)
+                    {
+                        _pauseMenu.Render(_buffer);
+                    }
+                    else if (State == GameState.StatusMenu)
                     {
                         _statusMenu.Render(_buffer, _status);
                     }
@@ -360,11 +414,17 @@ namespace HanlangGame
             // 3. 960x720 고해상도 타격 이펙트, 말풍선, 데미지 플로팅 텍스트
             _combatSystem.Render(_buffer, renderCamX);
 
-            // 4. 960x720 고해상도 다음 구역 화살표
+            // 4. 동적 날씨 파티클 및 환경 기믹 (단풍, 안개, 비, 번개, 화살)
+            _stageManager.RenderWeatherAndHazards(_buffer, renderCamX);
+
+            // 5. 960x720 고해상도 다음 구역 화살표
             _stageManager.RenderStageClearArrow(_buffer);
 
-            // 5. 960x720 고해상도 상단 HUD & 하단 보스 게이지
+            // 6. 960x720 고해상도 상단 HUD & 하단 보스 게이지
             _hud.Render(_buffer, _player, _stageManager.CurrentBoss, _stageManager.CurrentStage);
+
+            // 7. 보스전 대화창 및 KO 격파 배너
+            _dialogueBox.Render(_buffer);
         }
 
         private void RenderGameOver()

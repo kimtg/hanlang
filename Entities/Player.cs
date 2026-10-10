@@ -15,6 +15,13 @@ namespace HanlangGame.Entities
         public int ComboCount { get; set; } = 0;
         public float AttackTimer { get; set; } = 0f;
 
+        // 방어 및 순간 쳐내기 (Guard & Just Parry)
+        public float ZHoldTimer { get; set; } = 0f;
+        public float ParryWindowTimer { get; set; } = 0f;
+        public bool JustParried { get; set; } = false;
+        public float JustParryVisualTimer { get; set; } = 0f;
+        public bool IsGuarding => State == "guard";
+
         // 들기 시스템 (물체 및 쓰러진 적)
         public WorldObject? CarriedObject { get; set; }
         public Enemy? CarriedEnemy { get; set; }
@@ -110,7 +117,38 @@ namespace HanlangGame.Entities
 
         public void HandleInput(Input input, System.Collections.Generic.List<WorldObject>? worldObjects = null, System.Collections.Generic.List<Enemy>? enemies = null)
         {
+            // 비상 낙법 (Ukemi): 공중 피격 또는 쓰러지는 도중(Z > 0 및 지면 28px 이내) C키 입력 시 즉시 착지 기상!
+            if ((State == "hit" || State == "down") && Z > 0 && Z < 28f)
+            {
+                if (input.IsJustPressed(Keys.C))
+                {
+                    State = "idle";
+                    StateTimer = 0f;
+                    Z = 0f;
+                    Vz = 0f;
+                    Vx = (FacingRight ? 1f : -1f) * 40f;
+                    InvincibleTimer = 0.5f;
+                    SoundSynth.PlayUkemi();
+                    return;
+                }
+            }
+
             if (State == "hit" || State == "down") return;
+
+            // Z키 누름 시간 및 순간 쳐내기(Just Parry) 입력 타이머 계측
+            if (input.IsJustPressed(Keys.Z))
+            {
+                ZHoldTimer = 0f;
+                ParryWindowTimer = 0.22f; // 피격 직전 0.22초 이내 입력 시 순간 쳐내기 발동!
+            }
+            else if (input.IsHeld(Keys.Z))
+            {
+                ZHoldTimer += 0.016f;
+            }
+            else
+            {
+                ZHoldTimer = 0f;
+            }
 
             // 1. 공중(점프) 상태일 때의 조작
             if (!IsGrounded)
@@ -157,8 +195,37 @@ namespace HanlangGame.Entities
                 return; // 공중 상태일 때는 지상 공격/보행 로직 건너뜀
             }
 
+            // 방어(가드) 자세 유지 및 해제 (Z키를 누르고 있는 동안 방어 자세 유지)
+            if (State == "guard")
+            {
+                if (input.IsHeld(Keys.Z))
+                {
+                    Vx = 0f;
+                    Vy = 0f;
+                    return;
+                }
+                else
+                {
+                    State = "idle";
+                    StateTimer = 0f;
+                }
+            }
+
+            // Z키 홀드로 방어(가드) 진입 (0.12초 이상 누르고 있을 때 지상 대기/보행 상태에서 전이)
+            if (input.IsHeld(Keys.Z) && ZHoldTimer >= 0.12f && IsGrounded && !IsCarrying)
+            {
+                if (State == "idle" || State == "walk" || State == "run" || (State == "punch" && StateTimer < 0.14f))
+                {
+                    State = "guard";
+                    StateTimer = 0f;
+                    Vx = 0f;
+                    Vy = 0f;
+                    return;
+                }
+            }
+
             // 2. 지상 공격 동작 중 이동 불가
-            if (State == "punch" || State == "kick" || State == "spin" || State == "swing")
+            if (State == "punch" || State == "kick" || State == "spin" || State == "swing" || State == "dragon" || State == "wave")
             {
                 Vx *= 0.5f;
                 Vy *= 0.5f;
@@ -263,18 +330,59 @@ namespace HanlangGame.Entities
                     }
                 }
             }
+            // 5. Space키: 삼대 삼한 비기 (훈민선풍각 / 용비어천격 / 월인천강포)
             else if (input.IsJustPressed(Keys.Space))
             {
-                if (Status.CurrentMp >= 15)
+                if (input.IsHeld(Keys.Down))
                 {
-                    DropCarried();
-                    Status.CurrentMp -= 15;
-                    State = "spin";
-                    StateTimer = 0f;
-                    HasDealtDamage = false;
-                    CurrentAttackType = "spin";
-                    SoundSynth.PlaySpecial();
-                    return;
+                    // 제3 비기: 월인천강포 (Moon Wave) [↓ + Space]
+                    if (Status.CurrentMp >= 25)
+                    {
+                        DropCarried();
+                        Status.CurrentMp -= 25;
+                        State = "wave";
+                        StateTimer = 0f;
+                        HasDealtDamage = false;
+                        CurrentAttackType = "wave";
+                        Vx = 0f;
+                        Vy = 0f;
+                        SoundSynth.PlayWave();
+                        SoundSynth.PlaySpecial();
+                        return;
+                    }
+                }
+                else if (input.IsHeld(Keys.Up))
+                {
+                    // 제2 비기: 용비어천격 (Dragon Uppercut) [↑ + Space]
+                    if (Status.CurrentMp >= 20)
+                    {
+                        DropCarried();
+                        Status.CurrentMp -= 20;
+                        State = "dragon";
+                        StateTimer = 0f;
+                        HasDealtDamage = false;
+                        CurrentAttackType = "dragon";
+                        Vz = 185f;
+                        Vx = (FacingRight ? 1f : -1f) * 65f;
+                        SoundSynth.PlayDragon();
+                        SoundSynth.PlaySpecial();
+                        return;
+                    }
+                }
+                else
+                {
+                    // 제1 비기: 훈민선풍각 (Hunmin Whirlwind Kick) [Space]
+                    if (Status.CurrentMp >= 15)
+                    {
+                        DropCarried();
+                        Status.CurrentMp -= 15;
+                        State = "spin";
+                        StateTimer = 0f;
+                        HasDealtDamage = false;
+                        CurrentAttackType = "spin";
+                        SoundSynth.PlaySpecial();
+                        return;
+                    }
                 }
             }
 
@@ -411,6 +519,15 @@ namespace HanlangGame.Entities
             }
 
             // 상태별 타이머 진행
+            if (ParryWindowTimer > 0)
+            {
+                ParryWindowTimer -= dt;
+            }
+            if (JustParryVisualTimer > 0)
+            {
+                JustParryVisualTimer -= dt;
+            }
+
             if (State == "dashpunch")
             {
                 Vx *= 0.94f;
@@ -443,6 +560,15 @@ namespace HanlangGame.Entities
                 Vx = (FacingRight ? 1f : -1f) * 60f;
                 if (StateTimer > 0.45f) State = "idle";
             }
+            else if (State == "dragon")
+            {
+                if (StateTimer > 0.42f && IsGrounded) State = "idle";
+            }
+            else if (State == "wave")
+            {
+                Vx *= 0.7f;
+                if (StateTimer > 0.50f) State = "idle";
+            }
             else if (State == "hit")
             {
                 Vx *= 0.85f;
@@ -467,33 +593,92 @@ namespace HanlangGame.Entities
 
         public RectangleF? GetAttackHitbox()
         {
-            if (State != "punch" && State != "kick" && State != "jumpkick" && State != "spin" && State != "swing" && State != "dashpunch" && State != "dashkick")
+            if (State != "punch" && State != "kick" && State != "jumpkick" && State != "spin" && State != "swing" && State != "dashpunch" && State != "dashkick" && State != "dragon" && State != "wave")
                 return null;
 
-            float reach = (State == "kick" || State == "jumpkick" || State == "dashkick") ? 22f : 16f;
-            if (State == "spin" || State == "swing" || State == "dashpunch") reach = 28f;
+            if (State == "dragon")
+            {
+                // 제2 비기 용비어천격: 수직으로 솟구치는 상단 48px 승룡 판정
+                float reach = 26f;
+                float attackX = FacingRight ? X + 2f : X - 2f - reach;
+                float attackY = Y - Z - 42f;
+                return new RectangleF(attackX, attackY, reach + 8f, 48f);
+            }
+            if (State == "wave")
+            {
+                // 제3 비기 월인천강포: 전방 150px 일직선 관통 광선 파동포 판정
+                float reach = 150f;
+                float attackX = FacingRight ? X + 6f : X - 6f - reach;
+                float attackY = Y - Z - 24f;
+                return new RectangleF(attackX, attackY, reach, 28f);
+            }
 
-            float attackX = FacingRight ? X + 4f : X - 4f - reach;
-            if (State == "spin") attackX = X - reach / 2f;
+            float reachStd = (State == "kick" || State == "jumpkick" || State == "dashkick") ? 22f : 16f;
+            if (State == "spin" || State == "swing" || State == "dashpunch") reachStd = 28f;
+
+            float attackXStd = FacingRight ? X + 4f : X - 4f - reachStd;
+            if (State == "spin") attackXStd = X - reachStd / 2f;
 
             if (State == "jumpkick")
             {
                 // 공중 날라차기: 발끝부터 지상 적의 몸통/머리까지 닿도록 하단으로 판정 확장
                 float attackY = Y - Z - 12f;
                 float attackHeight = 24f + Z; // 높이 뜰수록 지면까지 판정 연결
-                return new RectangleF(attackX, attackY, reach + 8f, attackHeight);
+                return new RectangleF(attackXStd, attackY, reachStd + 8f, attackHeight);
             }
             else
             {
                 float attackY = Y - Z - 24f;
-                return new RectangleF(attackX, attackY, reach + 6f, 22f);
+                return new RectangleF(attackXStd, attackY, reachStd + 6f, 22f);
             }
         }
 
         public void TakeDamage(int damage, float knockbackDir)
         {
+            TakeDamage(damage, knockbackDir, out _, out _);
+        }
+
+        public void TakeDamage(int damage, float knockbackDir, out bool parried, out bool guarded)
+        {
+            parried = false;
+            guarded = false;
+
             if (InvincibleTimer > 0 || State == "down") return;
 
+            // 1. 순간 쳐내기 (Just Parry): 공격 직전(0.22초 이내) Z키를 타이밍 맞게 입력했을 때!
+            if (ParryWindowTimer > 0)
+            {
+                parried = true;
+                JustParried = true;
+                JustParryVisualTimer = 0.35f;
+                ParryWindowTimer = 0f;
+                InvincibleTimer = 0.4f;
+                Status.CurrentMp = Math.Min(Status.MaxMp, Status.CurrentMp + 10); // 기력 MP +10 회복!
+                SoundSynth.PlayParry();
+                return;
+            }
+
+            // 2. 가드 (Guard): Z키를 길게 홀드하여 방어 자세를 유지하고 있을 때
+            if (State == "guard")
+            {
+                guarded = true;
+                damage = Math.Max(1, (int)(damage * 0.30f)); // 피격 데미지 70% 대폭 감소!
+                Status.CurrentHp -= damage;
+                SoundSynth.PlayGuard();
+                Vx = knockbackDir * 35f; // 약간의 밀림
+                InvincibleTimer = 0.28f;
+                if (Status.CurrentHp <= 0)
+                {
+                    Status.CurrentHp = 0;
+                    State = "down";
+                    StateTimer = 0f;
+                    Vz = 120f;
+                    Vx = knockbackDir * 100f;
+                }
+                return;
+            }
+
+            // 3. 일반 피격
             DropCarried(); // 피격 시 들고 있던 물체/적을 놓침
 
             Status.CurrentHp -= damage;
@@ -528,6 +713,9 @@ namespace HanlangGame.Entities
 
             string spriteKey = State switch
             {
+                "guard" => ParryWindowTimer > 0 ? "player_parry" : "player_guard",
+                "dragon" => AnimFrame > 0 ? "player_dragon_1" : "player_dragon_0",
+                "wave" => AnimFrame > 0 ? "player_wave_1" : "player_wave_0",
                 "swing" => "player_swing",
                 "dashpunch" => "player_punch_2",
                 "dashkick" => "player_kick_2",
@@ -555,11 +743,25 @@ namespace HanlangGame.Entities
             }
 
             // ==========================================
-            // 비기 훈민선풍각 화려한 광(빛) 효과 & 선풍 아우라 렌더링
+            // 삼대 삼한 비기 고해상도 이펙트 렌더링
             // ==========================================
             if (State == "spin")
             {
                 RenderHunminSpinGlow(buffer, cameraX);
+            }
+            else if (State == "dragon")
+            {
+                RenderDragonStrikeGlow(buffer, cameraX);
+            }
+            else if (State == "wave")
+            {
+                RenderMoonWaveGlow(buffer, cameraX);
+            }
+
+            // 순간 쳐내기 (Just Parry) 푸른 섬광 및 충격파 렌더링
+            if (JustParryVisualTimer > 0)
+            {
+                RenderJustParryFlash(buffer, cameraX);
             }
         }
 
@@ -624,6 +826,136 @@ namespace HanlangGame.Entities
                 using var starBrush = new SolidBrush(Color.White);
                 g.FillEllipse(starBrush, px - 2f, py - 2f, 4f, 4f);
             }
+        }
+
+        private void RenderDragonStrikeGlow(PixelBuffer buffer, float cameraX)
+        {
+            var g = buffer.Graphics;
+            buffer.SetHighQualityModes();
+
+            float scx = Perspective.ProjectScreenX(X, cameraX, Y);
+            float scy = Perspective.ProjectScreenY(Y - 15f, Z);
+
+            // 1. 청룡의 비룡 승천 나선형 기운 (Ascending Azure Dragon Spiral Aura)
+            float t = StateTimer * 20f;
+            for (int i = 0; i < 8; i++)
+            {
+                float arcY = scy + (i * 12f) - (StateTimer * 140f);
+                float arcX = scx + (float)Math.Sin(t + i * 0.8f) * 28f * (FacingRight ? 1f : -1f);
+                float size = (32f - i * 3f) * PixelBuffer.Scale;
+
+                using var dragonBrush = new SolidBrush(Color.FromArgb(160 - i * 16, 40, 160, 255));
+                g.FillEllipse(dragonBrush, arcX - size / 2f, arcY - size / 3f, size, size * 0.65f);
+
+                using var coreBrush = new SolidBrush(Color.FromArgb(210 - i * 20, 200, 245, 255));
+                g.FillEllipse(coreBrush, arcX - size / 4f, arcY - size / 6f, size / 2f, size * 0.35f);
+            }
+
+            // 2. 황금 승룡 어퍼컷 섬광 및 용비늘 궤적
+            float fistX = scx + (FacingRight ? 18f : -18f);
+            float fistY = scy - 25f;
+            using (var goldAuraPen = new Pen(Color.FromArgb(240, 255, 225, 60), 4f))
+            {
+                g.DrawEllipse(goldAuraPen, fistX - 22f, fistY - 22f, 44f, 44f);
+            }
+            using (var coreFlash = new SolidBrush(Color.FromArgb(255, 255, 255, 200)))
+            {
+                g.FillEllipse(coreFlash, fistX - 10f, fistY - 10f, 20f, 20f);
+            }
+
+            // 3. 한자 서예 텍스트 "龍 飛 御 天" 솟구치는 기운 투사
+            string[] dragonChars = { "龍", "飛", "御", "天" };
+            for (int c = 0; c < dragonChars.Length; c++)
+            {
+                float charY = scy - (c * 24f) - 15f;
+                float charX = scx + (float)Math.Sin(StateTimer * 15f + c) * 14f;
+                buffer.DrawOutlinedText(dragonChars[c], charX - 10f, charY, Color.FromArgb(255, 235, 75), Color.FromArgb(20, 40, 80), buffer.FontHeader, 2f);
+            }
+        }
+
+        private void RenderMoonWaveGlow(PixelBuffer buffer, float cameraX)
+        {
+            var g = buffer.Graphics;
+            buffer.SetHighQualityModes();
+
+            float scx = Perspective.ProjectScreenX(X, cameraX, Y);
+            float scy = Perspective.ProjectScreenY(Y - 15f, Z);
+
+            // 1. 은빛 보름달 광륜 (Silver Celestial Moon Halo)
+            float moonRadius = 45f * PixelBuffer.Scale;
+            using (var moonPen = new Pen(Color.FromArgb(170, 210, 240, 255), 3.5f))
+            using (var moonGlow = new SolidBrush(Color.FromArgb(45, 180, 220, 255)))
+            {
+                g.FillEllipse(moonGlow, scx - moonRadius, scy - moonRadius, moonRadius * 2f, moonRadius * 2f);
+                g.DrawEllipse(moonPen, scx - moonRadius, scy - moonRadius, moonRadius * 2f, moonRadius * 2f);
+            }
+
+            // 2. 청홍 태극 파동구 (Taegeuk Energy Sphere at Hands)
+            float handX = scx + (FacingRight ? 22f : -22f);
+            float handY = scy - 5f;
+            using (var blueTaegeuk = new SolidBrush(Color.FromArgb(220, 30, 90, 220)))
+            using (var redTaegeuk = new SolidBrush(Color.FromArgb(220, 220, 40, 40)))
+            {
+                g.FillPie(blueTaegeuk, handX - 16f, handY - 16f, 32f, 32f, 0, 180);
+                g.FillPie(redTaegeuk, handX - 16f, handY - 16f, 32f, 32f, 180, 180);
+            }
+
+            // 3. 150px 일직선 관통 광선 파동포 빔 (Piercing Wave Beam)
+            float beamLength = 150f * PixelBuffer.Scale;
+            float dir = FacingRight ? 1f : -1f;
+            float endX = handX + dir * beamLength;
+
+            // 외곽 푸른 파동 글로우
+            using (var outerBeam = new Pen(Color.FromArgb(160, 70, 175, 255), 26f))
+            {
+                outerBeam.StartCap = System.Drawing.Drawing2D.LineCap.Round;
+                outerBeam.EndCap = System.Drawing.Drawing2D.LineCap.Round;
+                g.DrawLine(outerBeam, handX, handY, endX, handY);
+            }
+
+            // 내부 순백 코어 빔
+            using (var coreBeam = new Pen(Color.FromArgb(255, 255, 255, 230), 12f))
+            {
+                coreBeam.StartCap = System.Drawing.Drawing2D.LineCap.Round;
+                coreBeam.EndCap = System.Drawing.Drawing2D.LineCap.Round;
+                g.DrawLine(coreBeam, handX, handY, endX, handY);
+            }
+
+            // 4. 파동포 궤적을 타고 나아가는 광채 한자 "月 印 千 江"
+            string[] waveChars = { "月", "印", "千", "江" };
+            for (int w = 0; w < waveChars.Length; w++)
+            {
+                float charX = handX + dir * (35f + w * 32f) * PixelBuffer.Scale;
+                buffer.DrawOutlinedText(waveChars[w], charX - 10f, handY - 14f, Color.FromArgb(255, 250, 150), Color.FromArgb(20, 30, 70), buffer.FontHeader, 2f);
+            }
+        }
+
+        private void RenderJustParryFlash(PixelBuffer buffer, float cameraX)
+        {
+            var g = buffer.Graphics;
+            buffer.SetHighQualityModes();
+
+            float scx = Perspective.ProjectScreenX(X, cameraX, Y);
+            float scy = Perspective.ProjectScreenY(Y - 15f, Z);
+
+            float ratio = JustParryVisualTimer / 0.35f;
+            float ringR = (1f - ratio) * 55f * PixelBuffer.Scale + 15f;
+
+            // 푸른빛 쳐내기 충격파 링
+            using (var parryPen = new Pen(Color.FromArgb((int)(255 * ratio), 100, 235, 255), 4f))
+            {
+                g.DrawEllipse(parryPen, scx - ringR, scy - ringR, ringR * 2f, ringR * 2f);
+            }
+
+            // 섬광 십자 광선
+            using (var rayPen = new Pen(Color.FromArgb((int)(255 * ratio), 255, 255, 255), 3f))
+            {
+                g.DrawLine(rayPen, scx - ringR * 1.5f, scy, scx + ringR * 1.5f, scy);
+                g.DrawLine(rayPen, scx, scy - ringR * 1.5f, scx, scy + ringR * 1.5f);
+            }
+
+            // 텍스트 강조
+            buffer.DrawOutlinedTextCentered("★ 순간 쳐내기 (Just Parry)! ★", (int)(scy - 45f), Color.FromArgb(140, 245, 255), Color.Black, buffer.FontSubtitle, 2f);
         }
     }
 }

@@ -120,64 +120,223 @@ namespace HanlangGame.Systems
                     break;
             }
 
-            // 각 장별 길거리 투척/타격 오브젝트 배치
+            // 각 장별 길거리 투척/타격 오브젝트 배치 (목봉, 궤짝, 돌멩이, 옹기 항아리, 주막 술통)
             switch (stage)
             {
                 case 1:
                     WorldObjects.Add(new WorldObject(ObjectType.Club, 290f, 175f));
                     WorldObjects.Add(new WorldObject(ObjectType.Crate, 440f, 210f));
-                    WorldObjects.Add(new WorldObject(ObjectType.Rock, 610f, 165f));
+                    WorldObjects.Add(new WorldObject(ObjectType.Jar, 550f, 185f));
+                    WorldObjects.Add(new WorldObject(ObjectType.Rock, 670f, 165f));
                     break;
                 case 2:
                     WorldObjects.Add(new WorldObject(ObjectType.Club, 280f, 190f));
-                    WorldObjects.Add(new WorldObject(ObjectType.Crate, 460f, 170f));
-                    WorldObjects.Add(new WorldObject(ObjectType.Rock, 610f, 205f));
-                    WorldObjects.Add(new WorldObject(ObjectType.Club, 730f, 180f));
+                    WorldObjects.Add(new WorldObject(ObjectType.Barrel, 420f, 175f));
+                    WorldObjects.Add(new WorldObject(ObjectType.Crate, 560f, 170f));
+                    WorldObjects.Add(new WorldObject(ObjectType.Jar, 680f, 205f));
+                    WorldObjects.Add(new WorldObject(ObjectType.Club, 770f, 180f));
                     break;
                 case 3:
                     WorldObjects.Add(new WorldObject(ObjectType.Crate, 310f, 180f));
-                    WorldObjects.Add(new WorldObject(ObjectType.Rock, 490f, 200f));
-                    WorldObjects.Add(new WorldObject(ObjectType.Club, 640f, 170f));
+                    WorldObjects.Add(new WorldObject(ObjectType.Barrel, 460f, 190f));
+                    WorldObjects.Add(new WorldObject(ObjectType.Jar, 580f, 170f));
+                    WorldObjects.Add(new WorldObject(ObjectType.Rock, 670f, 200f));
                     break;
                 case 4:
                     WorldObjects.Add(new WorldObject(ObjectType.Rock, 300f, 165f));
-                    WorldObjects.Add(new WorldObject(ObjectType.Rock, 470f, 210f));
-                    WorldObjects.Add(new WorldObject(ObjectType.Club, 620f, 180f));
-                    WorldObjects.Add(new WorldObject(ObjectType.Crate, 740f, 195f));
+                    WorldObjects.Add(new WorldObject(ObjectType.Jar, 440f, 180f));
+                    WorldObjects.Add(new WorldObject(ObjectType.Rock, 550f, 210f));
+                    WorldObjects.Add(new WorldObject(ObjectType.Club, 660f, 180f));
+                    WorldObjects.Add(new WorldObject(ObjectType.Crate, 760f, 195f));
                     break;
                 case 5:
-                    WorldObjects.Add(new WorldObject(ObjectType.Crate, 290f, 185f));
-                    WorldObjects.Add(new WorldObject(ObjectType.Club, 450f, 175f));
-                    WorldObjects.Add(new WorldObject(ObjectType.Crate, 610f, 205f));
-                    WorldObjects.Add(new WorldObject(ObjectType.Rock, 710f, 165f));
+                    WorldObjects.Add(new WorldObject(ObjectType.Barrel, 280f, 185f));
+                    WorldObjects.Add(new WorldObject(ObjectType.Jar, 420f, 170f));
+                    WorldObjects.Add(new WorldObject(ObjectType.Club, 530f, 175f));
+                    WorldObjects.Add(new WorldObject(ObjectType.Barrel, 640f, 205f));
+                    WorldObjects.Add(new WorldObject(ObjectType.Jar, 740f, 165f));
                     break;
                 case 6:
                     WorldObjects.Add(new WorldObject(ObjectType.Club, 310f, 170f));
-                    WorldObjects.Add(new WorldObject(ObjectType.Rock, 500f, 195f));
-                    WorldObjects.Add(new WorldObject(ObjectType.Crate, 660f, 180f));
+                    WorldObjects.Add(new WorldObject(ObjectType.Barrel, 470f, 190f));
+                    WorldObjects.Add(new WorldObject(ObjectType.Jar, 590f, 175f));
+                    WorldObjects.Add(new WorldObject(ObjectType.Crate, 710f, 180f));
                     break;
                 case 7:
                     WorldObjects.Add(new WorldObject(ObjectType.Club, 290f, 190f));
-                    WorldObjects.Add(new WorldObject(ObjectType.Crate, 470f, 170f));
-                    WorldObjects.Add(new WorldObject(ObjectType.Rock, 610f, 205f));
-                    WorldObjects.Add(new WorldObject(ObjectType.Club, 730f, 175f));
+                    WorldObjects.Add(new WorldObject(ObjectType.Barrel, 430f, 175f));
+                    WorldObjects.Add(new WorldObject(ObjectType.Crate, 560f, 170f));
+                    WorldObjects.Add(new WorldObject(ObjectType.Jar, 680f, 205f));
+                    WorldObjects.Add(new WorldObject(ObjectType.Rock, 760f, 175f));
                     break;
                 case 8:
-                    WorldObjects.Add(new WorldObject(ObjectType.Crate, 300f, 175f));
-                    WorldObjects.Add(new WorldObject(ObjectType.Rock, 480f, 195f));
-                    WorldObjects.Add(new WorldObject(ObjectType.Club, 640f, 165f));
-                    WorldObjects.Add(new WorldObject(ObjectType.Crate, 740f, 205f));
+                    WorldObjects.Add(new WorldObject(ObjectType.Jar, 290f, 180f));
+                    WorldObjects.Add(new WorldObject(ObjectType.Crate, 420f, 175f));
+                    WorldObjects.Add(new WorldObject(ObjectType.Rock, 540f, 195f));
+                    WorldObjects.Add(new WorldObject(ObjectType.Barrel, 660f, 165f));
+                    WorldObjects.Add(new WorldObject(ObjectType.Crate, 760f, 205f));
                     break;
                 case 9:
                     WorldObjects.Add(new WorldObject(ObjectType.Rock, 320f, 185f));
-                    WorldObjects.Add(new WorldObject(ObjectType.Club, 510f, 170f));
-                    WorldObjects.Add(new WorldObject(ObjectType.Crate, 610f, 200f));
+                    WorldObjects.Add(new WorldObject(ObjectType.Barrel, 460f, 190f));
+                    WorldObjects.Add(new WorldObject(ObjectType.Jar, 570f, 175f));
+                    WorldObjects.Add(new WorldObject(ObjectType.Club, 680f, 170f));
                     break;
+            }
+
+            InitWeather(stage);
+        }
+
+        // 동적 날씨 및 환경 기믹 상태
+        public float WeatherTimer { get; private set; } = 0f;
+        public float HazardTimer { get; private set; } = 0f;
+        public float HazardWarningTimer { get; private set; } = 0f;
+        public float HazardX { get; private set; } = 0f;
+        public bool HazardActive { get; private set; } = false;
+        private readonly List<(float x, float y, float vx, float vy, float size, Color col)> _weatherParticles = new();
+
+        private void InitWeather(int stage)
+        {
+            HazardTimer = 0f;
+            HazardWarningTimer = 0f;
+            HazardActive = false;
+            _weatherParticles.Clear();
+
+            var rand = new Random();
+            if (stage == 1 || stage == 2)
+            {
+                // 가을 단풍잎
+                for (int i = 0; i < 35; i++)
+                {
+                    float px = (float)rand.NextDouble() * PixelBuffer.Width;
+                    float py = (float)rand.NextDouble() * PixelBuffer.Height;
+                    float vx = 25f + (float)rand.NextDouble() * 35f;
+                    float vy = 20f + (float)rand.NextDouble() * 25f;
+                    Color col = (i % 2 == 0) ? Color.FromArgb(220, 200, 70, 30) : Color.FromArgb(220, 230, 160, 40);
+                    _weatherParticles.Add((px, py, vx, vy, 4f + (float)rand.NextDouble() * 4f, col));
+                }
+            }
+            else if (stage == 3)
+            {
+                // 청계천 강물 안개 구름
+                for (int i = 0; i < 18; i++)
+                {
+                    float px = (float)rand.NextDouble() * PixelBuffer.Width;
+                    float py = 380f + (float)rand.NextDouble() * 180f;
+                    float vx = 12f + (float)rand.NextDouble() * 18f;
+                    _weatherParticles.Add((px, py, vx, 0f, 25f + (float)rand.NextDouble() * 20f, Color.FromArgb(50, 210, 225, 235)));
+                }
+            }
+            else if (stage == 8 || stage == 9)
+            {
+                // 궁궐 폭풍우 빗줄기
+                for (int i = 0; i < 65; i++)
+                {
+                    float px = (float)rand.NextDouble() * PixelBuffer.Width;
+                    float py = (float)rand.NextDouble() * PixelBuffer.Height;
+                    float vx = -40f - (float)rand.NextDouble() * 30f;
+                    float vy = 280f + (float)rand.NextDouble() * 120f;
+                    _weatherParticles.Add((px, py, vx, vy, 2f, Color.FromArgb(140, 180, 210, 255)));
+                }
             }
         }
 
         public void Update(Player player, float dt)
         {
+            WeatherTimer += dt;
+
+            // 날씨 파티클 갱신
+            for (int p = 0; p < _weatherParticles.Count; p++)
+            {
+                var pt = _weatherParticles[p];
+                pt.x += pt.vx * dt;
+                pt.y += pt.vy * dt;
+                if (pt.y > PixelBuffer.Height + 20f || pt.x < -40f || pt.x > PixelBuffer.Width + 40f)
+                {
+                    pt.y = -10f;
+                    pt.x = (float)new Random().NextDouble() * PixelBuffer.Width;
+                }
+                _weatherParticles[p] = pt;
+            }
+
+            // 7장: 광화문 앞뜰 화살 세례 기믹 (Arrow Rain Hazard)
+            if (CurrentStage == 7)
+            {
+                HazardTimer += dt;
+                if (HazardWarningTimer > 0)
+                {
+                    HazardWarningTimer -= dt;
+                    if (HazardWarningTimer <= 0)
+                    {
+                        HazardActive = true;
+                        SoundSynth.PlayWhoosh();
+                        float minH = HazardX - 60f;
+                        float maxH = HazardX + 60f;
+                        if (player.X >= minH && player.X <= maxH && player.InvincibleTimer <= 0 && player.State != "down")
+                        {
+                            player.TakeDamage(15, 0f);
+                        }
+                        foreach (var enemy in Enemies)
+                        {
+                            if (!enemy.IsDead && enemy.State != "down" && enemy.X >= minH && enemy.X <= maxH)
+                            {
+                                enemy.TakeDamage(20, 0f, out _);
+                            }
+                        }
+                    }
+                }
+                else if (HazardActive)
+                {
+                    if (HazardTimer > 1.8f) HazardActive = false;
+                }
+                else if (HazardTimer > 9.0f)
+                {
+                    HazardTimer = 0f;
+                    HazardWarningTimer = 1.4f;
+                    HazardX = Math.Clamp(player.X + (new Random().Next(100) - 50), 120f, StageWidth - 120f);
+                }
+            }
+
+            // 9장: 천추전 낙뢰 기믹 (Thunder Strike Hazard)
+            if (CurrentStage == 9)
+            {
+                HazardTimer += dt;
+                if (HazardWarningTimer > 0)
+                {
+                    HazardWarningTimer -= dt;
+                    if (HazardWarningTimer <= 0)
+                    {
+                        HazardActive = true;
+                        SoundSynth.PlayThunder();
+                        float minH = HazardX - 45f;
+                        float maxH = HazardX + 45f;
+                        if (player.X >= minH && player.X <= maxH && player.InvincibleTimer <= 0 && player.State != "down")
+                        {
+                            player.TakeDamage(22, 0f);
+                        }
+                        foreach (var enemy in Enemies)
+                        {
+                            if (!enemy.IsDead && enemy.State != "down" && enemy.X >= minH && enemy.X <= maxH)
+                            {
+                                enemy.TakeDamage(30, 0f, out _);
+                                enemy.State = "down";
+                                enemy.Vz = 180f;
+                            }
+                        }
+                    }
+                }
+                else if (HazardActive)
+                {
+                    if (HazardTimer > 0.8f) HazardActive = false;
+                }
+                else if (HazardTimer > 10.5f)
+                {
+                    HazardTimer = 0f;
+                    HazardWarningTimer = 1.1f;
+                    HazardX = Math.Clamp(player.X + (new Random().Next(80) - 40), 100f, StageWidth - 100f);
+                }
+            }
+
             for (int i = Enemies.Count - 1; i >= 0; i--)
             {
                 var enemy = Enemies[i];
@@ -725,6 +884,99 @@ namespace HanlangGame.Systems
                             }
                         }
                     }
+                }
+            }
+        }
+
+        public void RenderWeatherAndHazards(PixelBuffer buffer, float cameraX)
+        {
+            var g = buffer.Graphics;
+            buffer.SetHighQualityModes();
+
+            // 1. 환경 기믹 렌더링 (7장 화살 세례 & 9장 천추전 낙뢰)
+            if (HazardWarningTimer > 0)
+            {
+                float scx = Perspective.ProjectScreenX(HazardX, cameraX, 185f);
+                float scy = Perspective.ProjectScreenY(185f, 0f);
+                bool blink = ((int)(HazardWarningTimer * 10) % 2 == 0);
+
+                if (CurrentStage == 7)
+                {
+                    // 7장 화살 낙하 위험 경고 구역
+                    float zoneW = 120f * PixelBuffer.Scale;
+                    using var warnBrush = new SolidBrush(Color.FromArgb(blink ? 120 : 60, 240, 40, 40));
+                    using var warnPen = new Pen(Color.FromArgb(255, 255, 60, 60), 2.5f);
+                    g.FillEllipse(warnBrush, scx - zoneW / 2f, scy - 18f, zoneW, 36f);
+                    g.DrawEllipse(warnPen, scx - zoneW / 2f, scy - 18f, zoneW, 36f);
+
+                    buffer.DrawOutlinedTextCentered("▲ 화살 세례 경고! ▲", (int)(scy - 45f), Color.FromArgb(255, 230, 80), Color.Black, buffer.FontSubtitle, 2f);
+                }
+                else if (CurrentStage == 9)
+                {
+                    // 9장 천추전 낙뢰 룬 서클 경고
+                    float zoneW = 90f * PixelBuffer.Scale;
+                    using var warnBrush = new SolidBrush(Color.FromArgb(blink ? 140 : 70, 160, 40, 240));
+                    using var warnPen = new Pen(Color.FromArgb(255, 140, 230, 255), 3f);
+                    g.FillEllipse(warnBrush, scx - zoneW / 2f, scy - 16f, zoneW, 32f);
+                    g.DrawEllipse(warnPen, scx - zoneW / 2f, scy - 16f, zoneW, 32f);
+
+                    buffer.DrawOutlinedTextCentered("⚡ 천둥 낙뢰 경고! ⚡", (int)(scy - 45f), Color.FromArgb(160, 240, 255), Color.Black, buffer.FontSubtitle, 2f);
+                }
+            }
+
+            if (HazardActive)
+            {
+                float scx = Perspective.ProjectScreenX(HazardX, cameraX, 185f);
+                float scy = Perspective.ProjectScreenY(185f, 0f);
+
+                if (CurrentStage == 7)
+                {
+                    // 화살비 세례 쏟아짐
+                    using var arrowPen = new Pen(Color.FromArgb(240, 60, 30), 2.5f);
+                    using var flamePen = new Pen(Color.FromArgb(255, 230, 80), 1.5f);
+                    for (int a = -4; a <= 4; a++)
+                    {
+                        float ax = scx + a * 14f;
+                        g.DrawLine(arrowPen, ax - 15f, scy - 120f, ax, scy);
+                        g.DrawLine(flamePen, ax - 8f, scy - 60f, ax, scy);
+                    }
+                }
+                else if (CurrentStage == 9)
+                {
+                    // 천추전 거대 벼락 강타 & 화면 섬광
+                    buffer.FillRect(0, 0, PixelBuffer.Width, PixelBuffer.Height, Color.FromArgb(60, 200, 240, 255));
+
+                    using var boltOuter = new Pen(Color.FromArgb(200, 90, 180, 255), 18f);
+                    using var boltInner = new Pen(Color.White, 7f);
+                    g.DrawLine(boltOuter, scx, 0, scx, scy);
+                    g.DrawLine(boltInner, scx, 0, scx, scy);
+
+                    // 바닥 충격파 링
+                    using var shockPen = new Pen(Color.FromArgb(255, 160, 240, 255), 4f);
+                    g.DrawEllipse(shockPen, scx - 65f, scy - 20f, 130f, 40f);
+                }
+            }
+
+            // 2. 동적 날씨 파티클 렌더링
+            foreach (var pt in _weatherParticles)
+            {
+                if (CurrentStage == 1 || CurrentStage == 2)
+                {
+                    // 흩날리는 가을 단풍잎
+                    using var leafBrush = new SolidBrush(pt.col);
+                    g.FillEllipse(leafBrush, pt.x, pt.y, pt.size, pt.size * 0.7f);
+                }
+                else if (CurrentStage == 3)
+                {
+                    // 청계천 수면을 덮는 자욱한 안개 구름
+                    using var mistBrush = new SolidBrush(pt.col);
+                    g.FillEllipse(mistBrush, pt.x - pt.size, pt.y - pt.size * 0.4f, pt.size * 2f, pt.size * 0.8f);
+                }
+                else if (CurrentStage == 8 || CurrentStage == 9)
+                {
+                    // 사선으로 거세게 내리는 궁궐 폭풍우 빗줄기
+                    using var rainPen = new Pen(pt.col, 1.5f);
+                    g.DrawLine(rainPen, pt.x, pt.y, pt.x - 6f, pt.y + 16f);
                 }
             }
         }

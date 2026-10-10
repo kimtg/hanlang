@@ -262,6 +262,174 @@ namespace HanlangGame.Engine
             PlayAsync(CreateWav(samples, sampleRate));
         }
 
+        // 순간 쳐내기 (Just Parry) - 맑고 날카로운 금속음
+        public static void PlayParry()
+        {
+            int sampleRate = 22050;
+            int count = (int)(sampleRate * 0.25);
+            short[] samples = new short[count];
+            double p1 = 0, p2 = 0;
+
+            for (int i = 0; i < count; i++)
+            {
+                double t = (double)i / count;
+                p1 += 1760.0 / sampleRate; // A6
+                p2 += 2637.0 / sampleRate; // E7
+                double tone1 = Math.Sin(p1 * Math.PI * 2);
+                double tone2 = Math.Sin(p2 * Math.PI * 2);
+                double env = Math.Pow(1.0 - t, 2.5);
+                samples[i] = (short)((tone1 * 0.6 + tone2 * 0.4) * env * 16000);
+            }
+
+            PlayAsync(CreateWav(samples, sampleRate));
+        }
+
+        // 일반 방어 (Guard) - 묵직한 둔탁한 막기 소리
+        public static void PlayGuard()
+        {
+            int sampleRate = 22050;
+            int count = (int)(sampleRate * 0.12);
+            short[] samples = new short[count];
+            double phase = 0;
+
+            for (int i = 0; i < count; i++)
+            {
+                double t = (double)i / count;
+                double freq = 120.0 * (1.0 - t * 0.5);
+                phase += freq / sampleRate;
+                double val = Math.Sin(phase * Math.PI * 2) > 0 ? 0.7 : -0.7;
+                double env = 1.0 - t;
+                samples[i] = (short)(val * env * 11000);
+            }
+
+            PlayAsync(CreateWav(samples, sampleRate));
+        }
+
+        // 무기/바람 가르는 소리 (Whoosh)
+        public static void PlayWhoosh()
+        {
+            int sampleRate = 22050;
+            int count = (int)(sampleRate * 0.15);
+            short[] samples = new short[count];
+            var rand = new Random();
+
+            for (int i = 0; i < count; i++)
+            {
+                double t = (double)i / count;
+                double noise = rand.NextDouble() * 2.0 - 1.0;
+                double env = Math.Sin(t * Math.PI); // 부드러운 호형 엔벨로프
+                samples[i] = (short)(noise * env * 11000);
+            }
+
+            PlayAsync(CreateWav(samples, sampleRate));
+        }
+
+        // 항아리/술통 깨지는 파열음 (Shatter)
+        public static void PlayShatter()
+        {
+            int sampleRate = 22050;
+            int count = (int)(sampleRate * 0.22);
+            short[] samples = new short[count];
+            var rand = new Random();
+            double phase = 0;
+
+            for (int i = 0; i < count; i++)
+            {
+                double t = (double)i / count;
+                phase += (800.0 - t * 500.0) / sampleRate;
+                double tone = Math.Sin(phase * Math.PI * 2) * 0.3;
+                double noise = (rand.NextDouble() * 2.0 - 1.0) * 0.7;
+                double env = Math.Pow(1.0 - t, 2.0);
+                samples[i] = (short)((tone + noise) * env * 16000);
+            }
+
+            PlayAsync(CreateWav(samples, sampleRate));
+        }
+
+        // 제2 비기: 용비어천격 솟구침 사운드 (Dragon)
+        public static void PlayDragon()
+        {
+            int sampleRate = 22050;
+            int count = (int)(sampleRate * 0.35);
+            short[] samples = new short[count];
+            double phase = 0;
+
+            for (int i = 0; i < count; i++)
+            {
+                double t = (double)i / count;
+                double freq = 220.0 + t * t * 750.0; // 220Hz -> 970Hz 급상승
+                phase += freq / sampleRate;
+                double val = Math.Sin(phase * Math.PI * 2) > 0 ? 0.65 : -0.65;
+                double env = 1.0 - t * 0.4;
+                samples[i] = (short)(val * env * 14000);
+            }
+
+            PlayAsync(CreateWav(samples, sampleRate));
+        }
+
+        // 제3 비기: 월인천강포 방출 빔 사운드 (Wave)
+        public static void PlayWave()
+        {
+            int sampleRate = 22050;
+            int count = (int)(sampleRate * 0.38);
+            short[] samples = new short[count];
+            double p1 = 0, p2 = 0;
+            var rand = new Random();
+
+            for (int i = 0; i < count; i++)
+            {
+                double t = (double)i / count;
+                p1 += (520.0 + Math.Sin(t * 40.0) * 80.0) / sampleRate;
+                p2 += (260.0 + Math.Sin(t * 20.0) * 40.0) / sampleRate;
+                double tone = (Math.Sin(p1 * Math.PI * 2) + Math.Sin(p2 * Math.PI * 2)) * 0.4;
+                double noise = (rand.NextDouble() * 2.0 - 1.0) * 0.25;
+                double env = (t < 0.1) ? (t * 10.0) : Math.Pow(1.0 - (t - 0.1) / 0.9, 1.2);
+                samples[i] = (short)((tone + noise) * env * 15000);
+            }
+
+            PlayAsync(CreateWav(samples, sampleRate));
+        }
+
+        // 천둥 번개 굉음 (Thunder)
+        public static void PlayThunder()
+        {
+            int sampleRate = 22050;
+            int count = (int)(sampleRate * 0.45);
+            short[] samples = new short[count];
+            var rand = new Random();
+
+            for (int i = 0; i < count; i++)
+            {
+                double t = (double)i / count;
+                double noise = rand.NextDouble() * 2.0 - 1.0;
+                double env = (t < 0.05) ? (t * 20.0) : Math.Pow(1.0 - (t - 0.05) / 0.95, 2.5);
+                samples[i] = (short)(noise * env * 16500);
+            }
+
+            PlayAsync(CreateWav(samples, sampleRate));
+        }
+
+        // 회전 낙법 사운드 (Ukemi)
+        public static void PlayUkemi()
+        {
+            int sampleRate = 22050;
+            int count = (int)(sampleRate * 0.12);
+            short[] samples = new short[count];
+            double phase = 0;
+
+            for (int i = 0; i < count; i++)
+            {
+                double t = (double)i / count;
+                double freq = 320.0 + (1.0 - t) * 220.0;
+                phase += freq / sampleRate;
+                double val = Math.Sin(phase * Math.PI * 2) > 0 ? 0.6 : -0.6;
+                double env = 1.0 - t;
+                samples[i] = (short)(val * env * 10000);
+            }
+
+            PlayAsync(CreateWav(samples, sampleRate));
+        }
+
         private static byte[] GenerateBgmWav(string trackName)
         {
             int sampleRate = 22050;
