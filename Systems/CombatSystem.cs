@@ -17,6 +17,21 @@ namespace HanlangGame.Systems
         public Action<float, float>? OnScreenShake;
         public Action<float>? OnHitStop;
 
+        // 콤보 카운터 및 조선풍 스타일 랭크
+        public int ComboCount { get; private set; } = 0;
+        public float ComboTimer { get; private set; } = 0f;
+        public int MaxCombo { get; private set; } = 0;
+        public string CurrentStyleRank { get; private set; } = "";
+        public float StyleRankDisplayTimer { get; private set; } = 0f;
+
+        // 보스 정면 충돌 '합(合)' 힘겨루기 QTE
+        public bool IsClashing { get; private set; } = false;
+        public float ClashTimer { get; private set; } = 0f;
+        public int ClashPressCount { get; private set; } = 0;
+        public int ClashRequiredPresses { get; set; } = 4;
+        public Enemy? ClashingBoss { get; private set; } = null;
+        public float ClashCooldown { get; set; } = 0f;
+
         public void AddHitSparks(float x, float y, float z = 0, int count = 5)
         {
             var rand = new Random();
@@ -75,6 +90,102 @@ namespace HanlangGame.Systems
                 Particles[i].Update(dt);
                 if (Particles[i].IsExpired) Particles.RemoveAt(i);
             }
+
+            if (ComboTimer > 0)
+            {
+                ComboTimer -= dt;
+                if (ComboTimer <= 0)
+                {
+                    ComboCount = 0;
+                    CurrentStyleRank = "";
+                }
+            }
+
+            if (StyleRankDisplayTimer > 0)
+            {
+                StyleRankDisplayTimer -= dt;
+            }
+
+            if (ClashCooldown > 0)
+            {
+                ClashCooldown -= dt;
+            }
+
+            if (IsClashing)
+            {
+                ClashTimer -= dt;
+                if (ClashTimer <= 0)
+                {
+                    IsClashing = false;
+                    ClashingBoss = null;
+                }
+            }
+        }
+
+        public void RegisterHit(Player player, Enemy enemy, int damage)
+        {
+            ComboCount++;
+            ComboTimer = player.Status.HasRelic("mapae") ? 4.5f : 3.0f;
+            if (ComboCount > MaxCombo) MaxCombo = ComboCount;
+
+            // 콤보 보너스: 10콤보 이상 시 타격마다 MP 회복
+            if (ComboCount >= 35) player.Status.CurrentMp = Math.Min(player.Status.MaxMp, player.Status.CurrentMp + 3);
+            else if (ComboCount >= 20) player.Status.CurrentMp = Math.Min(player.Status.MaxMp, player.Status.CurrentMp + 2);
+            else if (ComboCount >= 10) player.Status.CurrentMp = Math.Min(player.Status.MaxMp, player.Status.CurrentMp + 1);
+
+            // 마패 유물: 10콤보 주기마다 MP +10 추가 보너스
+            if (player.Status.HasRelic("mapae") && ComboCount % 10 == 0)
+            {
+                player.Status.CurrentMp = Math.Min(player.Status.MaxMp, player.Status.CurrentMp + 10);
+            }
+
+            // 스타일 랭크 승급 체크
+            string newRank = ComboCount switch
+            {
+                >= 50 => "천명각성 (天命覺醒)",
+                >= 35 => "일기당천 (一騎當千)",
+                >= 20 => "쾌도난마 (快刀亂麻)",
+                >= 10 => "질풍 (疾風)",
+                >= 5 => "초출 (初出)",
+                _ => ""
+            };
+
+            if (!string.IsNullOrEmpty(newRank) && newRank != CurrentStyleRank)
+            {
+                CurrentStyleRank = newRank;
+                StyleRankDisplayTimer = 2.2f;
+                SoundSynth.PlaySpecial();
+            }
+        }
+
+        public void RegisterClashInput(Player player)
+        {
+            if (!IsClashing || ClashingBoss == null) return;
+
+            ClashPressCount++;
+            SoundSynth.PlayPunch();
+            AddHitSparks(player.X + (player.FacingRight ? 18f : -18f), player.Y - 18f, count: 5);
+
+            if (ClashPressCount >= ClashRequiredPresses)
+            {
+                // 합(合) 승리: 보스 튕겨나감 및 그로기 유발!
+                var boss = ClashingBoss;
+                IsClashing = false;
+                ClashingBoss = null;
+                ClashCooldown = 7.0f;
+
+                boss.TakeDamage(35, player.FacingRight ? 1f : -1f);
+                boss.State = "hit";
+                boss.StateTimer = -2.2f; // 2.5초 긴 그로기 (Hit 상태 유지)
+                boss.Vx = (player.FacingRight ? 1f : -1f) * 160f;
+                boss.Vz = 100f;
+
+                SoundSynth.PlayLevelUp();
+                OnScreenShake?.Invoke(6.5f, 0.45f);
+                OnHitStop?.Invoke(0.12f);
+                DamageNumbers.Add(new DamageNumber(35, boss.X, boss.Y - boss.Height - 12f, false));
+                Bubbles.Add(new SpeechBubble("격파! (그로기 상태)", boss.X, boss.Y - boss.Height - 20f));
+            }
         }
 
         public void CheckCollisions(Player player, List<Enemy> enemies, List<WorldObject>? worldObjects = null)
@@ -97,11 +208,60 @@ namespace HanlangGame.Systems
                 }
             }
 
+            // 보스 정면 충돌 '합(合)' 힘겨루기 QTE 체크
+            if (ClashCooldown <= 0f && !IsClashing)
+            {
+                foreach (var enemy in enemies)
+                {
+                    if (enemy.IsDead || enemy.State == "down") continue;
+                    if (enemy.IsBossType && (enemy.State == "punch" || enemy.State == "kick") &&
+                        (player.IsAttackingOrRecovering || player.ParryWindowTimer > 0f) &&
+                        Math.Abs(player.X - enemy.X) < 42f && Math.Abs(player.Y - enemy.Y) < 14f)
+                    {
+                        IsClashing = true;
+                        ClashingBoss = enemy;
+                        ClashTimer = 2.5f;
+                        ClashPressCount = 0;
+                        ClashRequiredPresses = 8;
+                        ClashCooldown = 6.0f;
+                        SoundSynth.PlaySpecial();
+                        OnScreenShake?.Invoke(5.0f, 0.35f);
+                        OnHitStop?.Invoke(0.1f);
+                        Bubbles.Add(new SpeechBubble("합(合)!", (player.X + enemy.X) * 0.5f, player.Y - player.Height - 20f));
+                        return;
+                    }
+                }
+            }
+
             // 1. 플레이어의 공격 판정 -> 적 피격
             var playerHitbox = player.GetAttackHitbox();
             if (playerHitbox.HasValue && !player.HasDealtDamage)
             {
                 var box = playerHitbox.Value;
+
+                // 부채질(fan_wave) 또는 풍압(wave/ex_wave)으로 날아오는 적 화살 반사!
+                if (player.CurrentAttackType == "fan_wave" || player.CurrentAttackType == "wave" || player.CurrentAttackType == "ex_wave")
+                {
+                    if (worldObjects != null)
+                    {
+                        foreach (var wObj in worldObjects)
+                        {
+                            if (wObj.IsDead || !wObj.IsFlying || wObj.ThrownByPlayer || wObj.Type != ObjectType.Arrow) continue;
+                            if (Math.Abs(player.Y - wObj.Y) <= 18f && box.IntersectsWith(wObj.GetBodyHitbox()))
+                            {
+                                wObj.ThrownByPlayer = true;
+                                wObj.Vx = (player.FacingRight ? 1f : -1f) * 360f;
+                                wObj.Vz = 10f;
+                                SoundSynth.PlayWhoosh();
+                                AddHitSparks(wObj.X, wObj.Y - 10f, count: 8);
+                                Bubbles.Add(new SpeechBubble("화살 반사!", player.X, player.Y - player.Height - 16f));
+                            }
+                        }
+                    }
+                }
+
+                bool isMultiHit = (player.CurrentAttackType == "wave" || player.CurrentAttackType == "ex_wave" || player.CurrentAttackType == "ex_spin" || player.CurrentAttackType == "fan_wave");
+                bool hasHitAny = false;
 
                 foreach (var enemy in enemies)
                 {
@@ -113,7 +273,8 @@ namespace HanlangGame.Systems
                     var enemyBody = enemy.GetBodyHitbox();
                     if (box.IntersectsWith(enemyBody))
                     {
-                        if (player.CurrentAttackType != "wave")
+                        hasHitAny = true;
+                        if (!isMultiHit)
                         {
                             player.HasDealtDamage = true;
                         }
@@ -123,6 +284,12 @@ namespace HanlangGame.Systems
                             "spin" => player.Status.SpecialDamage,
                             "dragon" => (int)(player.Status.SpecialDamage * 1.15f),
                             "wave" => (int)(player.Status.SpecialDamage * 1.25f),
+                            "ex_spin" => (int)(player.Status.SpecialDamage * 1.8f),
+                            "ex_dragon" => (int)(player.Status.SpecialDamage * 2.0f),
+                            "ex_wave" => (int)(player.Status.SpecialDamage * 2.2f),
+                            "spear_stab" => player.Status.PunchDamage + 18,
+                            "cudgel_swing" => player.Status.PunchDamage + 22,
+                            "fan_wave" => player.Status.PunchDamage + 14,
                             "dashpunch" => player.Status.PunchDamage + 6,
                             "dashkick" => player.Status.KickDamage + 8,
                             "kick" => player.Status.KickDamage,
@@ -145,6 +312,15 @@ namespace HanlangGame.Systems
                             "giantswing" => 25,
                             _ => player.Status.PunchDamage
                         };
+
+                        // 백호의 발톱 유물: 20% 확률 치명타 및 엽전 드롭
+                        if (player.Status.HasRelic("tiger") && new Random().Next(100) < 20)
+                        {
+                            damage = (int)(damage * 1.5f);
+                            Items.Add(new Item(enemy.X, enemy.Y, ItemType.Coin));
+                            AddHitSparks(enemy.X, enemy.Y - 16f, count: 8);
+                            Bubbles.Add(new SpeechBubble("백호 일격!", enemy.X, enemy.Y - enemy.Height - 16f));
+                        }
 
                         // 스윙 공격 시 들고 있던 물체의 내구도 소모
                         if (player.CurrentAttackType == "swing")
@@ -174,6 +350,19 @@ namespace HanlangGame.Systems
                             }
                         }
 
+                        // 손에 든 장착 무기 내구도 소모
+                        if (player.EquippedWeapon != null && (player.CurrentAttackType == "spear_stab" || player.CurrentAttackType == "cudgel_swing" || player.CurrentAttackType == "fan_wave"))
+                        {
+                            player.EquippedWeapon.Durability--;
+                            if (player.EquippedWeapon.Durability <= 0)
+                            {
+                                SoundSynth.PlayShatter();
+                                player.EquippedWeapon.IsDead = true;
+                                player.EquippedWeapon = null;
+                                Bubbles.Add(new SpeechBubble("무기 파손!", player.X, player.Y - player.Height - 16f));
+                            }
+                        }
+
                         // 공중 추격타 (Airborne Juggle Spike): 공중 날라차기로 체공 중인 적 강타 시 추가 데미지
                         bool isAirJuggle = (player.CurrentAttackType == "jumpkick" && enemy.Z > 8f);
                         if (isAirJuggle)
@@ -184,6 +373,9 @@ namespace HanlangGame.Systems
                         float knockDir = player.FacingRight ? 1f : -1f;
                         enemy.TakeDamage(damage, knockDir, out bool isKnockedDown);
 
+                        // 콤보 및 스타일 랭크 등록
+                        RegisterHit(player, enemy, damage);
+
                         // 제2 비기 용비어천격: 적을 공중으로 솟구쳐 띄움 (Airborne Juggle)
                         if (player.CurrentAttackType == "dragon")
                         {
@@ -191,6 +383,35 @@ namespace HanlangGame.Systems
                             enemy.StateTimer = 0f;
                             enemy.Vz = 240f;
                             enemy.Vx = knockDir * 60f;
+                        }
+                        else if (player.CurrentAttackType == "ex_dragon")
+                        {
+                            enemy.State = "down";
+                            enemy.StateTimer = 0f;
+                            enemy.Vz = 340f;
+                            enemy.Vx = knockDir * 120f;
+                            OnScreenShake?.Invoke(5.5f, 0.3f);
+                        }
+                        else if (player.CurrentAttackType == "ex_spin")
+                        {
+                            float pullDir = Math.Sign(player.X - enemy.X);
+                            enemy.Vx = pullDir * 160f;
+                            enemy.State = "hit";
+                            enemy.StateTimer = 0f;
+                        }
+                        else if (player.CurrentAttackType == "ex_wave")
+                        {
+                            enemy.State = "down";
+                            enemy.StateTimer = 0f;
+                            enemy.Vx = knockDir * 200f;
+                            enemy.Vz = 90f;
+                        }
+                        else if (player.CurrentAttackType == "cudgel_swing")
+                        {
+                            enemy.State = "down";
+                            enemy.StateTimer = 0f;
+                            enemy.Vx = knockDir * 140f;
+                            enemy.Vz = 60f;
                         }
 
                         // 공중 추격타 (Airborne Juggle Spike): 급강하 슬램!
@@ -209,8 +430,11 @@ namespace HanlangGame.Systems
 
                         // 타격감 극대화: 히트스톱 역경직, 화면 흔들림, 충격 스파크 방출!
                         bool isHeavy = player.CurrentAttackType == "spin" || player.CurrentAttackType == "dragon" ||
-                                       player.CurrentAttackType == "wave" || player.CurrentAttackType == "dashpunch" ||
-                                       player.CurrentAttackType == "dashkick" || player.CurrentAttackType == "swing" || isKnockedDown;
+                                       player.CurrentAttackType == "wave" || player.CurrentAttackType == "ex_spin" ||
+                                       player.CurrentAttackType == "ex_dragon" || player.CurrentAttackType == "ex_wave" ||
+                                       player.CurrentAttackType == "cudgel_swing" || player.CurrentAttackType == "spear_stab" ||
+                                       player.CurrentAttackType == "dashpunch" || player.CurrentAttackType == "dashkick" ||
+                                       player.CurrentAttackType == "swing" || isKnockedDown;
                         OnScreenShake?.Invoke(isHeavy ? 3.8f : 1.8f, isHeavy ? 0.22f : 0.09f);
                         OnHitStop?.Invoke(isHeavy ? 0.055f : 0.025f);
                         AddHitSparks(enemy.X, enemy.Y - enemy.Z - 16f, count: isHeavy ? 9 : 5);
@@ -222,20 +446,35 @@ namespace HanlangGame.Systems
                         string quote = enemy.GetRandomHitQuote();
                         Bubbles.Add(new SpeechBubble(quote, enemy.X, enemy.Y - enemy.Z - enemy.Height - 18f));
 
-                        // 적 처치 시 보상 드롭
-                        if (enemy.CurrentHp <= 0)
+                        // 3장 청계천 다리 밖 수장 판정: 다리 아래 물가로 튕겨나간 적 즉사
+                        if (enemy.Y > 218f)
                         {
+                            enemy.CurrentHp = 0;
+                            enemy.IsDead = true;
+                            SoundSynth.PlayShatter();
+                            AddDust(enemy.X, enemy.Y, count: 8);
+                            Bubbles.Add(new SpeechBubble("풍덩! (수장)", enemy.X, enemy.Y - 20f));
+                            OnEnemyDefeated(enemy, player);
+                        }
+                        else if (enemy.CurrentHp <= 0)
+                        {
+                            // 적 처치 시 보상 드롭
                             OnEnemyDefeated(enemy, player);
                         }
 
-                        if (player.CurrentAttackType != "wave")
+                        if (!isMultiHit)
                         {
                             break;
                         }
                     }
                 }
 
-                // 플레이어 공격 -> 바닥 항아리/술통 타격
+                if (isMultiHit && hasHitAny)
+                {
+                    player.HasDealtDamage = true;
+                }
+
+                // 플레이어 공격 -> 바닥 항아리/술통/화차 타격
                 if (worldObjects != null && !player.HasDealtDamage)
                 {
                     foreach (var obj in worldObjects)
@@ -246,7 +485,27 @@ namespace HanlangGame.Systems
                         if (box.IntersectsWith(obj.GetBodyHitbox()))
                         {
                             player.HasDealtDamage = true;
-                            if (obj.Type == ObjectType.Jar || obj.Type == ObjectType.RiceSack)
+                            if (obj.Type == ObjectType.Hwacha)
+                            {
+                                // 신기전 화차 타격 시 전방 다연장 로켓 화살 8발 일제 발사!
+                                SoundSynth.PlaySpecial();
+                                OnScreenShake?.Invoke(4.5f, 0.3f);
+                                AddHitSparks(obj.X, obj.Y - 14f, count: 12);
+                                Bubbles.Add(new SpeechBubble("신기전 일제 발사!", obj.X, obj.Y - 32f));
+                                float fireDir = player.FacingRight ? 1f : -1f;
+                                for (int k = 0; k < 8; k++)
+                                {
+                                    var arrow = new WorldObject(ObjectType.Arrow, obj.X + fireDir * (24f + k * 8f), obj.Y + (k % 3 - 1) * 6f)
+                                    {
+                                        IsFlying = true,
+                                        ThrownByPlayer = true,
+                                        Vx = fireDir * (300f + k * 22f),
+                                        Vz = 10f + (k % 3) * 5f
+                                    };
+                                    worldObjects.Add(arrow);
+                                }
+                            }
+                            else if (obj.Type == ObjectType.Jar || obj.Type == ObjectType.RiceSack)
                             {
                                 obj.Durability = 0;
                                 obj.IsDead = true;
@@ -546,6 +805,20 @@ namespace HanlangGame.Systems
                                 AddHitSparks(player.X, player.Y - player.Z - 16f, count: 12);
                                 Bubbles.Add(new SpeechBubble("쳐내기!", player.X, player.Y - player.Z - player.Height - 18f));
                                 Bubbles.Add(new SpeechBubble("크윽!", enemy.X, enemy.Y - enemy.Z - enemy.Height - 18f));
+
+                                // 단전 벼락구슬 유물: 패링 시 적에게 낙뢰 28 피해!
+                                if (player.Status.HasRelic("spark"))
+                                {
+                                    enemy.TakeDamage(28, 0f, out _);
+                                    DamageNumbers.Add(new DamageNumber(28, enemy.X, enemy.Y - enemy.Z - enemy.Height - 12f, isPlayerHit: false));
+                                    AddHitSparks(enemy.X, enemy.Y - 18f, count: 15);
+                                    SoundSynth.PlaySpecial();
+                                    Bubbles.Add(new SpeechBubble("낙뢰!", enemy.X, enemy.Y - enemy.Height - 20f));
+                                    if (enemy.CurrentHp <= 0)
+                                    {
+                                        OnEnemyDefeated(enemy, player);
+                                    }
+                                }
                             }
                             else if (guarded)
                             {
@@ -641,13 +914,21 @@ namespace HanlangGame.Systems
 
         private void OnEnemyDefeated(Enemy enemy, Player player)
         {
-            // 경험치 및 골드 보상
-            player.Status.Gold += enemy.GoldReward;
+            // 경험치 및 골드 보상 (콤보 수치에 따른 골드 보너스 가산)
+            int comboBonus = (int)(ComboCount * 1.5f);
+            player.Status.Gold += enemy.GoldReward + comboBonus;
             bool leveledUp = player.Status.AddExp(enemy.ExpReward, out bool leveled);
             if (leveled)
             {
                 SoundSynth.PlayLevelUp();
                 Bubbles.Add(new SpeechBubble("★ 레벨 업! (스탯 +3) ★", player.X, player.Y - 50f));
+            }
+
+            // 주모의 약주단지 유물: 적 처치 시 35% 확률로 주먹밥 즉시 드롭
+            if (player.Status.HasRelic("gourd") && new Random().Next(100) < 35)
+            {
+                Items.Add(new Item(enemy.X, enemy.Y, ItemType.RiceBall));
+                Bubbles.Add(new SpeechBubble("약주단지 발동!", enemy.X, enemy.Y - 25f));
             }
 
             // 보스는 훈민정음 신기 문자 룬 확정 드롭!

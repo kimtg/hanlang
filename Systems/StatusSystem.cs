@@ -60,6 +60,24 @@ namespace HanlangGame.Systems
             }
         }
 
+        // 기연(奇緣) 신비한 유물 (Relics)
+        public System.Collections.Generic.HashSet<string> Relics { get; } = new();
+
+        public bool HasRelic(string id) => Relics.Contains(id);
+
+        public bool AddRelic(string id)
+        {
+            if (Relics.Add(id))
+            {
+                if (id == "medallion")
+                {
+                    CurrentHp = Math.Min(CurrentHp + 30, MaxHp);
+                }
+                return true;
+            }
+            return false;
+        }
+
         public int GetSpecialMpCost(int baseCost)
         {
             if (ActiveResonances.Contains("용비어천가")) return Math.Max(1, baseCost / 2);
@@ -67,16 +85,16 @@ namespace HanlangGame.Systems
             return baseCost;
         }
 
-        // 파생 능력치 (룬 및 공명 보너스 반영)
-        public int MaxHp => 100 + (Endurance - 10) * 12 + (Runes.Contains("철") ? 20 : 0) + (ActiveResonances.Contains("철화") ? 30 : 0);
+        // 파생 능력치 (룬, 공명 및 기연 유물 보너스 반영)
+        public int MaxHp => 100 + (Endurance - 10) * 12 + (Runes.Contains("철") ? 20 : 0) + (ActiveResonances.Contains("철화") ? 30 : 0) + (HasRelic("medallion") ? 30 : 0);
         public int MaxMp => 50 + (Ki - 10) * 8 + (Runes.Contains("천") ? 20 : 0) + (ActiveResonances.Contains("용비어천가") ? 50 : 0);
-        public float MoveSpeed => (80f + (Agility - 10) * 4f) * (Runes.Contains("풍") ? 1.15f : 1.0f) * (ActiveResonances.Contains("용풍") ? 1.15f : 1.0f);
-        public float DashSpeed => (135f + (Agility - 10) * 6f) * (Runes.Contains("풍") ? 1.15f : 1.0f) * (ActiveResonances.Contains("용풍") ? 1.15f : 1.0f);
+        public float MoveSpeed => (80f + (Agility - 10) * 4f) * (Runes.Contains("풍") ? 1.15f : 1.0f) * (ActiveResonances.Contains("용풍") ? 1.15f : 1.0f) * (HasRelic("dokkaebi") ? 1.15f : 1.0f);
+        public float DashSpeed => (135f + (Agility - 10) * 6f) * (Runes.Contains("풍") ? 1.15f : 1.0f) * (ActiveResonances.Contains("용풍") ? 1.15f : 1.0f) * (HasRelic("dokkaebi") ? 1.20f : 1.0f);
         public float JumpPower => 235f + (Agility - 10) * 6f;
 
         public int PunchDamage => 8 + (Power - 10) * 2 + (Runes.Contains("화") ? 4 : 0) + (ActiveResonances.Contains("철화") ? 4 : 0);
         public int KickDamage => 14 + (Power - 10) * 3 + (Runes.Contains("화") ? 4 : 0) + (ActiveResonances.Contains("철화") ? 4 : 0);
-        public int SpecialDamage => (int)Math.Round(((25 + (Ki - 10) * 4 + (Power - 10) * 2) * 1.5) * (ActiveResonances.Contains("용비어천가") ? 1.4f : (Runes.Contains("용") ? 1.15f : 1.0f)));
+        public int SpecialDamage => (int)Math.Round(((25 + (Ki - 10) * 4 + (Power - 10) * 2) * 1.5) * (ActiveResonances.Contains("용비어천가") ? 1.4f : (Runes.Contains("용") ? 1.15f : 1.0f)) * (HasRelic("spark") ? 1.4f : 1.0f));
 
         public int CurrentHp { get; set; } = 100;
         public int CurrentMp { get; set; } = 50;

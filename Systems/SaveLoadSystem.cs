@@ -20,6 +20,7 @@ namespace HanlangGame.Systems
         public int CurrentMp { get; set; } = 50;
         public int StageIndex { get; set; } = 1;
         public System.Collections.Generic.List<string> Runes { get; set; } = new();
+        public System.Collections.Generic.List<string> Relics { get; set; } = new();
         public string SaveDate { get; set; } = "";
     }
 
@@ -50,6 +51,7 @@ namespace HanlangGame.Systems
                     CurrentMp = status.CurrentMp,
                     StageIndex = stageIndex,
                     Runes = new System.Collections.Generic.List<string>(status.Runes),
+                    Relics = new System.Collections.Generic.List<string>(status.Relics),
                     SaveDate = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")
                 };
 
@@ -90,6 +92,13 @@ namespace HanlangGame.Systems
                         foreach (var r in data.Runes)
                         {
                             status.AddRune(r, out _);
+                        }
+                    }
+                    if (data.Relics != null)
+                    {
+                        foreach (var relic in data.Relics)
+                        {
+                            status.AddRelic(relic);
                         }
                     }
                     return data;

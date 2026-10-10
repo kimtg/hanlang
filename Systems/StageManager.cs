@@ -14,27 +14,34 @@ namespace HanlangGame.Systems
 
         public List<Enemy> Enemies { get; } = new();
         public List<WorldObject> WorldObjects { get; } = new();
-        public bool StageCleared => Enemies.Count == 0 && CurrentStage < MaxStage;
+        public bool IsSurvivalMode { get; set; } = false;
+        public int SurvivalWave { get; set; } = 1;
+        public bool StageCleared => IsSurvivalMode ? (Enemies.Count == 0) : (Enemies.Count == 0 && CurrentStage < MaxStage);
         public bool GameWon { get; set; } = false;
 
         public Enemy? CurrentBoss => Enemies.Find(e => e.IsBossType);
 
-        public string GetStageName(int stage) => stage switch
+        public string GetStageName(int stage)
         {
-            1 => "1장: 한양 저잣거리",
-            2 => "2장: 서당 뒷골목",
-            3 => "3장: 청계천 다리 (중간보스전)",
-            4 => "4장: 남산 성곽길",
-            5 => "5장: 도성 주막거리",
-            6 => "6장: 육조거리 (중간보스전)",
-            7 => "7장: 광화문 앞뜰",
-            8 => "8장: 경복궁 근정전",
-            9 => "9장: 집현전 천추전 (최종결전)",
-            _ => $"{stage}장"
-        };
+            if (IsSurvivalMode) return $"무한 연무장 : 제 {SurvivalWave} 파도 (Wave {SurvivalWave})";
+            return stage switch
+            {
+                1 => "1장: 한양 저잣거리",
+                2 => "2장: 서당 뒷골목",
+                3 => "3장: 청계천 다리 (중간보스전)",
+                4 => "4장: 남산 성곽길",
+                5 => "5장: 도성 주막거리",
+                6 => "6장: 육조거리 (중간보스전)",
+                7 => "7장: 광화문 앞뜰",
+                8 => "8장: 경복궁 근정전",
+                9 => "9장: 집현전 천추전 (최종결전)",
+                _ => $"{stage}장"
+            };
+        }
 
         public void LoadStage(int stage)
         {
+            IsSurvivalMode = false;
             CurrentStage = stage;
             GameWon = false; // 재시작 시 엔딩이 다시 뜨지 않도록 완벽 리셋!
             Enemies.Clear();
@@ -120,12 +127,13 @@ namespace HanlangGame.Systems
                     break;
             }
 
-            // 각 장별 길거리 투척/타격 오브젝트 배치 (목봉, 궤짝, 돌멩이, 옹기 항아리, 주막 술통, 대형 수레, 대형 탁자, 평상, 쌀가마니)
+            // 각 장별 길거리 투척/타격 오브젝트 및 손에 쥐는 무기(장창, 쇠방망이, 부채), 신기전 화차 배치
             switch (stage)
             {
                 case 1:
                     WorldObjects.Add(new WorldObject(ObjectType.Cart, 270f, 175f));
                     WorldObjects.Add(new WorldObject(ObjectType.Crate, 430f, 210f));
+                    WorldObjects.Add(new WorldObject(ObjectType.Spear, 480f, 175f)); // 장창
                     WorldObjects.Add(new WorldObject(ObjectType.RiceSack, 540f, 185f));
                     WorldObjects.Add(new WorldObject(ObjectType.Jar, 650f, 165f));
                     WorldObjects.Add(new WorldObject(ObjectType.Rock, 760f, 195f));
@@ -133,6 +141,7 @@ namespace HanlangGame.Systems
                 case 2:
                     WorldObjects.Add(new WorldObject(ObjectType.Table, 270f, 180f));
                     WorldObjects.Add(new WorldObject(ObjectType.Barrel, 410f, 175f));
+                    WorldObjects.Add(new WorldObject(ObjectType.Cudgel, 480f, 185f)); // 육각 쇠방망이
                     WorldObjects.Add(new WorldObject(ObjectType.Bench, 540f, 195f));
                     WorldObjects.Add(new WorldObject(ObjectType.Jar, 670f, 205f));
                     WorldObjects.Add(new WorldObject(ObjectType.Club, 770f, 180f));
@@ -140,12 +149,14 @@ namespace HanlangGame.Systems
                 case 3:
                     WorldObjects.Add(new WorldObject(ObjectType.Cart, 290f, 180f));
                     WorldObjects.Add(new WorldObject(ObjectType.Bench, 440f, 190f));
+                    WorldObjects.Add(new WorldObject(ObjectType.Fan, 480f, 180f)); // 선비 쇠살부채
                     WorldObjects.Add(new WorldObject(ObjectType.Barrel, 570f, 170f));
                     WorldObjects.Add(new WorldObject(ObjectType.Jar, 680f, 200f));
                     WorldObjects.Add(new WorldObject(ObjectType.Rock, 770f, 175f));
                     break;
                 case 4:
                     WorldObjects.Add(new WorldObject(ObjectType.Cart, 280f, 165f));
+                    WorldObjects.Add(new WorldObject(ObjectType.Spear, 370f, 180f));
                     WorldObjects.Add(new WorldObject(ObjectType.RiceSack, 420f, 180f));
                     WorldObjects.Add(new WorldObject(ObjectType.Rock, 540f, 210f));
                     WorldObjects.Add(new WorldObject(ObjectType.Bench, 660f, 175f));
@@ -154,12 +165,14 @@ namespace HanlangGame.Systems
                 case 5:
                     WorldObjects.Add(new WorldObject(ObjectType.Table, 260f, 185f));
                     WorldObjects.Add(new WorldObject(ObjectType.Bench, 390f, 170f));
+                    WorldObjects.Add(new WorldObject(ObjectType.Cudgel, 450f, 185f));
                     WorldObjects.Add(new WorldObject(ObjectType.Barrel, 510f, 200f));
                     WorldObjects.Add(new WorldObject(ObjectType.RiceSack, 630f, 175f));
                     WorldObjects.Add(new WorldObject(ObjectType.Cart, 750f, 190f));
                     break;
                 case 6:
                     WorldObjects.Add(new WorldObject(ObjectType.Cart, 290f, 170f));
+                    WorldObjects.Add(new WorldObject(ObjectType.Fan, 380f, 180f));
                     WorldObjects.Add(new WorldObject(ObjectType.Table, 440f, 190f));
                     WorldObjects.Add(new WorldObject(ObjectType.Barrel, 580f, 175f));
                     WorldObjects.Add(new WorldObject(ObjectType.Bench, 700f, 185f));
@@ -167,26 +180,86 @@ namespace HanlangGame.Systems
                 case 7:
                     WorldObjects.Add(new WorldObject(ObjectType.Cart, 270f, 185f));
                     WorldObjects.Add(new WorldObject(ObjectType.Bench, 410f, 175f));
-                    WorldObjects.Add(new WorldObject(ObjectType.Table, 540f, 195f));
+                    WorldObjects.Add(new WorldObject(ObjectType.Hwacha, 480f, 185f)); // 광화문 신기전 화차!
+                    WorldObjects.Add(new WorldObject(ObjectType.Spear, 540f, 175f));
+                    WorldObjects.Add(new WorldObject(ObjectType.Table, 590f, 195f));
                     WorldObjects.Add(new WorldObject(ObjectType.Jar, 670f, 205f));
                     WorldObjects.Add(new WorldObject(ObjectType.Rock, 770f, 175f));
                     break;
                 case 8:
                     WorldObjects.Add(new WorldObject(ObjectType.Table, 280f, 180f));
+                    WorldObjects.Add(new WorldObject(ObjectType.Spear, 350f, 175f));
                     WorldObjects.Add(new WorldObject(ObjectType.Bench, 420f, 175f));
                     WorldObjects.Add(new WorldObject(ObjectType.Jar, 550f, 195f));
+                    WorldObjects.Add(new WorldObject(ObjectType.Cudgel, 620f, 190f));
                     WorldObjects.Add(new WorldObject(ObjectType.Cart, 670f, 170f));
                     WorldObjects.Add(new WorldObject(ObjectType.Crate, 770f, 205f));
                     break;
                 case 9:
                     WorldObjects.Add(new WorldObject(ObjectType.Table, 290f, 185f));
+                    WorldObjects.Add(new WorldObject(ObjectType.Fan, 360f, 175f));
                     WorldObjects.Add(new WorldObject(ObjectType.Cart, 440f, 180f));
+                    WorldObjects.Add(new WorldObject(ObjectType.Spear, 510f, 180f));
                     WorldObjects.Add(new WorldObject(ObjectType.Bench, 580f, 195f));
+                    WorldObjects.Add(new WorldObject(ObjectType.Hwacha, 640f, 185f));
                     WorldObjects.Add(new WorldObject(ObjectType.RiceSack, 700f, 170f));
                     break;
             }
 
             InitWeather(stage);
+        }
+
+        public void LoadSurvivalWave(int wave)
+        {
+            IsSurvivalMode = true;
+            SurvivalWave = wave;
+            CurrentStage = ((wave - 1) % MaxStage) + 1;
+            GameWon = false;
+            Enemies.Clear();
+            WorldObjects.Clear();
+
+            int enemyCount = 3 + wave;
+            var rand = new Random(wave * 7919);
+
+            for (int i = 0; i < enemyCount; i++)
+            {
+                float x = 200f + (i * 115f) % (StageWidth - 250f);
+                float y = 160f + (i % 3) * 20f;
+                EnemyType t;
+                if (wave % 5 == 0 && i == enemyCount - 1)
+                {
+                    t = (wave % 10 == 0) ? EnemyType.Boss : EnemyType.MidBoss2;
+                }
+                else if (wave % 3 == 0 && i == enemyCount - 1)
+                {
+                    t = EnemyType.MidBoss1;
+                }
+                else
+                {
+                    int roll = rand.Next(100);
+                    t = roll switch
+                    {
+                        < 35 => EnemyType.Thug,
+                        < 60 => EnemyType.Scholar,
+                        < 75 => EnemyType.Ninja,
+                        < 90 => EnemyType.Archer,
+                        _ => EnemyType.ShieldGuard
+                    };
+                }
+                Enemies.Add(new Enemy(t, x, y, CurrentStage));
+            }
+
+            // 무기 및 기물 배치
+            WorldObjects.Add(new WorldObject(ObjectType.Spear, 320f, 175f));
+            WorldObjects.Add(new WorldObject(ObjectType.Cudgel, 520f, 185f));
+            WorldObjects.Add(new WorldObject(ObjectType.Fan, 700f, 180f));
+            WorldObjects.Add(new WorldObject(ObjectType.Cart, 420f, 170f));
+            if (wave >= 3)
+            {
+                WorldObjects.Add(new WorldObject(ObjectType.Hwacha, 600f, 185f));
+            }
+
+            InitWeather(CurrentStage);
         }
 
         // 동적 날씨 및 환경 기믹 상태

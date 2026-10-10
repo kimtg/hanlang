@@ -16,7 +16,11 @@ namespace HanlangGame.Entities
         Table,    // 대형 주막 탁자 / 서당 책상 (넓은 면적, 강력한 내려치기와 파쇄 투척)
         Bench,    // 대형 주막 평상 / 긴 의자 (광역 가로 휩쓸기 및 적 다운)
         RiceSack, // 볏짚 쌀가마니 (묵직한 타격, 충격 시 터지며 주먹밥/엽전 드롭)
-        Arrow     // 흑호단 궁수의 날아가는 화살 (패링 시 반사 가능!)
+        Arrow,    // 흑호단 궁수의 날아가는 화살 (패링 시 반사 가능!)
+        Spear,    // 오랏줄 장창 (초장거리 찌르기, 관통, 내구도 5)
+        Cudgel,   // 육각 쇠방망이 (묵직한 강타, 100% 스턴 및 가드 브레이크, 내구도 6)
+        Fan,      // 선비 쇠살 부채 (광역 횡베기, 바람 장풍, 화살 쳐내기, 내구도 8)
+        Hwacha    // 광화문 신기전 화차 (타격 시 전방으로 화전 일제 사격)
     }
 
     public class WorldObject : Entity
@@ -86,6 +90,26 @@ namespace HanlangGame.Entities
                     Width = 18;
                     Height = 6;
                     Durability = 1;
+                    break;
+                case ObjectType.Spear:
+                    Width = 28;
+                    Height = 10;
+                    Durability = 5;
+                    break;
+                case ObjectType.Cudgel:
+                    Width = 22;
+                    Height = 10;
+                    Durability = 6;
+                    break;
+                case ObjectType.Fan:
+                    Width = 18;
+                    Height = 10;
+                    Durability = 8;
+                    break;
+                case ObjectType.Hwacha:
+                    Width = 36;
+                    Height = 24;
+                    Durability = 999;
                     break;
             }
         }
@@ -169,6 +193,10 @@ namespace HanlangGame.Entities
                 ObjectType.Bench => "obj_bench",
                 ObjectType.RiceSack => "obj_ricesack",
                 ObjectType.Arrow => "obj_arrow",
+                ObjectType.Spear => "obj_spear",
+                ObjectType.Cudgel => "obj_cudgel",
+                ObjectType.Fan => "obj_fan",
+                ObjectType.Hwacha => "obj_hwacha",
                 _ => "obj_club"
             };
 

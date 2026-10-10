@@ -17,8 +17,11 @@ namespace HanlangGame
         StatusMenu,
         ShopMenu,
         GameOver,
-        GameWon
+        GameWon,
+        RelicSelect
     }
+
+    public record RelicOption(string Id, string Name, string Hanja, string Effect, Color Color);
 
     public class GameScene
     {
@@ -43,6 +46,21 @@ namespace HanlangGame
         private string _notifyMessage = "";
         private float _notifyTimer = 0f;
         private float _gameOverTimer = 0f;
+
+        private static readonly List<RelicOption> AllRelics = new()
+        {
+            new RelicOption("cheolgap", "철갑 흉경", "鐵甲胸鏡", "방어력 +6, 상시 받는 피해 4 감소", Color.FromArgb(70, 130, 180)),
+            new RelicOption("spark", "단전 벼락구슬", "丹田雷珠", "비기 피해 +40%, 저스트 패링 시 적에게 낙뢰 28 방출", Color.FromArgb(255, 215, 0)),
+            new RelicOption("shoes", "풍운의 짚신", "風雲草履", "공중 2단 점프 활성화 및 도약력 대폭 상승", Color.FromArgb(144, 238, 144)),
+            new RelicOption("dokkaebi", "도깨비 감투", "鬼之冠", "대시 속도 +20%, 대시 돌진 중 완전 무적", Color.FromArgb(186, 85, 211)),
+            new RelicOption("tiger", "백호의 발톱", "白虎之爪", "모든 공격 20% 확률 치명타(1.5배) & 적 타격 시 엽전 드롭", Color.FromArgb(255, 140, 0)),
+            new RelicOption("gourd", "주모의 약주단지", "酒母藥酒壺", "적 처치 시 35% 확률로 주먹밥 즉시 드롭", Color.FromArgb(210, 105, 30)),
+            new RelicOption("medallion", "금강역사의 패", "金剛力士牌", "최대 HP +30 증가, 피격 경직에 완전 면역 (슈퍼아머)", Color.FromArgb(220, 20, 60)),
+            new RelicOption("mapae", "암행어사 마패", "暗行御史馬牌", "콤보 지속시간 +1.5초 연장, 10콤보 주기마다 MP +10 즉시 회복", Color.FromArgb(50, 205, 50))
+        };
+
+        private List<RelicOption> _currentRelicChoices = new();
+        private int _selectedRelicIdx = 0;
 
         public float ScreenShakeTimer { get; private set; } = 0f;
         public float ScreenShakeIntensity { get; private set; } = 0f;
@@ -134,6 +152,12 @@ namespace HanlangGame
 
         public void RespawnAtPreviousStage()
         {
+            if (_stageManager.IsSurvivalMode)
+            {
+                StartSurvivalMode();
+                return;
+            }
+
             int originalStage = _stageManager.CurrentStage;
             int prevStage = Math.Max(1, originalStage - 1);
             _stageManager.LoadStage(prevStage);
@@ -175,6 +199,93 @@ namespace HanlangGame
             }
         }
 
+        public void StartSurvivalMode()
+        {
+            _status = new StatusSystem();
+            _player = new Player(_status);
+            _stageManager.LoadSurvivalWave(1);
+            _combatSystem.Items.Clear();
+            _combatSystem.Bubbles.Clear();
+            _combatSystem.DamageNumbers.Clear();
+            _cameraX = 0f;
+            State = GameState.Playing;
+            SoundSynth.PlayBgm("boss");
+            ShowNotification("무한 연무장 개시! 끝없이 몰려드는 적을 섬멸하시오!");
+        }
+
+        private void TriggerRelicSelect()
+        {
+            var unobtained = AllRelics.FindAll(r => !_status.HasRelic(r.Id));
+            if (unobtained.Count == 0)
+            {
+                ProceedToNextStageOrWave();
+                return;
+            }
+
+            var rng = new Random();
+            var shuffled = new List<RelicOption>(unobtained);
+            for (int i = shuffled.Count - 1; i > 0; i--)
+            {
+                int k = rng.Next(i + 1);
+                (shuffled[i], shuffled[k]) = (shuffled[k], shuffled[i]);
+            }
+            _currentRelicChoices = shuffled.GetRange(0, Math.Min(3, shuffled.Count));
+            _selectedRelicIdx = 0;
+            State = GameState.RelicSelect;
+            SoundSynth.PlaySpecial();
+        }
+
+        private void ProceedToNextStageOrWave()
+        {
+            if (_stageManager.IsSurvivalMode)
+            {
+                int nextWave = _stageManager.SurvivalWave + 1;
+                _stageManager.LoadSurvivalWave(nextWave);
+                _player.X = 35f;
+                _cameraX = 0f;
+                _status.CurrentHp = Math.Min(_status.MaxHp, _status.CurrentHp + 45);
+                _status.CurrentMp = _status.MaxMp;
+                SoundSynth.PlayLevelUp();
+                ShowNotification($"연무장 제 {nextWave} 파도가 시작되었습니다!");
+                State = GameState.Playing;
+            }
+            else
+            {
+                int nextStage = _stageManager.CurrentStage + 1;
+                _stageManager.LoadStage(nextStage);
+                _player.X = 35f;
+                _cameraX = 0f;
+                SoundSynth.PlayLevelUp();
+                ShowNotification(_stageManager.GetStageName(nextStage) + "에 진입했습니다!");
+                State = GameState.Playing;
+            }
+        }
+
+        private void UpdateRelicSelect()
+        {
+            if (_input.IsJustPressed(Keys.Left))
+            {
+                _selectedRelicIdx = (_selectedRelicIdx - 1 + _currentRelicChoices.Count) % _currentRelicChoices.Count;
+                SoundSynth.PlayJump();
+            }
+            else if (_input.IsJustPressed(Keys.Right))
+            {
+                _selectedRelicIdx = (_selectedRelicIdx + 1) % _currentRelicChoices.Count;
+                SoundSynth.PlayJump();
+            }
+            else if (_input.IsJustPressed(Keys.Z) || _input.IsJustPressed(Keys.Enter))
+            {
+                if (_currentRelicChoices.Count > 0)
+                {
+                    var chosen = _currentRelicChoices[_selectedRelicIdx];
+                    _status.AddRelic(chosen.Id);
+                    SoundSynth.PlayLevelUp();
+                    ShowNotification($"기연 유물 [ {chosen.Name} ] 을(를) 획득하였소!");
+                }
+                ProceedToNextStageOrWave();
+            }
+        }
+
         public void ShowNotification(string msg)
         {
             _notifyMessage = msg;
@@ -195,6 +306,7 @@ namespace HanlangGame
                     _titleScreen.HandleInput(_input, out string titleAction);
                     if (titleAction == "new_game") StartNewGame();
                     else if (titleAction == "load_game") LoadSavedGame();
+                    else if (titleAction == "survival_mode") StartSurvivalMode();
                     break;
 
                 case GameState.Paused:
@@ -220,6 +332,10 @@ namespace HanlangGame
                         State = GameState.Playing;
                         SoundSynth.PlayBgm(GetCurrentGameplayBgmTrack());
                     }
+                    break;
+
+                case GameState.RelicSelect:
+                    UpdateRelicSelect();
                     break;
 
                 case GameState.GameOver:
@@ -344,6 +460,17 @@ namespace HanlangGame
                 return;
             }
 
+            // 보스 합(合) 힘겨루기 QTE 연타 처리
+            if (_combatSystem.IsClashing)
+            {
+                if (_input.IsJustPressed(Keys.Z) || _input.IsJustPressed(Keys.X) || _input.IsJustPressed(Keys.Space))
+                {
+                    _combatSystem.RegisterClashInput(_player);
+                }
+                _combatSystem.Update(dt);
+                return;
+            }
+
             // 플레이어 조작 & 업데이트
             _player.HandleInput(_input, _stageManager.WorldObjects, _stageManager.Enemies);
             _player.Update(dt);
@@ -360,15 +487,22 @@ namespace HanlangGame
             _combatSystem.CheckCollisions(_player, _stageManager.Enemies, _stageManager.WorldObjects);
             _combatSystem.Update(dt);
 
-            // 다음 구역 진입 판정
-            if (_stageManager.StageCleared && _player.X >= _stageManager.StageWidth - 24f)
+            // 다음 구역 진입 또는 연무장 파도 진행 판정 (기연 유물 3지선다 선택 연계)
+            if (_stageManager.IsSurvivalMode)
             {
-                int nextStage = _stageManager.CurrentStage + 1;
-                _stageManager.LoadStage(nextStage);
-                _player.X = 35f;
-                _cameraX = 0f;
-                SoundSynth.PlayLevelUp();
-                ShowNotification(_stageManager.GetStageName(nextStage) + "에 진입했습니다!");
+                if (_stageManager.StageCleared)
+                {
+                    TriggerRelicSelect();
+                    return;
+                }
+            }
+            else
+            {
+                if (_stageManager.StageCleared && _player.X >= _stageManager.StageWidth - 24f)
+                {
+                    TriggerRelicSelect();
+                    return;
+                }
             }
 
             // 게임 오버 검사
@@ -398,6 +532,7 @@ namespace HanlangGame
                 case GameState.Paused:
                 case GameState.StatusMenu:
                 case GameState.ShopMenu:
+                case GameState.RelicSelect:
                     RenderPlaying();
                     if (State == GameState.Paused)
                     {
@@ -410,6 +545,10 @@ namespace HanlangGame
                     else if (State == GameState.ShopMenu)
                     {
                         _shopMenu.Render(_buffer, _status);
+                    }
+                    else if (State == GameState.RelicSelect)
+                    {
+                        RenderRelicSelect();
                     }
                     break;
 
@@ -482,11 +621,79 @@ namespace HanlangGame
             // 5. 960x720 고해상도 다음 구역 화살표
             _stageManager.RenderStageClearArrow(_buffer);
 
-            // 6. 960x720 고해상도 상단 HUD & 하단 보스 게이지
-            _hud.Render(_buffer, _player, _stageManager.CurrentBoss, _stageManager.CurrentStage);
+            // 6. 960x720 고해상도 상단 HUD & 하단 보스 게이지 & 콤보/스타일 랭크/합 QTE
+            _hud.Render(_buffer, _player, _stageManager.CurrentBoss, _stageManager.CurrentStage, _combatSystem);
 
             // 7. 보스전 대화창 및 KO 격파 배너
             _dialogueBox.Render(_buffer);
+        }
+
+        private void RenderRelicSelect()
+        {
+            _buffer.FillRect(0, 0, PixelBuffer.Width, PixelBuffer.Height, Color.FromArgb(210, 12, 10, 22));
+
+            _buffer.DrawOutlinedTextCentered("【 기 연 (奇 緣) : 조 선 8 대 유 물 전 승 】", 100, Color.FromArgb(255, 225, 60), Color.Black, _buffer.FontHuge, 4f);
+            _buffer.DrawOutlinedTextCentered("강호의 기운이 깃든 신비한 보구를 하나 선택하여 능력을 전승받으시오.", 175, Color.FromArgb(235, 230, 200), Color.Black, _buffer.FontSubtitle, 1.8f);
+
+            int count = _currentRelicChoices.Count;
+            if (count == 0) return;
+
+            int cardW = 270;
+            int cardH = 350;
+            int gap = 24;
+            int totalW = count * cardW + (count - 1) * gap;
+            int startX = (PixelBuffer.Width - totalW) / 2;
+            int startY = 225;
+
+            for (int i = 0; i < count; i++)
+            {
+                var relic = _currentRelicChoices[i];
+                bool isSelected = (i == _selectedRelicIdx);
+                int cx = startX + i * (cardW + gap);
+                int cy = startY;
+
+                if (isSelected)
+                {
+                    cy -= 10;
+                    _buffer.FillRoundedRect(cx, cy, cardW, cardH, 14f, Color.FromArgb(245, 45, 35, 52));
+                    _buffer.DrawRoundedRect(cx, cy, cardW, cardH, 14f, Color.FromArgb(255, 230, 80), 3.5f);
+                }
+                else
+                {
+                    _buffer.FillRoundedRect(cx, cy, cardW, cardH, 14f, Color.FromArgb(190, 25, 22, 35));
+                    _buffer.DrawRoundedRect(cx, cy, cardW, cardH, 14f, Color.FromArgb(120, 110, 130), 2f);
+                }
+
+                // 카드 상단 한자 뱃지
+                _buffer.FillRoundedRect(cx + 15, cy + 16, cardW - 30, 56, 8f, Color.FromArgb(220, 18, 16, 26));
+                _buffer.DrawRoundedRect(cx + 15, cy + 16, cardW - 30, 56, 8f, relic.Color, 1.5f);
+                _buffer.DrawOutlinedTextCentered(relic.Hanja, cy + 24, relic.Color, Color.Black, _buffer.FontTitle, 2f);
+
+                // 유물 이름
+                Color nameCol = isSelected ? Color.FromArgb(255, 240, 100) : Color.FromArgb(240, 240, 240);
+                _buffer.DrawOutlinedTextCentered(relic.Name, cy + 90, nameCol, Color.Black, _buffer.FontSubtitle, 1.8f);
+
+                // 분할선
+                _buffer.DrawLine(cx + 25, cy + 130, cx + cardW - 25, cy + 130, Color.FromArgb(150, 130, 90), 1.5f);
+
+                // 효과 설명
+                string[] words = relic.Effect.Split(',', StringSplitOptions.TrimEntries);
+                int effY = cy + 148;
+                foreach (var line in words)
+                {
+                    _buffer.DrawOutlinedTextCentered(line, effY, Color.FromArgb(220, 225, 235), Color.Black, _buffer.FontBody, 1.2f);
+                    effY += 28;
+                }
+
+                // 하단 선택 표시
+                if (isSelected)
+                {
+                    _buffer.FillRoundedRect(cx + 30, cy + cardH - 52, cardW - 60, 36, 6f, Color.FromArgb(230, 200, 50));
+                    _buffer.DrawOutlinedTextCentered("★ 전 승 ★", cy + cardH - 46, Color.FromArgb(40, 20, 10), Color.Transparent, _buffer.FontHeader, 1.5f);
+                }
+            }
+
+            _buffer.DrawOutlinedTextCentered("[ ← → 방향키 : 선택  |  Z / Enter : 기연 전승 ]", 615, Color.FromArgb(255, 235, 140), Color.Black, _buffer.FontHeader, 1.8f);
         }
 
         private void RenderGameOver()
@@ -497,11 +704,21 @@ namespace HanlangGame
             int currentStage = _stageManager.CurrentStage;
             int prevStage = Math.Max(1, currentStage - 1);
             string currentStageName = _stageManager.GetStageName(currentStage);
-            _buffer.DrawOutlinedTextCentered($"유생 한랑이 {currentStageName}에서 쓰러졌습니다.", 270, Color.FromArgb(230, 230, 230), Color.Black, _buffer.FontSubtitle, 2f);
 
-            string respawnLabel = currentStage > 1
-                ? $"[ Z 키 : {_stageManager.GetStageName(prevStage)}에서 부활 ]"
-                : "[ Z 키 : 1장에서 다시 도전 ]";
+            if (_stageManager.IsSurvivalMode)
+            {
+                _buffer.DrawOutlinedTextCentered($"유생 한랑이 연무장 제 {_stageManager.SurvivalWave} 파도에서 장렬히 쓰러졌습니다.", 270, Color.FromArgb(230, 230, 230), Color.Black, _buffer.FontSubtitle, 2f);
+            }
+            else
+            {
+                _buffer.DrawOutlinedTextCentered($"유생 한랑이 {currentStageName}에서 쓰러졌습니다.", 270, Color.FromArgb(230, 230, 230), Color.Black, _buffer.FontSubtitle, 2f);
+            }
+
+            string respawnLabel = _stageManager.IsSurvivalMode
+                ? "[ Z 키 : 제 1 파도부터 재도전 ]"
+                : (currentStage > 1
+                    ? $"[ Z 키 : {_stageManager.GetStageName(prevStage)}에서 부활 ]"
+                    : "[ Z 키 : 1장에서 다시 도전 ]");
 
             int btnW = 540;
             int btnY = 380;

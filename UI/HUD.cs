@@ -9,7 +9,7 @@ namespace HanlangGame.UI
 {
     public class HUD
     {
-        public void Render(PixelBuffer buffer, Player player, Enemy? boss = null, int currentStage = 1)
+        public void Render(PixelBuffer buffer, Player player, Enemy? boss = null, int currentStage = 1, CombatSystem? combat = null)
         {
             var g = buffer.Graphics;
             buffer.SetHighQualityModes();
@@ -171,6 +171,86 @@ namespace HanlangGame.UI
                 else
                 {
                     buffer.DrawOutlinedText("기물 파지 [ Z: 휘두르기 | X: 투척 / 굴리기 ]", guideX + 18, 88, Color.FromArgb(255, 235, 130), Color.Black, buffer.FontBody, 1.2f);
+                }
+            }
+
+            // 3-2. 장착 무기 (장창 / 쇠방망이 / 부채) 상태 표시
+            if (player.EquippedWeapon != null)
+            {
+                string wpName = player.EquippedWeapon.Type switch
+                {
+                    ObjectType.Spear => "장창 (長槍)",
+                    ObjectType.Cudgel => "육각 쇠방망이 (鐵棒)",
+                    ObjectType.Fan => "선비 쇠살부채 (鐵扇)",
+                    _ => "무기"
+                };
+                int wpDura = player.EquippedWeapon.Durability;
+                int wpX = 16;
+                int wpY = (status.Runes.Count > 0) ? 112 : 76;
+                buffer.FillRoundedRect(wpX, wpY, 215, 28, 5f, Color.FromArgb(200, 20, 30, 45));
+                buffer.DrawRoundedRect(wpX, wpY, 215, 28, 5f, Color.FromArgb(100, 180, 255), 1.2f);
+                buffer.DrawOutlinedText($"[무기: {wpName} (내구도 {wpDura})]", wpX + 8, wpY + 6, Color.FromArgb(220, 240, 255), Color.Black, buffer.FontTiny, 1.2f);
+            }
+
+            // 3-3. 콤보 카운터 및 조선풍 스타일 랭크 배너
+            if (combat != null)
+            {
+                if (combat.ComboCount > 1 && combat.ComboTimer > 0)
+                {
+                    int comboX = PixelBuffer.Width - 165;
+                    int comboY = 82;
+                    buffer.DrawOutlinedText($"{combat.ComboCount}", comboX, comboY, Color.FromArgb(255, 230, 60), Color.FromArgb(50, 20, 0), buffer.FontTitle, 3f);
+                    buffer.DrawOutlinedText("HITS!", comboX + 68, comboY + 6, Color.FromArgb(255, 140, 40), Color.Black, buffer.FontHeader, 2f);
+
+                    float maxTimer = player.Status.HasRelic("mapae") ? 4.5f : 3.0f;
+                    int cBarW = 140;
+                    int cFill = Math.Clamp((int)(combat.ComboTimer / maxTimer * cBarW), 0, cBarW);
+                    buffer.FillRoundedRect(comboX, comboY + 36, cBarW, 6, 2f, Color.FromArgb(150, 40, 20, 20));
+                    buffer.FillRoundedRect(comboX, comboY + 36, cFill, 6, 2f, Color.FromArgb(255, 200, 50));
+                }
+
+                if (!string.IsNullOrEmpty(combat.CurrentStyleRank))
+                {
+                    int rankX = PixelBuffer.Width - 250;
+                    int rankY = 132;
+                    Color rankCol = combat.CurrentStyleRank.StartsWith("천명") ? Color.FromArgb(255, 80, 80) :
+                                   (combat.CurrentStyleRank.StartsWith("일기") ? Color.FromArgb(255, 180, 50) :
+                                   (combat.CurrentStyleRank.StartsWith("쾌도") ? Color.FromArgb(255, 235, 70) :
+                                   (combat.CurrentStyleRank.StartsWith("질풍") ? Color.FromArgb(100, 210, 255) : Color.FromArgb(200, 220, 220))));
+
+                    buffer.FillRoundedRect(rankX, rankY, 235, 30, 6f, Color.FromArgb(210, 20, 15, 25));
+                    buffer.DrawRoundedRect(rankX, rankY, 235, 30, 6f, rankCol, 1.6f);
+                    buffer.DrawOutlinedText($"[ {combat.CurrentStyleRank} ]", rankX + 12, rankY + 6, rankCol, Color.Black, buffer.FontBody, 1.5f);
+                }
+
+                // 3-4. 합(合) 힘겨루기 QTE 컷인 오버레이
+                if (combat.IsClashing && combat.ClashingBoss != null)
+                {
+                    int cOverlayW = 540;
+                    int cOverlayH = 110;
+                    int cOverlayX = (PixelBuffer.Width - cOverlayW) / 2;
+                    int cOverlayY = PixelBuffer.Height / 2 - 80;
+
+                    buffer.FillRoundedRect(cOverlayX, cOverlayY, cOverlayW, cOverlayH, 12f, Color.FromArgb(240, 35, 10, 15));
+                    buffer.DrawRoundedRect(cOverlayX, cOverlayY, cOverlayW, cOverlayH, 12f, Color.FromArgb(255, 215, 70), 3f);
+
+                    buffer.DrawOutlinedTextCentered("【 합 (合) : 힘 겨 루 기 ! 】", cOverlayY + 14, Color.FromArgb(255, 240, 120), Color.Black, buffer.FontTitle, 3f);
+                    buffer.DrawOutlinedTextCentered("Z 키를 맹렬히 연타하시오!", cOverlayY + 46, Color.FromArgb(255, 100, 100), Color.Black, buffer.FontHeader, 2f);
+
+                    int gBarX = cOverlayX + 30;
+                    int gBarY = cOverlayY + 76;
+                    int gBarW = cOverlayW - 60;
+                    int gBarH = 18;
+
+                    buffer.FillRoundedRect(gBarX, gBarY, gBarW, gBarH, 4f, Color.FromArgb(160, 20, 20, 30));
+                    buffer.DrawRoundedRect(gBarX, gBarY, gBarW, gBarH, 4f, Color.FromArgb(200, 150, 50), 1.5f);
+
+                    float pct = Math.Clamp((float)combat.ClashPressCount / combat.ClashRequiredPresses, 0f, 1f);
+                    int fillG = (int)(pct * (gBarW - 4));
+                    if (fillG > 0)
+                    {
+                        buffer.FillRoundedRect(gBarX + 2, gBarY + 2, fillG, gBarH - 4, 3f, Color.FromArgb(255, 220, 60));
+                    }
                 }
             }
 

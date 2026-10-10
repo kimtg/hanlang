@@ -24,12 +24,18 @@ namespace HanlangGame.Entities
         public float JustParryVisualTimer { get; set; } = 0f;
         public bool IsGuarding => State == "guard";
 
+        // 손에 쥐는 근접 무기 및 공중 기동
+        public WorldObject? EquippedWeapon { get; set; }
+        public bool HasDoubleJumped { get; set; } = false;
+
         // 격투 게임식 공격 동작 및 후딜레이 판정
         public bool IsAttackingOrRecovering =>
             State == "punch" || State == "kick" || State == "jumpkick" ||
             State == "dashpunch" || State == "dashkick" || State == "spin" ||
             State == "dragon" || State == "wave" || State == "swing" ||
             State == "knee" || State == "giantswing" ||
+            State == "spear_stab" || State == "cudgel_swing" || State == "fan_wave" ||
+            State == "ex_spin" || State == "ex_dragon" || State == "ex_wave" ||
             PostAttackDelayTimer > 0f;
 
         // 들기 시스템 (물체 및 쓰러진 적)
@@ -133,6 +139,28 @@ namespace HanlangGame.Entities
             }
         }
 
+        public void EquipWeapon(WorldObject weapon)
+        {
+            EquippedWeapon = weapon;
+        }
+
+        public void ThrowEquippedWeapon()
+        {
+            if (EquippedWeapon == null) return;
+            var wp = EquippedWeapon;
+            EquippedWeapon = null;
+            wp.IsCarried = false;
+            wp.IsFlying = true;
+            wp.ThrownByPlayer = true;
+            wp.X = X + (FacingRight ? 16f : -16f);
+            wp.Y = Y;
+            wp.Z = Z + 16f;
+            float speed = wp.Type == ObjectType.Spear ? 320f : (wp.Type == ObjectType.Fan ? 280f : 250f);
+            wp.Vx = (FacingRight ? 1f : -1f) * speed;
+            wp.Vz = 25f;
+            SoundSynth.PlaySpecial();
+        }
+
         public void HandleInput(Input input, System.Collections.Generic.List<WorldObject>? worldObjects = null, System.Collections.Generic.List<Enemy>? enemies = null)
         {
             // 비상 낙법 (Ukemi): 공중 피격 또는 쓰러지는 도중(Z > 0 및 지면 28px 이내) C키 입력 시 즉시 착지 기상! (사망 시 불가능)
@@ -164,7 +192,9 @@ namespace HanlangGame.Entities
 
             // 공격 동작 진행 중에는 이동 및 추가 액션/패링 불가
             if (State == "punch" || State == "kick" || State == "dashpunch" || State == "dashkick" ||
-                State == "swing" || State == "spin" || State == "dragon" || State == "wave")
+                State == "swing" || State == "spin" || State == "dragon" || State == "wave" ||
+                State == "spear_stab" || State == "cudgel_swing" || State == "fan_wave" ||
+                State == "ex_spin" || State == "ex_dragon" || State == "ex_wave")
             {
                 Vx *= 0.5f;
                 Vy *= 0.5f;
@@ -199,10 +229,19 @@ namespace HanlangGame.Entities
             // 1. 공중(점프) 상태일 때의 조작
             if (!IsGrounded)
             {
-                // 공중에서 X키 누르면 들고 있는 것 투척
-                if (input.IsJustPressed(Keys.X) && IsCarrying)
+                // 공중 2단 점프 (풍운의 짚신 유물)
+                if (input.IsJustPressed(Keys.C) && Status.HasRelic("shoes") && !HasDoubleJumped)
                 {
-                    ThrowCarried();
+                    HasDoubleJumped = true;
+                    Vz = Status.JumpPower * 0.9f;
+                    SoundSynth.PlayJump();
+                }
+
+                // 공중에서 X키 누르면 들고 있는 것 또는 무기 투척
+                if (input.IsJustPressed(Keys.X) && (IsCarrying || EquippedWeapon != null))
+                {
+                    if (IsCarrying) ThrowCarried();
+                    else ThrowEquippedWeapon();
                     return;
                 }
                 else if ((input.IsJustPressed(Keys.Z) || input.IsJustPressed(Keys.X)) && State != "jumpkick")
@@ -278,9 +317,161 @@ namespace HanlangGame.Entities
                 return;
             }
 
-            // 3. 지상 Z키: 들고 있으면 '들고 때린다', 들 게 있으면 '주워 든다', 없으면 '주먹'
+            // 2. 비기(Special) 및 EX 강화 비기 (Space, Space + Z, Space + X)
+            bool isExWithZ = (input.IsJustPressed(Keys.Space) && (input.IsHeld(Keys.Z) || input.IsJustPressed(Keys.Z))) ||
+                             (input.IsHeld(Keys.Space) && input.IsJustPressed(Keys.Z));
+            bool isExWithX = (input.IsJustPressed(Keys.Space) && (input.IsHeld(Keys.X) || input.IsJustPressed(Keys.X))) ||
+                             (input.IsHeld(Keys.Space) && input.IsJustPressed(Keys.X));
+            bool isSpacePressed = input.IsJustPressed(Keys.Space);
+
+            if (isExWithZ || isExWithX || isSpacePressed)
+            {
+                // 잡은 적 자이언트 스윙 (Space)
+                int giantSwingCost = Status.GetSpecialMpCost(10);
+                if (CarriedEnemy != null && isSpacePressed && !isExWithZ && !isExWithX && Status.CurrentMp >= giantSwingCost)
+                {
+                    Status.CurrentMp -= giantSwingCost;
+                    State = "giantswing";
+                    StateTimer = 0f;
+                    HasDealtDamage = false;
+                    CurrentAttackType = "giantswing";
+                    SoundSynth.PlaySpecial();
+                    return;
+                }
+
+                // EX 강화 비기: MP 20 소모, 1초 무적, 강력한 범위 판정
+                if (isExWithZ || isExWithX || (isSpacePressed && (input.IsHeld(Keys.Z) || input.IsHeld(Keys.X))))
+                {
+                    int exCost = Status.GetSpecialMpCost(20);
+                    if (Status.CurrentMp >= exCost)
+                    {
+                        DropCarried();
+                        Status.CurrentMp -= exCost;
+                        InvincibleTimer = 1.0f;
+                        HasDealtDamage = false;
+
+                        if (input.IsHeld(Keys.Down))
+                        {
+                            State = "ex_wave";
+                            StateTimer = 0f;
+                            CurrentAttackType = "ex_wave";
+                            Vx = 0f;
+                            Vy = 0f;
+                            SoundSynth.PlayWave();
+                            SoundSynth.PlaySpecial();
+                        }
+                        else if (isExWithX || input.IsHeld(Keys.Up))
+                        {
+                            State = "ex_dragon";
+                            StateTimer = 0f;
+                            CurrentAttackType = "ex_dragon";
+                            Vz = 240f;
+                            Vx = (FacingRight ? 1f : -1f) * 85f;
+                            SoundSynth.PlayDragon();
+                            SoundSynth.PlaySpecial();
+                        }
+                        else
+                        {
+                            State = "ex_spin";
+                            StateTimer = 0f;
+                            CurrentAttackType = "ex_spin";
+                            SoundSynth.PlaySpecial();
+                        }
+                    }
+                    return;
+                }
+
+                // 일반 3대 비기
+                if (isSpacePressed)
+                {
+                    if (input.IsHeld(Keys.Down))
+                    {
+                        int waveCost = Status.GetSpecialMpCost(25);
+                        if (Status.CurrentMp >= waveCost)
+                        {
+                            DropCarried();
+                            Status.CurrentMp -= waveCost;
+                            State = "wave";
+                            StateTimer = 0f;
+                            HasDealtDamage = false;
+                            CurrentAttackType = "wave";
+                            Vx = 0f;
+                            Vy = 0f;
+                            SoundSynth.PlayWave();
+                            SoundSynth.PlaySpecial();
+                            return;
+                        }
+                    }
+                    else if (input.IsHeld(Keys.Up))
+                    {
+                        int dragonCost = Status.GetSpecialMpCost(20);
+                        if (Status.CurrentMp >= dragonCost)
+                        {
+                            DropCarried();
+                            Status.CurrentMp -= dragonCost;
+                            State = "dragon";
+                            StateTimer = 0f;
+                            HasDealtDamage = false;
+                            CurrentAttackType = "dragon";
+                            Vz = 185f;
+                            Vx = (FacingRight ? 1f : -1f) * 65f;
+                            SoundSynth.PlayDragon();
+                            SoundSynth.PlaySpecial();
+                            return;
+                        }
+                    }
+                    else
+                    {
+                        int spinCost = Status.GetSpecialMpCost(15);
+                        if (Status.CurrentMp >= spinCost)
+                        {
+                            DropCarried();
+                            Status.CurrentMp -= spinCost;
+                            State = "spin";
+                            StateTimer = 0f;
+                            HasDealtDamage = false;
+                            CurrentAttackType = "spin";
+                            SoundSynth.PlaySpecial();
+                            return;
+                        }
+                    }
+                }
+            }
+
+            // 3. 지상 Z키: 무기 들고 있으면 '무기 공격', 들고 있으면 '들고 때린다', 들 게 있으면 '주워 든다', 없으면 '주먹'
             if (input.IsJustPressed(Keys.Z))
             {
+                if (EquippedWeapon != null)
+                {
+                    if (EquippedWeapon.Type == ObjectType.Spear)
+                    {
+                        State = "spear_stab";
+                        StateTimer = 0f;
+                        HasDealtDamage = false;
+                        CurrentAttackType = "spear_stab";
+                        SoundSynth.PlayWhoosh();
+                        return;
+                    }
+                    else if (EquippedWeapon.Type == ObjectType.Cudgel)
+                    {
+                        State = "cudgel_swing";
+                        StateTimer = 0f;
+                        HasDealtDamage = false;
+                        CurrentAttackType = "cudgel_swing";
+                        SoundSynth.PlayKick();
+                        return;
+                    }
+                    else if (EquippedWeapon.Type == ObjectType.Fan)
+                    {
+                        State = "fan_wave";
+                        StateTimer = 0f;
+                        HasDealtDamage = false;
+                        CurrentAttackType = "fan_wave";
+                        SoundSynth.PlayWhoosh();
+                        return;
+                    }
+                }
+
                 if (IsCarrying)
                 {
                     if (CarriedEnemy != null)
@@ -305,17 +496,27 @@ namespace HanlangGame.Entities
                 }
                 else
                 {
-                    // 1) 바닥에 있는 물체 줍기
+                    // 1) 바닥에 있는 무기나 물체 줍기
                     if (worldObjects != null)
                     {
                         var nearbyObj = worldObjects.Find(o => !o.IsDead && !o.IsCarried && !o.IsFlying && !o.IsRolling &&
                                                                Math.Abs(X - o.X) < Math.Max(26f, o.Width / 2f + 14f) && Math.Abs(Y - o.Y) < 18f);
                         if (nearbyObj != null)
                         {
-                            CarriedObject = nearbyObj;
-                            nearbyObj.IsCarried = true;
-                            SoundSynth.PlayJump();
-                            return;
+                            if (nearbyObj.Type == ObjectType.Spear || nearbyObj.Type == ObjectType.Cudgel || nearbyObj.Type == ObjectType.Fan)
+                            {
+                                EquippedWeapon = nearbyObj;
+                                nearbyObj.IsCarried = true;
+                                SoundSynth.PlayJump();
+                                return;
+                            }
+                            else if (nearbyObj.Type != ObjectType.Hwacha && nearbyObj.Type != ObjectType.Arrow)
+                            {
+                                CarriedObject = nearbyObj;
+                                nearbyObj.IsCarried = true;
+                                SoundSynth.PlayJump();
+                                return;
+                            }
                         }
                     }
 
@@ -357,12 +558,17 @@ namespace HanlangGame.Entities
                     }
                 }
             }
-            // 4. 지상 X키: 들고 있으면 '던진다', 대시 중이면 '대시 킥(돌진 날아차기)', 없으면 '발차기'
+            // 4. 지상 X키: 들고 있으면 '던진다', 무기 있으면 '무기 투척', 대시 중이면 '대시 킥(돌진 날아차기)', 없으면 '발차기'
             else if (input.IsJustPressed(Keys.X))
             {
                 if (IsCarrying)
                 {
                     ThrowCarried();
+                    return;
+                }
+                else if (EquippedWeapon != null)
+                {
+                    ThrowEquippedWeapon();
                     return;
                 }
                 else
@@ -389,77 +595,7 @@ namespace HanlangGame.Entities
                     }
                 }
             }
-            // 5. Space키: 잡은 적이 있으면 자이언트 스윙, 아니면 삼대 삼한 비기 (훈민선풍각 / 용비어천격 / 월인천강포)
-            else if (input.IsJustPressed(Keys.Space))
-            {
-                int giantSwingCost = Status.GetSpecialMpCost(10);
-                if (CarriedEnemy != null && Status.CurrentMp >= giantSwingCost)
-                {
-                    // 잡은 적 자이언트 스윙 (Giant Swing) [Space]
-                    Status.CurrentMp -= giantSwingCost;
-                    State = "giantswing";
-                    StateTimer = 0f;
-                    HasDealtDamage = false;
-                    CurrentAttackType = "giantswing";
-                    SoundSynth.PlaySpecial();
-                    return;
-                }
 
-                if (input.IsHeld(Keys.Down))
-                {
-                    // 제3 비기: 월인천강포 (Moon Wave) [↓ + Space]
-                    int waveCost = Status.GetSpecialMpCost(25);
-                    if (Status.CurrentMp >= waveCost)
-                    {
-                        DropCarried();
-                        Status.CurrentMp -= waveCost;
-                        State = "wave";
-                        StateTimer = 0f;
-                        HasDealtDamage = false;
-                        CurrentAttackType = "wave";
-                        Vx = 0f;
-                        Vy = 0f;
-                        SoundSynth.PlayWave();
-                        SoundSynth.PlaySpecial();
-                        return;
-                    }
-                }
-                else if (input.IsHeld(Keys.Up))
-                {
-                    // 제2 비기: 용비어천격 (Dragon Uppercut) [↑ + Space]
-                    int dragonCost = Status.GetSpecialMpCost(20);
-                    if (Status.CurrentMp >= dragonCost)
-                    {
-                        DropCarried();
-                        Status.CurrentMp -= dragonCost;
-                        State = "dragon";
-                        StateTimer = 0f;
-                        HasDealtDamage = false;
-                        CurrentAttackType = "dragon";
-                        Vz = 185f;
-                        Vx = (FacingRight ? 1f : -1f) * 65f;
-                        SoundSynth.PlayDragon();
-                        SoundSynth.PlaySpecial();
-                        return;
-                    }
-                }
-                else
-                {
-                    // 제1 비기: 훈민선풍각 (Hunmin Whirlwind Kick) [Space]
-                    int spinCost = Status.GetSpecialMpCost(15);
-                    if (Status.CurrentMp >= spinCost)
-                    {
-                        DropCarried();
-                        Status.CurrentMp -= spinCost;
-                        State = "spin";
-                        StateTimer = 0f;
-                        HasDealtDamage = false;
-                        CurrentAttackType = "spin";
-                        SoundSynth.PlaySpecial();
-                        return;
-                    }
-                }
-            }
 
             // 4. 지상 이동 입력 계산
             float moveX = 0f;
@@ -535,6 +671,7 @@ namespace HanlangGame.Entities
             // 공중 및 지면 착지 상태 갱신
             if (IsGrounded)
             {
+                HasDoubleJumped = false;
                 if (State == "jump" || State == "jumpkick")
                 {
                     State = "idle";
@@ -549,6 +686,15 @@ namespace HanlangGame.Entities
                 {
                     State = "jump";
                 }
+            }
+
+            // 손에 쥔 무기 위치 동기화
+            if (EquippedWeapon != null)
+            {
+                EquippedWeapon.X = X + (FacingRight ? 12f : -12f);
+                EquippedWeapon.Y = Y;
+                EquippedWeapon.Z = Z + 14f;
+                EquippedWeapon.FacingRight = FacingRight;
             }
 
             // 들고 있는 물체 및 쓰러진 적의 위치 동기화 (머리 위 또는 스윙 타격 위치)
@@ -719,6 +865,65 @@ namespace HanlangGame.Entities
                     ParryCooldownTimer = 0.28f;
                 }
             }
+            else if (State == "spear_stab")
+            {
+                Vx = (FacingRight ? 1f : -1f) * 45f;
+                if (StateTimer > 0.28f)
+                {
+                    State = "idle";
+                    HasDealtDamage = false;
+                    ParryCooldownTimer = 0.22f;
+                }
+            }
+            else if (State == "cudgel_swing")
+            {
+                Vx *= 0.6f;
+                if (StateTimer > 0.32f)
+                {
+                    State = "idle";
+                    HasDealtDamage = false;
+                    ParryCooldownTimer = 0.24f;
+                }
+            }
+            else if (State == "fan_wave")
+            {
+                Vx = (FacingRight ? 1f : -1f) * 35f;
+                if (StateTimer > 0.24f)
+                {
+                    State = "idle";
+                    HasDealtDamage = false;
+                    ParryCooldownTimer = 0.20f;
+                }
+            }
+            else if (State == "ex_spin")
+            {
+                Vx = (FacingRight ? 1f : -1f) * 90f;
+                if (StateTimer > 0.55f)
+                {
+                    State = "idle";
+                    HasDealtDamage = false;
+                    ParryCooldownTimer = 0.28f;
+                }
+            }
+            else if (State == "ex_dragon")
+            {
+                if (StateTimer > 0.50f && IsGrounded)
+                {
+                    State = "idle";
+                    HasDealtDamage = false;
+                    ParryCooldownTimer = 0.28f;
+                }
+            }
+            else if (State == "ex_wave")
+            {
+                Vx *= 0.5f;
+                if (StateTimer > 0.60f)
+                {
+                    State = "idle";
+                    HasDealtDamage = false;
+                    ParryCooldownTimer = 0.28f;
+                }
+            }
             else if (State == "hit")
             {
                 Vx *= 0.85f;
@@ -744,7 +949,9 @@ namespace HanlangGame.Entities
 
         public RectangleF? GetAttackHitbox()
         {
-            if (State != "punch" && State != "kick" && State != "jumpkick" && State != "spin" && State != "swing" && State != "dashpunch" && State != "dashkick" && State != "dragon" && State != "wave" && State != "knee" && State != "giantswing")
+            if (State != "punch" && State != "kick" && State != "jumpkick" && State != "spin" && State != "swing" && State != "dashpunch" && State != "dashkick" && State != "dragon" && State != "wave" && State != "knee" && State != "giantswing" &&
+                State != "spear_stab" && State != "cudgel_swing" && State != "fan_wave" &&
+                State != "ex_spin" && State != "ex_dragon" && State != "ex_wave")
                 return null;
 
             // 격투 게임식 판정: 공격 후딜레이(Recovery) 구간에는 타격 판정 소멸
@@ -758,6 +965,47 @@ namespace HanlangGame.Entities
             if (State == "dragon" && StateTimer > 0.30f) return null;
             if (State == "wave" && StateTimer > 0.36f) return null;
             if (State == "giantswing" && StateTimer > 0.40f) return null;
+            if (State == "spear_stab" && StateTimer > 0.22f) return null;
+            if (State == "cudgel_swing" && StateTimer > 0.24f) return null;
+            if (State == "fan_wave" && StateTimer > 0.20f) return null;
+            if (State == "ex_spin" && StateTimer > 0.42f) return null;
+            if (State == "ex_dragon" && StateTimer > 0.38f) return null;
+            if (State == "ex_wave" && StateTimer > 0.45f) return null;
+
+            if (State == "spear_stab")
+            {
+                float reach = 85f;
+                float attackX = FacingRight ? X + 4f : X - 4f - reach;
+                return new RectangleF(attackX, Y - Z - 24f, reach, 20f);
+            }
+            if (State == "cudgel_swing")
+            {
+                float reach = 34f;
+                float attackX = FacingRight ? X + 4f : X - 4f - reach;
+                return new RectangleF(attackX, Y - Z - 28f, reach, 28f);
+            }
+            if (State == "fan_wave")
+            {
+                float reach = 45f;
+                float attackX = FacingRight ? X + 4f : X - 4f - reach;
+                return new RectangleF(attackX, Y - Z - 26f, reach, 26f);
+            }
+            if (State == "ex_spin")
+            {
+                return new RectangleF(X - 55f, Y - Z - 28f, 110f, 32f);
+            }
+            if (State == "ex_dragon")
+            {
+                float reach = 38f;
+                float attackX = FacingRight ? X + 2f : X - 2f - reach;
+                return new RectangleF(attackX, Y - Z - 65f, reach + 10f, 72f);
+            }
+            if (State == "ex_wave")
+            {
+                float reach = 280f;
+                float attackX = FacingRight ? X + 6f : X - 6f - reach;
+                return new RectangleF(attackX, Y - Z - 28f, reach, 34f);
+            }
 
             if (State == "giantswing")
             {
@@ -826,6 +1074,9 @@ namespace HanlangGame.Entities
 
             if (InvincibleTimer > 0 || State == "down") return;
 
+            // 도깨비 감투 유물: 대시(달리기) 중 완전 무적
+            if (State == "run" && Status.HasRelic("dokkaebi")) return;
+
             // 격투 게임식 카운터 판정: 공격 동작 중이거나 공격 후딜레이(PostAttackDelay) 중에는 패링/가드 불가!
             bool isAttackingOrInRecovery = IsAttackingOrRecovering;
 
@@ -839,6 +1090,12 @@ namespace HanlangGame.Entities
                 InvincibleTimer = 0.4f;
                 Status.CurrentMp = Math.Min(Status.MaxMp, Status.CurrentMp + 10); // 기력 MP +10 회복!
                 SoundSynth.PlayParry();
+
+                // 단전 벼락구슬 유물: 저스트 패링 성공 시 벼락 발동
+                if (Status.HasRelic("spark"))
+                {
+                    SoundSynth.PlaySpecial();
+                }
                 return;
             }
 
@@ -847,6 +1104,7 @@ namespace HanlangGame.Entities
             {
                 guarded = true;
                 damage = Math.Max(1, (int)(damage * 0.30f)); // 피격 데미지 70% 대폭 감소!
+                if (Status.HasRelic("cheolgap")) damage = Math.Max(1, damage - 4);
                 Status.CurrentHp -= damage;
                 SoundSynth.PlayGuard();
                 Vx = knockbackDir * 35f; // 약간의 밀림
@@ -871,6 +1129,12 @@ namespace HanlangGame.Entities
                 damage = (int)(damage * 1.25f); // 공격 중 피격 시 25% 추가 카운터 데미지!
             }
 
+            // 철갑 흉경 유물: 상시 받는 피해 4 감소
+            if (Status.HasRelic("cheolgap"))
+            {
+                damage = Math.Max(1, damage - 4);
+            }
+
             Status.CurrentHp -= damage;
             SoundSynth.PlayHit();
 
@@ -888,6 +1152,13 @@ namespace HanlangGame.Entities
             }
             else
             {
+                // 금강역사의 패 유물: 약한 공격 피격 시 경직 무시 (슈퍼아머)
+                if (Status.HasRelic("medallion") && damage < 18)
+                {
+                    InvincibleTimer = 0.25f;
+                    return;
+                }
+
                 State = "hit";
                 StateTimer = 0f;
                 InvincibleTimer = counterHit ? 0.45f : 0.6f;

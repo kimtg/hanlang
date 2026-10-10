@@ -1099,6 +1099,254 @@ namespace HanlangGame.Tests
             Assert("9장 최종보스 격파 후 BGM은 stage_palace로 환원", bgmScene.GetCurrentGameplayBgmTrack() == "stage_palace");
             SoundSynth.StopBgm();
 
+            // Test 45: 더블탭 대시 및 대시 슬라이딩 / 대시 날아차기 조작 및 공격 판정
+            var dashInput = new Input();
+            var testDashPlayer = new Player(new StatusSystem());
+            dashInput.OnKeyDown(System.Windows.Forms.Keys.Right);
+            dashInput.OnKeyUp(System.Windows.Forms.Keys.Right);
+            dashInput.OnKeyDown(System.Windows.Forms.Keys.Right); // 더블탭
+            Assert("더블탭 입력으로 대시(IsDashing) 활성화", dashInput.IsDashing);
+
+            testDashPlayer.HandleInput(dashInput);
+            Assert("대시 중 플레이어 상태는 run", testDashPlayer.State == "run");
+            Assert("대시 중 플레이어 수평 속도는 DashSpeed", testDashPlayer.Vx == testDashPlayer.Status.DashSpeed);
+
+            // 대시 중 Z키 -> 슬라이딩 정권 (dashpunch)
+            dashInput.OnKeyDown(System.Windows.Forms.Keys.Z);
+            testDashPlayer.HandleInput(dashInput);
+            Assert("대시 중 Z 입력 시 dashpunch 전이", testDashPlayer.State == "dashpunch" && testDashPlayer.CurrentAttackType == "dashpunch");
+            dashInput.OnKeyUp(System.Windows.Forms.Keys.Z);
+
+            // 대시 중 X키 -> 날아차기 돌진기 (dashkick)
+            testDashPlayer.State = "run";
+            dashInput.OnKeyDown(System.Windows.Forms.Keys.X);
+            testDashPlayer.HandleInput(dashInput);
+            Assert("대시 중 X 입력 시 dashkick 전이", testDashPlayer.State == "dashkick" && testDashPlayer.CurrentAttackType == "dashkick");
+            dashInput.OnKeyUp(System.Windows.Forms.Keys.X);
+            dashInput.OnKeyUp(System.Windows.Forms.Keys.Right);
+
+            // Test 46: 콤보 카운터 증가 및 5단계 조선풍 스타일 랭크 승급 검증
+            var comboCombat = new CombatSystem();
+            var comboPlayer = new Player(new StatusSystem());
+            var dummyEnemy = new Enemy(EnemyType.Thug, 100f, 180f);
+
+            Assert("초기 콤보 수 0", comboCombat.ComboCount == 0);
+            Assert("초기 스타일 랭크 공백", string.IsNullOrEmpty(comboCombat.CurrentStyleRank));
+
+            // 5히트 달성 -> 초출 (初出)
+            for (int i = 0; i < 5; i++) comboCombat.RegisterHit(comboPlayer, dummyEnemy, 10);
+            Assert("5히트 달성 콤보 카운터 일치", comboCombat.ComboCount == 5);
+            Assert("5히트 달성 시 초출 스타일 랭크 승급", comboCombat.CurrentStyleRank.Contains("초출"));
+
+            // 10히트 달성 -> 질풍 (疾風)
+            for (int i = 0; i < 5; i++) comboCombat.RegisterHit(comboPlayer, dummyEnemy, 10);
+            Assert("10히트 달성 시 질풍 스타일 랭크 승급", comboCombat.CurrentStyleRank.Contains("질풍"));
+
+            // 20히트 달성 -> 쾌도난마 (快刀亂麻)
+            for (int i = 0; i < 10; i++) comboCombat.RegisterHit(comboPlayer, dummyEnemy, 10);
+            Assert("20히트 달성 시 쾌도난마 스타일 랭크 승급", comboCombat.CurrentStyleRank.Contains("쾌도난마"));
+
+            // 35히트 달성 -> 일기당천 (一騎當千)
+            for (int i = 0; i < 15; i++) comboCombat.RegisterHit(comboPlayer, dummyEnemy, 10);
+            Assert("35히트 달성 시 일기당천 스타일 랭크 승급", comboCombat.CurrentStyleRank.Contains("일기당천"));
+
+            // 50히트 달성 -> 천명각성 (天命覺醒)
+            for (int i = 0; i < 15; i++) comboCombat.RegisterHit(comboPlayer, dummyEnemy, 10);
+            Assert("50히트 달성 시 천명각성 스타일 랭크 승급", comboCombat.CurrentStyleRank.Contains("천명각성"));
+
+            // 콤보 타이머 감쇠 및 만료 리셋
+            comboCombat.Update(4.0f);
+            Assert("콤보 타이머 만료 시 콤보 카운터 0 리셋", comboCombat.ComboCount == 0);
+
+            // Test 47: 손에 쥐는 근접 무기 3종 (Spear, Cudgel, Fan) 장착 및 고유 스윙 검증
+            var wpPlayer = new Player(new StatusSystem());
+            var spearObj = new WorldObject(ObjectType.Spear, wpPlayer.X, wpPlayer.Y);
+            var cudgelObj = new WorldObject(ObjectType.Cudgel, wpPlayer.X, wpPlayer.Y);
+            var fanObj = new WorldObject(ObjectType.Fan, wpPlayer.X, wpPlayer.Y);
+
+            // 장창 줍기
+            wpPlayer.EquipWeapon(spearObj);
+            Assert("장창 장착 완료", wpPlayer.EquippedWeapon == spearObj);
+            Assert("장창 내구도 5 확인", spearObj.Durability == 5);
+
+            // 장창 찌르기 (spear_stab)
+            var wpInput = new Input();
+            wpInput.OnKeyDown(System.Windows.Forms.Keys.Z);
+            wpPlayer.HandleInput(wpInput);
+            Assert("장창 장착 시 Z 입력은 spear_stab", wpPlayer.State == "spear_stab" && wpPlayer.CurrentAttackType == "spear_stab");
+            wpInput.OnKeyUp(System.Windows.Forms.Keys.Z);
+
+            // 장창 타격 판정 및 내구도 감소
+            var targetEnemy = new Enemy(EnemyType.Thug, wpPlayer.X + 25f, wpPlayer.Y);
+            var wpCombat = new CombatSystem();
+            wpCombat.CheckCollisions(wpPlayer, new List<Enemy> { targetEnemy });
+            Assert("장창 타격 후 내구도 1 감소", spearObj.Durability == 4);
+
+            // 쇠방망이 장착 및 100% 넉다운 스윙
+            wpPlayer.EquippedWeapon = null;
+            wpPlayer.EquipWeapon(cudgelObj);
+            wpPlayer.State = "cudgel_swing";
+            wpPlayer.CurrentAttackType = "cudgel_swing";
+            wpPlayer.HasDealtDamage = false;
+            targetEnemy.State = "idle";
+            wpCombat.CheckCollisions(wpPlayer, new List<Enemy> { targetEnemy });
+            Assert("쇠방망이 타격 시 적 넉다운(down) 전이", targetEnemy.State == "down");
+
+            // 부채 장착
+            wpPlayer.EquippedWeapon = null;
+            wpPlayer.EquipWeapon(fanObj);
+            Assert("선비 부채 내구도 8 확인", fanObj.Durability == 8);
+
+            // Test 48: 장착 무기 투척 (ThrowEquippedWeapon)
+            wpPlayer.ThrowEquippedWeapon();
+            Assert("무기 투척 후 플레이어 장착 해제", wpPlayer.EquippedWeapon == null);
+            Assert("투척된 부채는 비행(IsFlying) 상태", fanObj.IsFlying);
+            Assert("투척된 부채에 고속 전방 속도 부여", Math.Abs(fanObj.Vx) >= 250f);
+
+            // Test 49: EX 강화 비기 (Space + Z / X) MP 소모, 데미지, 무적 검증
+            var exPlayer = new Player(new StatusSystem());
+            exPlayer.Status.CurrentMp = 100;
+            var exInput = new Input();
+
+            // Space + Z -> 극·훈민선풍각 (ex_spin)
+            exInput.OnKeyDown(System.Windows.Forms.Keys.Space);
+            exInput.OnKeyDown(System.Windows.Forms.Keys.Z);
+            exPlayer.HandleInput(exInput);
+            Assert("Space+Z 입력 시 ex_spin 발동", exPlayer.State == "ex_spin" && exPlayer.CurrentAttackType == "ex_spin");
+            Assert("EX 비기 발동 시 MP 20 소모", exPlayer.Status.CurrentMp == 80);
+            Assert("EX 비기 발동 시 1초 이상 무적 부여", exPlayer.InvincibleTimer >= 1.0f);
+            exInput.OnKeyUp(System.Windows.Forms.Keys.Z);
+
+            // Space + X -> 극·용비어천격 (ex_dragon)
+            exPlayer.State = "idle";
+            exInput.OnKeyDown(System.Windows.Forms.Keys.X);
+            exPlayer.HandleInput(exInput);
+            Assert("Space+X 입력 시 ex_dragon 발동", exPlayer.State == "ex_dragon" && exPlayer.CurrentAttackType == "ex_dragon");
+            Assert("EX 비기 추가 MP 소모", exPlayer.Status.CurrentMp == 60);
+            exInput.OnKeyUp(System.Windows.Forms.Keys.X);
+            exInput.OnKeyUp(System.Windows.Forms.Keys.Space);
+
+            // 기력 부족 시 EX 비기 발동 불가
+            exPlayer.Status.CurrentMp = 5;
+            exPlayer.State = "idle";
+            exInput.OnKeyDown(System.Windows.Forms.Keys.Space);
+            exInput.OnKeyDown(System.Windows.Forms.Keys.Z);
+            exPlayer.HandleInput(exInput);
+            Assert("MP 부족 시 EX 비기 발동 불가", exPlayer.State != "ex_spin");
+            exInput.OnKeyUp(System.Windows.Forms.Keys.Z);
+            exInput.OnKeyUp(System.Windows.Forms.Keys.Space);
+
+            // Test 50: 선비 쇠살 부채(Fan) 화살 반사 검증
+            var fanPlayer = new Player(new StatusSystem());
+            fanPlayer.State = "fan_wave";
+            fanPlayer.CurrentAttackType = "fan_wave";
+            var incomingArrow = new WorldObject(ObjectType.Arrow, fanPlayer.X + 20f, fanPlayer.Y)
+            {
+                IsFlying = true,
+                ThrownByPlayer = false,
+                Vx = -250f
+            };
+            var fanCombat = new CombatSystem();
+            fanCombat.CheckCollisions(fanPlayer, new List<Enemy>(), new List<WorldObject> { incomingArrow });
+            Assert("부채질로 화살 반사 성공 (ThrownByPlayer true)", incomingArrow.ThrownByPlayer);
+            Assert("반사된 화살 속도 반전 (Vx > 0)", incomingArrow.Vx > 0);
+
+            // Test 51: 광화문 신기전 화차 (Hwacha) 다연장 발사 검증
+            var hwachaPlayer = new Player(new StatusSystem());
+            hwachaPlayer.State = "punch";
+            hwachaPlayer.CurrentAttackType = "punch";
+            var hwachaObj = new WorldObject(ObjectType.Hwacha, hwachaPlayer.X + 20f, hwachaPlayer.Y);
+            var hwachaList = new List<WorldObject> { hwachaObj };
+            var hwachaCombat = new CombatSystem();
+            hwachaCombat.CheckCollisions(hwachaPlayer, new List<Enemy>(), hwachaList);
+            int firedArrows = hwachaList.FindAll(o => o.Type == ObjectType.Arrow && o.ThrownByPlayer).Count;
+            Assert("화차 타격 시 다연장 화살 8발 일제 발사", firedArrows == 8);
+
+            // Test 52: 3장 청계천 다리 밖 수장 (Y > 218px) 즉사 판정 검증
+            var riverPlayer = new Player(new StatusSystem());
+            riverPlayer.Y = 220f;
+            riverPlayer.State = "kick";
+            riverPlayer.CurrentAttackType = "kick";
+            var drowningEnemy = new Enemy(EnemyType.Thug, riverPlayer.X + 20f, 222f); // 청계천 물가
+            var riverCombat = new CombatSystem();
+            riverCombat.CheckCollisions(riverPlayer, new List<Enemy> { drowningEnemy });
+            Assert("다리 밖 물가로 추락한 적 즉사(IsDead true)", drowningEnemy.IsDead);
+            Assert("수장된 적 HP 0", drowningEnemy.CurrentHp == 0);
+
+            // Test 53: 보스전 '합(合)' 힘겨루기 QTE 및 그로기 스턴 검증
+            var clashPlayer = new Player(new StatusSystem());
+            clashPlayer.State = "punch";
+            clashPlayer.CurrentAttackType = "punch";
+            var clashBoss = new Enemy(EnemyType.Boss, clashPlayer.X + 25f, clashPlayer.Y);
+            clashBoss.State = "punch";
+            var clashCombat = new CombatSystem();
+
+            clashCombat.CheckCollisions(clashPlayer, new List<Enemy> { clashBoss });
+            Assert("보스와 정면 격돌 시 합(IsClashing) 발동", clashCombat.IsClashing);
+            Assert("격돌 상대 보스 설정", clashCombat.ClashingBoss == clashBoss);
+
+            // 연타 승리 (8회 연타)
+            for (int i = 0; i < 8; i++) clashCombat.RegisterClashInput(clashPlayer);
+            Assert("연타 성공 시 합 종료", !clashCombat.IsClashing);
+            Assert("합 승리 후 보스 그로기 스턴(State hit)", clashBoss.State == "hit");
+            Assert("합 승리 후 보스 장시간 역경직(StateTimer < 0)", clashBoss.StateTimer <= -2.0f);
+
+            // Test 54: 로그라이트 조선 8대 기연 유물 (Relics) 효과 및 세이브/로드 무결성
+            var relicStatus = new StatusSystem();
+            Assert("초기 유물 개수 0", relicStatus.Relics.Count == 0);
+
+            // 철갑 흉경
+            relicStatus.AddRelic("cheolgap");
+            Assert("철갑 흉경 유물 보유", relicStatus.HasRelic("cheolgap"));
+            var ironPlayer = new Player(relicStatus);
+            int hpStart = ironPlayer.Status.CurrentHp;
+            ironPlayer.TakeDamage(20, 0f);
+            Assert("철갑 흉경 유물로 피격 피해 4 감소", ironPlayer.Status.CurrentHp == hpStart - 16);
+
+            // 금강역사의 패 (HP +30)
+            int hpBeforeMedal = relicStatus.MaxHp;
+            relicStatus.AddRelic("medallion");
+            Assert("금강역사 패로 최대 HP 30 증가", relicStatus.MaxHp == hpBeforeMedal + 30);
+
+            // 풍운의 짚신 (2단 점프)
+            relicStatus.AddRelic("shoes");
+            var shoePlayer = new Player(relicStatus);
+            shoePlayer.Z = 15f; // 공중
+            var shoeInput = new Input();
+            shoeInput.OnKeyDown(System.Windows.Forms.Keys.C);
+            shoePlayer.HandleInput(shoeInput);
+            Assert("풍운의 짚신 보유 시 공중 2단 점프 발동", shoePlayer.HasDoubleJumped);
+
+            // 도깨비 감투 (대시 중 완전 무적)
+            relicStatus.AddRelic("dokkaebi");
+            var hatPlayer = new Player(relicStatus);
+            int hpBeforeHat = hatPlayer.Status.CurrentHp;
+            hatPlayer.State = "run";
+            hatPlayer.TakeDamage(30, 0f, out _, out _, out _);
+            Assert("도깨비 감투 착용 시 대시 중 완전 무적(HP 무피해)", hatPlayer.Status.CurrentHp == hpBeforeHat);
+
+            // 세이브/로드 무결성 검증
+            SaveLoadSystem.Save(relicStatus, 4);
+            var loadedRelicStatus = new StatusSystem();
+            SaveLoadSystem.Load(loadedRelicStatus, out _);
+            Assert("저장된 유물 개수와 로드된 유물 개수 일치", loadedRelicStatus.Relics.Count == relicStatus.Relics.Count);
+            Assert("로드 후에도 철갑 흉경 보유 유지", loadedRelicStatus.HasRelic("cheolgap"));
+            Assert("로드 후에도 금강역사의 패 보유 유지", loadedRelicStatus.HasRelic("medallion"));
+
+            // Test 55: 무한 연무장(서바이벌) 모드 웨이브 시스템 검증
+            var survScene = new GameScene();
+            survScene.Initialize();
+            survScene.StartSurvivalMode();
+            Assert("서바이벌 모드 활성화", survScene.StageManager.IsSurvivalMode);
+            Assert("초기 서바이벌 웨이브는 1", survScene.StageManager.SurvivalWave == 1);
+            Assert("웨이브 1 적 스폰 확인", survScene.StageManager.Enemies.Count > 0);
+
+            // 5웨이브 보스 출현 검증
+            survScene.StageManager.LoadSurvivalWave(5);
+            Assert("5웨이브 설정 완료", survScene.StageManager.SurvivalWave == 5);
+            Assert("5웨이브 보스 출현 확인", survScene.StageManager.CurrentBoss != null);
+            Assert("연무장에 신기전 화차 배치 확인", survScene.StageManager.WorldObjects.Exists(o => o.Type == ObjectType.Hwacha));
+
             Console.WriteLine("----------------------------------------------------");
             Console.WriteLine($" 총 테스트 결과: {passed} / {total} 통과 ({(passed == total ? "100% 성공" : "실패 항목 있음")})");
             Console.WriteLine("====================================================");

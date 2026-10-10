@@ -67,6 +67,10 @@ namespace HanlangGame.Visuals
             _cache["obj_bench"]    = CreateBench();     // 대형 주막 평상 / 긴 의자
             _cache["obj_ricesack"] = CreateRiceSack();  // 볏짚 쌀가마니
             _cache["obj_arrow"]    = CreateArrow();     // 흑호단 궁수 화살
+            _cache["obj_spear"]    = CreateSpear();     // 오랏줄 장창
+            _cache["obj_cudgel"]   = CreateCudgel();    // 육각 쇠방망이
+            _cache["obj_fan"]      = CreateFan();       // 선비 쇠살 부채
+            _cache["obj_hwacha"]   = CreateHwacha();    // 광화문 신기전 화차
         }
 
         private static void RegisterChibiHeroSet(string prefix, Color robeColor, Color vestColor, Color beltColor, bool isEnemy = false, bool isBoss = false, int scaleW = 30, int scaleH = 34, HeadgearType headgear = HeadgearType.Topknot)
@@ -1385,6 +1389,114 @@ namespace HanlangGame.Visuals
             // 화살촉 (쇠촉 철촉)
             g.FillPolygon(bHead, new Point[] { new Point(14, 0), new Point(18, 3), new Point(14, 5) });
             g.FillPolygon(bHeadDk, new Point[] { new Point(14, 2), new Point(17, 3), new Point(14, 4) });
+
+            return bmp;
+        }
+
+        private static Bitmap CreateSpear()
+        {
+            var bmp = new Bitmap(28, 10);
+            using var g = System.Drawing.Graphics.FromImage(bmp);
+            g.Clear(Color.Transparent);
+
+            using var bWood = new SolidBrush(Color.FromArgb(145, 95, 45));
+            using var bBlade = new SolidBrush(Color.FromArgb(220, 225, 235));
+            using var bBladeDk = new SolidBrush(Color.FromArgb(110, 115, 125));
+            using var bTassel = new SolidBrush(Color.FromArgb(220, 45, 45));
+
+            // 긴 창대 (나무)
+            g.FillRectangle(bWood, 0, 4, 20, 2);
+
+            // 붉은 상모/술 (적색 술)
+            g.FillRectangle(bTassel, 18, 2, 3, 6);
+
+            // 강철 창날
+            g.FillPolygon(bBlade, new Point[] { new Point(20, 1), new Point(28, 5), new Point(20, 9) });
+            g.FillPolygon(bBladeDk, new Point[] { new Point(20, 4), new Point(26, 5), new Point(20, 6) });
+
+            return bmp;
+        }
+
+        private static Bitmap CreateCudgel()
+        {
+            var bmp = new Bitmap(22, 10);
+            using var g = System.Drawing.Graphics.FromImage(bmp);
+            g.Clear(Color.Transparent);
+
+            using var bWood = new SolidBrush(Color.FromArgb(120, 75, 35));
+            using var bIron = new SolidBrush(Color.FromArgb(70, 75, 85));
+            using var bStud = new SolidBrush(Color.FromArgb(200, 205, 215));
+
+            // 굵은 쇠방망이 몸통
+            g.FillRectangle(bWood, 0, 3, 20, 4);
+            g.FillRectangle(bIron, 10, 2, 10, 6);
+
+            // 쇠징 박힘 (리벳/돌기)
+            g.FillRectangle(bStud, 12, 3, 2, 1);
+            g.FillRectangle(bStud, 16, 3, 2, 1);
+            g.FillRectangle(bStud, 12, 6, 2, 1);
+            g.FillRectangle(bStud, 16, 6, 2, 1);
+
+            return bmp;
+        }
+
+        private static Bitmap CreateFan()
+        {
+            var bmp = new Bitmap(18, 12);
+            using var g = System.Drawing.Graphics.FromImage(bmp);
+            g.Clear(Color.Transparent);
+
+            using var bBamboo = new SolidBrush(Color.FromArgb(160, 125, 60));
+            using var bPaper = new SolidBrush(Color.FromArgb(245, 240, 225));
+            using var bBlue = new SolidBrush(Color.FromArgb(40, 90, 180));
+            using var bRed = new SolidBrush(Color.FromArgb(200, 40, 40));
+
+            // 펼친 합죽선 부채살
+            g.FillPolygon(bPaper, new Point[] { new Point(2, 2), new Point(16, 2), new Point(13, 10), new Point(5, 10) });
+
+            // 태극 문양
+            g.FillEllipse(bRed, 7, 3, 4, 4);
+            g.FillEllipse(bBlue, 7, 5, 4, 3);
+
+            // 부채살 뼈대
+            g.FillRectangle(bBamboo, 8, 8, 2, 4);
+
+            return bmp;
+        }
+
+        private static Bitmap CreateHwacha()
+        {
+            var bmp = new Bitmap(36, 24);
+            using var g = System.Drawing.Graphics.FromImage(bmp);
+            g.Clear(Color.Transparent);
+
+            using var bWood = new SolidBrush(Color.FromArgb(135, 85, 40));
+            using var bWoodDk = new SolidBrush(Color.FromArgb(85, 50, 25));
+            using var bIron = new SolidBrush(Color.FromArgb(60, 65, 75));
+            using var bRockets = new SolidBrush(Color.FromArgb(200, 60, 40));
+            using var bGold = new SolidBrush(Color.FromArgb(220, 180, 50));
+
+            // 수레 본체 바퀴
+            g.FillEllipse(bWoodDk, 3, 11, 12, 12);
+            g.FillEllipse(bIron, 6, 14, 6, 6);
+
+            // 수레 지지대 및 손잡이
+            g.FillRectangle(bWood, 10, 14, 22, 3);
+            g.FillRectangle(bWoodDk, 28, 11, 4, 11);
+
+            // 신기전 발사대 (로켓 다연장 통)
+            g.FillRectangle(bWoodDk, 8, 2, 22, 10);
+            g.FillRectangle(bIron, 7, 2, 2, 10);
+
+            // 로켓 화전 머리들 (빨간 화전 촉)
+            for (int y = 3; y <= 9; y += 3)
+            {
+                for (int x = 10; x <= 26; x += 4)
+                {
+                    g.FillRectangle(bRockets, x, y, 2, 2);
+                }
+            }
+            g.FillRectangle(bGold, 16, 5, 6, 4); // 관청 인장
 
             return bmp;
         }
