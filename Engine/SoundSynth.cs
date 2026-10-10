@@ -16,7 +16,7 @@ namespace HanlangGame.Engine
         private static bool _bgmEnabled = true;
         private static string _targetBgmTrack = "";
         private static readonly object _bgmLock = new();
-        private static readonly System.Collections.Generic.Dictionary<string, byte[]> _bgmBytesCache = new();
+        private static readonly System.Collections.Generic.Dictionary<string, byte[]> _bgmMidCache = new();
         private static readonly System.Threading.AutoResetEvent _bgmWakeEvent = new(false);
         private static System.Threading.Thread? _bgmThread;
         private static bool _bgmWorkerStarted = false;
@@ -124,28 +124,28 @@ namespace HanlangGame.Engine
                     }
                     catch { }
 
-                    if (!_bgmBytesCache.TryGetValue(targetTrack, out byte[]? wavBytes))
+                    if (!_bgmMidCache.TryGetValue(targetTrack, out byte[]? midBytes))
                     {
-                        wavBytes = GenerateBgmWav(targetTrack);
+                        midBytes = MidiGenerator.GenerateBgmMid(targetTrack);
                         lock (_bgmLock)
                         {
-                            _bgmBytesCache[targetTrack] = wavBytes;
+                            _bgmMidCache[targetTrack] = midBytes;
                         }
                     }
 
-                    string tempPath = Path.Combine(Path.GetTempPath(), $"hanlang_bgm_v3_{targetTrack}.wav");
-                    if (!File.Exists(tempPath) || new FileInfo(tempPath).Length != wavBytes.Length)
+                    string tempPath = Path.Combine(Path.GetTempPath(), $"hanlang_bgm_v4_{targetTrack}.mid");
+                    if (!File.Exists(tempPath) || new FileInfo(tempPath).Length != midBytes.Length)
                     {
                         try
                         {
-                            File.WriteAllBytes(tempPath, wavBytes);
+                            File.WriteAllBytes(tempPath, midBytes);
                         }
                         catch { }
                     }
 
                     try
                     {
-                        mciSendString($"open \"{tempPath}\" type waveaudio alias hanlang_bgm", null, 0, IntPtr.Zero);
+                        mciSendString($"open \"{tempPath}\" type sequencer alias hanlang_bgm", null, 0, IntPtr.Zero);
                         mciSendString("play hanlang_bgm from 0", null, 0, IntPtr.Zero);
                         currentPlayingTrack = targetTrack;
                     }

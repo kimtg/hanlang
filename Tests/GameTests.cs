@@ -669,6 +669,32 @@ namespace HanlangGame.Tests
             Assert("3채널 칩튠 BGM 비동기 재생/정지 호출 안정성 보장", true);
             Assert("BGM 트랙 전환 시 단일 오디오 스레드 제어로 음원 중복 재생 방지", true);
 
+            // Test 29: 순수 C# General MIDI (SMF Format 0) 프로시저럴 생성 엔진 검증
+            byte[] stageMid = MidiGenerator.GenerateBgmMid("stage");
+            Assert("스테이지 MIDI(한양 저잣거리 활극) SMF 생성 성공", stageMid != null && stageMid.Length > 200);
+            Assert("스테이지 MIDI MThd 헤더 일치", stageMid[0] == (byte)'M' && stageMid[1] == (byte)'T' && stageMid[2] == (byte)'h' && stageMid[3] == (byte)'d');
+            Assert("스테이지 MIDI MTrk 트랙 마커 일치", stageMid[14] == (byte)'M' && stageMid[15] == (byte)'T' && stageMid[16] == (byte)'r' && stageMid[17] == (byte)'k');
+
+            byte[] bossMid = MidiGenerator.GenerateBgmMid("boss");
+            Assert("보스전 MIDI(마도 결전) SMF 생성 성공", bossMid != null && bossMid.Length > 200);
+
+            byte[] titleMid = MidiGenerator.GenerateBgmMid("title");
+            Assert("타이틀 MIDI(대취타 유생) SMF 생성 성공", titleMid != null && titleMid.Length > 150);
+
+            byte[] shopMid = MidiGenerator.GenerateBgmMid("shop");
+            Assert("주막 MIDI(도성 주막 풍류) SMF 생성 성공", shopMid != null && shopMid.Length > 150);
+
+            byte[] victoryMid = MidiGenerator.GenerateBgmMid("victory");
+            Assert("승리 MIDI(훈민정음 만세) SMF 생성 성공", victoryMid != null && victoryMid.Length > 150);
+
+            // MIDI 다채널 음색(가야금 107, 대금 73, 현악 48, 베이스 32) 프로그램 체인지 이벤트 존재 검증
+            bool hasKotoProgram = false;
+            for (int i = 0; i < stageMid.Length - 1; i++)
+            {
+                if (stageMid[i] == 0xC0 && stageMid[i + 1] == 107) hasKotoProgram = true;
+            }
+            Assert("국악 가야금(GM 107 Koto) 프로그램 체인지 이벤트 포함", hasKotoProgram);
+
             Console.WriteLine("----------------------------------------------------");
             Console.WriteLine($" 총 테스트 결과: {passed} / {total} 통과 ({(passed == total ? "100% 성공" : "실패 항목 있음")})");
             Console.WriteLine("====================================================");

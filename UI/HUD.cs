@@ -36,8 +36,8 @@ namespace HanlangGame.UI
             }
 
             // 플레이어 이름 및 레벨 명패
-            buffer.FillRoundedRect(16, 12, 160, 48, 6f, Color.FromArgb(180, 35, 30, 40));
-            buffer.DrawRoundedRect(16, 12, 160, 48, 6f, Color.FromArgb(190, 150, 60), 1.5f);
+            buffer.FillRoundedRect(16, 12, 140, 48, 6f, Color.FromArgb(180, 35, 30, 40));
+            buffer.DrawRoundedRect(16, 12, 140, 48, 6f, Color.FromArgb(190, 150, 60), 1.5f);
 
             buffer.DrawOutlinedText("한 랑", 28, 16, Color.FromArgb(255, 240, 180), Color.FromArgb(30, 20, 10), buffer.FontSubtitle, 1.8f);
             buffer.DrawOutlinedText($"LV.{status.Level}", 95, 26, Color.FromArgb(255, 215, 80), Color.FromArgb(30, 20, 10), buffer.FontHeader, 1.5f);
