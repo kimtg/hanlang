@@ -74,6 +74,16 @@ namespace HanlangGame.Engine
             }
         }
 
+        public static string GetStageBgmTrack(int stage) => stage switch
+        {
+            1 or 2 => "stage_market",
+            3 or 4 => "stage_fortress",
+            5 or 6 => "stage_night",
+            7 or 8 => "stage_palace",
+            9 => "stage_palace",
+            _ => "stage_market"
+        };
+
         public static byte[] GenerateBgmMid(string trackName)
         {
             float bpm;
@@ -88,13 +98,13 @@ namespace HanlangGame.Engine
 
             switch (trackName.ToLowerInvariant())
             {
-                case "boss":
-                    // 「마도 결전」 (168 BPM, D 계면조 / Phrygian 모드, 128 스텝 16비트 배틀 비트)
+                case "midboss":
+                    // 「숙명의 대결」 (168 BPM, D 계면조, 128 스텝 16비트 배틀 비트) - 중간보스 마달 & 철웅 테마
                     bpm = 168f;
                     totalSteps = 128;
                     ch0Prog = 107; // Koto (맹렬한 배틀 가야금 아르페지오)
                     ch1Prog = 77;  // Shakuhachi (날카로운 살수 피리 대선율)
-                    ch2Prog = 48;  // String Ensemble 1 (웅장한 어둠의 배틀 스트링)
+                    ch2Prog = 48;  // String Ensemble 1 (배틀 스트링)
                     ch3Prog = 32;  // Acoustic Bass (전투 베이스)
                     melody = new string[]
                     {
@@ -117,6 +127,179 @@ namespace HanlangGame.Engine
                         "Bb1", "Bb1", "Bb1", "Bb1", "C2", "C2", "C2", "C2", "D2", "D2", "D2", "D2", "Eb2", "Eb2", "Eb2", "Eb2",
                         "F2", "F2", "F2", "F2", "Eb2", "Eb2", "Eb2", "Eb2", "D2", "D2", "D2", "D2", "C2", "C2", "C2", "C2",
                         "D2", "D2", "D2", "D2", "D2", "D2", "D2", "D2", "D2", "D2", "D2", "D2", "D2", "-", "D2", "-"
+                    };
+                    drums = new string[]
+                    {
+                        "C", ".", "H", "H", "S", ".", "H", "H", "K", "K", "H", "H", "S", ".", "H", "O",
+                        "K", ".", "H", "H", "S", ".", "H", "H", "K", "K", "H", "H", "S", "H", "S", "O",
+                        "K", "K", "H", "H", "S", ".", "H", "H", "K", "K", "H", "H", "S", ".", "H", "O",
+                        "K", "H", "K", "H", "S", "H", "S", "H", "K", "K", "H", "H", "S", "S", "S", "C",
+                        "C", "K", "H", "H", "S", "H", "H", "H", "K", "K", "H", "H", "S", "H", "H", "O",
+                        "K", "K", "H", "H", "S", "H", "H", "H", "K", "K", "H", "H", "S", "H", "S", "O",
+                        "K", "H", "K", "H", "S", "H", "H", "H", "K", "K", "H", "H", "S", "H", "H", "O",
+                        "K", "K", "K", "K", "S", "S", "S", "S", "K", "K", "H", "H", "S", "S", "C", "C"
+                    };
+                    break;
+
+                case "finalboss":
+                case "boss":
+                    // 「마도학사 흑호의 강림」 (180 BPM, C Phrygian 다크 배틀 모드, 128 스텝) - 9장 최종결전 테마
+                    bpm = 180f;
+                    totalSteps = 128;
+                    ch0Prog = 107; // Koto (질풍노도의 배틀 가야금)
+                    ch1Prog = 19;  // Church Organ (마도학사 흑호의 웅장한 파이프오르간)
+                    ch2Prog = 48;  // String Ensemble 1 (어둠의 장엄한 풀 오케스트라)
+                    ch3Prog = 32;  // Acoustic Bass (위압적인 배틀 베이스)
+                    melody = new string[]
+                    {
+                        "C4", "Eb4", "G4", "C5", "Db5", "C5", "Ab4", "G4", "Eb4", "F4", "G4", "Ab4", "G4", "F4", "Eb4", "Db4",
+                        "C4", "C4", "Eb4", "F4", "G4", "Ab4", "Bb4", "C5", "Db5", "C5", "Bb4", "Ab4", "G4", "F4", "Eb4", "Db4",
+                        "C5", "C5", "Db5", "C5", "Bb4", "Ab4", "G4", "F4", "Eb4", "F4", "G4", "Eb4", "Db4", "C4", "Bb3", "C4",
+                        "G4", "Ab4", "Bb4", "C5", "Db5", "Eb5", "F5", "Eb5", "Db5", "C5", "Bb4", "Ab4", "G4", "Ab4", "G4", "-",
+                        "C5", "Eb5", "G5", "C6", "Bb5", "Ab5", "G5", "F5", "Eb5", "F5", "G5", "Ab5", "G5", "F5", "Eb5", "Db5",
+                        "C5", "Db5", "C5", "Bb4", "Ab4", "Bb4", "C5", "Db5", "Eb5", "F5", "G5", "Ab5", "Bb5", "Ab5", "G5", "F5",
+                        "Eb5", "F5", "G5", "Eb5", "Db5", "Eb5", "F5", "Db5", "C5", "Db5", "Eb5", "C5", "Bb4", "C5", "Db5", "Bb4",
+                        "C4", "Eb4", "G4", "C5", "Db5", "C5", "G4", "Eb4", "C4", "C4", "Eb4", "G4", "C5", "-", "C5", "-"
+                    };
+                    bass = new string[]
+                    {
+                        "C2", "C2", "C2", "C2", "Db2", "Db2", "C2", "C2", "Eb2", "Eb2", "F2", "F2", "G2", "F2", "Eb2", "Db2",
+                        "C2", "C2", "C2", "C2", "Eb2", "Eb2", "C2", "C2", "F2", "F2", "G2", "G2", "Ab2", "G2", "F2", "Eb2",
+                        "C2", "C2", "C2", "C2", "Db2", "Db2", "C2", "C2", "Bb1", "Bb1", "Bb1", "Bb1", "C2", "C2", "Db2", "C2",
+                        "G1", "G1", "Ab1", "Ab1", "Bb1", "Bb1", "C2", "C2", "Db2", "Db2", "Eb2", "Eb2", "F2", "F2", "G2", "G2",
+                        "C2", "C2", "C2", "C2", "C2", "C2", "C2", "C2", "Db2", "Db2", "Db2", "Db2", "C2", "C2", "C2", "C2",
+                        "Ab1", "Ab1", "Ab1", "Ab1", "Bb1", "Bb1", "Bb1", "Bb1", "C2", "C2", "C2", "C2", "Db2", "Db2", "Db2", "Db2",
+                        "Eb2", "Eb2", "Eb2", "Eb2", "Db2", "Db2", "Db2", "Db2", "C2", "C2", "C2", "C2", "Bb1", "Bb1", "Bb1", "Bb1",
+                        "C2", "C2", "C2", "C2", "C2", "C2", "C2", "C2", "C2", "C2", "C2", "C2", "C2", "-", "C2", "-"
+                    };
+                    drums = new string[]
+                    {
+                        "C", "T", "H", "H", "S", ".", "H", "H", "K", "K", "H", "H", "S", ".", "H", "O",
+                        "K", "T", "H", "H", "S", ".", "H", "H", "K", "K", "H", "H", "S", "H", "S", "C",
+                        "K", "K", "H", "H", "S", ".", "H", "H", "K", "K", "H", "H", "S", ".", "H", "O",
+                        "K", "H", "K", "H", "S", "H", "S", "H", "K", "K", "H", "H", "S", "S", "S", "C",
+                        "C", "K", "T", "H", "S", "H", "H", "H", "K", "K", "H", "H", "S", "H", "H", "O",
+                        "K", "K", "H", "H", "S", "H", "H", "H", "K", "K", "H", "H", "S", "H", "S", "C",
+                        "K", "H", "K", "H", "S", "H", "H", "H", "K", "K", "H", "H", "S", "H", "H", "O",
+                        "K", "K", "K", "K", "S", "S", "S", "S", "K", "K", "T", "T", "S", "S", "C", "C"
+                    };
+                    break;
+
+                case "stage_fortress":
+                    // 「남산 성곽의 황혼」 (128 BPM, A 계면조 굿거리/타령) - 3장 청계천 & 4장 남산 성곽길
+                    bpm = 128f;
+                    totalSteps = 128;
+                    ch0Prog = 40;  // Violin (해금 질감의 애잔하고 비장한 선율)
+                    ch1Prog = 77;  // Shakuhachi (성곽의 황혼을 가르는 피리 대선율)
+                    ch2Prog = 48;  // String Ensemble 1 (따스하고 비장한 현악 패드)
+                    ch3Prog = 32;  // Acoustic Bass
+                    melody = new string[]
+                    {
+                        "A4", "C5", "D5", "E5", "G5", "E5", "D5", "C5", "A4", "C5", "D5", "E5", "D5", "C5", "A4", "G4",
+                        "A4", "A4", "C5", "D5", "E5", "=", "D5", "C5", "D5", "E5", "G5", "A5", "G5", "E5", "D5", "-",
+                        "E5", "G5", "A5", "C6", "A5", "G5", "E5", "D5", "C5", "D5", "E5", "G5", "E5", "D5", "C5", "A4",
+                        "D5", "E5", "D5", "C5", "A4", "G4", "E4", "G4", "A4", "C5", "D5", "C5", "A4", "-", "A4", "-",
+                        "A5", "G5", "E5", "D5", "C5", "D5", "E5", "G5", "A5", "C6", "D6", "C6", "A5", "G5", "E5", "D5",
+                        "E5", "G5", "A5", "G5", "E5", "D5", "C5", "D5", "E5", "D5", "C5", "A4", "G4", "A4", "C5", "D5",
+                        "C5", "A4", "G4", "E4", "G4", "A4", "C5", "D5", "E5", "G5", "E5", "D5", "C5", "A4", "G4", "E4",
+                        "A4", "C5", "D5", "E5", "G5", "E5", "D5", "C5", "A4", "A4", "C5", "E5", "A5", "-", "A5", "-"
+                    };
+                    bass = new string[]
+                    {
+                        "A2", "-", "A2", "A2", "C3", "-", "C3", "C3", "D3", "-", "D3", "D3", "E3", "-", "D3", "C3",
+                        "A2", "-", "A2", "A2", "E3", "-", "E3", "E3", "D3", "-", "D3", "D3", "C3", "-", "D3", "E3",
+                        "A2", "-", "C3", "-", "D3", "-", "E3", "-", "G3", "-", "E3", "-", "D3", "-", "C3", "-",
+                        "D3", "-", "C3", "-", "A2", "-", "G2", "-", "A2", "-", "C3", "-", "A2", "-", "A2", "-",
+                        "A2", "A2", "C3", "C3", "D3", "D3", "E3", "E3", "G3", "G3", "E3", "E3", "D3", "D3", "C3", "C3",
+                        "E3", "E3", "G3", "G3", "A3", "A3", "G3", "G3", "E3", "E3", "D3", "D3", "C3", "C3", "D3", "D3",
+                        "C3", "C3", "A2", "A2", "G2", "G2", "E2", "E2", "G2", "G2", "A2", "A2", "C3", "C3", "D3", "D3",
+                        "A2", "-", "C3", "-", "D3", "-", "E3", "-", "A2", "-", "E3", "-", "A2", "-", "A2", "-"
+                    };
+                    drums = new string[]
+                    {
+                        "C", ".", "H", ".", "K", ".", "H", ".", "S", ".", "H", ".", "K", "H", "S", "O",
+                        "K", ".", "H", ".", "S", ".", "H", ".", "K", "K", "H", ".", "S", ".", "H", "O",
+                        "K", ".", "H", ".", "S", ".", "H", ".", "K", ".", "H", "H", "S", ".", "H", "O",
+                        "K", "H", "K", ".", "S", ".", "H", "H", "K", "K", "H", "H", "S", "S", "H", "C",
+                        "C", ".", "H", ".", "K", ".", "H", ".", "S", ".", "H", ".", "K", "H", "S", "O",
+                        "K", ".", "H", ".", "S", ".", "H", ".", "K", "K", "H", ".", "S", ".", "H", "O",
+                        "K", ".", "H", ".", "S", ".", "H", ".", "K", ".", "H", "H", "S", ".", "H", "O",
+                        "K", "H", "K", ".", "S", ".", "H", "H", "K", "K", "S", "S", "C", "C", "C", "-"
+                    };
+                    break;
+
+                case "stage_night":
+                    // 「달빛 아래 육조거리」 (144 BPM, D 계면조 동살풀이 첩보 비트) - 5장 주막거리 & 6장 육조거리
+                    bpm = 144f;
+                    totalSteps = 128;
+                    ch0Prog = 107; // Koto (거문고/가야금의 탄력 있는 심야 리프)
+                    ch1Prog = 73;  // Flute (대금 날카로운 대선율)
+                    ch2Prog = 45;  // Pizzicato Strings (긴장감 넘치는 피치카토 반주)
+                    ch3Prog = 32;  // Acoustic Bass (긴박한 워킹 베이스)
+                    melody = new string[]
+                    {
+                        "D4", "F4", "G4", "A4", "D5", "C5", "A4", "G4", "F4", "G4", "A4", "C5", "A4", "G4", "F4", "D4",
+                        "D4", "D4", "F4", "F4", "G4", "G4", "A4", "A4", "C5", "D5", "C5", "A4", "G4", "F4", "D4", "-",
+                        "A4", "C5", "D5", "F5", "D5", "C5", "A4", "G4", "F4", "A4", "C5", "D5", "C5", "A4", "G4", "F4",
+                        "G4", "A4", "C5", "D5", "F5", "G5", "F5", "D5", "C5", "D5", "C5", "A4", "F4", "G4", "A4", "-",
+                        "D5", "D5", "F5", "G5", "A5", "A5", "G5", "F5", "D5", "F5", "G5", "A5", "C6", "A5", "G5", "F5",
+                        "G5", "A5", "C6", "D6", "C6", "A5", "G5", "F5", "D5", "F5", "G5", "F5", "D5", "C5", "D5", "-",
+                        "A5", "G5", "F5", "D5", "C5", "D5", "F5", "G5", "A5", "G5", "F5", "D5", "C5", "A4", "C5", "D5",
+                        "D4", "F4", "G4", "A4", "C5", "A4", "G4", "F4", "D4", "D4", "F4", "A4", "D5", "-", "D5", "-"
+                    };
+                    bass = new string[]
+                    {
+                        "D2", "-", "D2", "F2", "G2", "-", "A2", "-", "D2", "-", "F2", "-", "G2", "-", "A2", "-",
+                        "D2", "-", "D2", "D2", "F2", "-", "F2", "F2", "G2", "-", "G2", "G2", "A2", "G2", "F2", "D2",
+                        "D2", "-", "F2", "-", "G2", "-", "A2", "-", "Bb2", "-", "A2", "-", "G2", "-", "F2", "-",
+                        "G2", "-", "A2", "-", "C3", "-", "D3", "-", "G2", "-", "F2", "-", "D2", "-", "D2", "-",
+                        "D2", "D2", "F2", "F2", "G2", "G2", "A2", "A2", "D2", "D2", "F2", "F2", "G2", "G2", "A2", "A2",
+                        "G2", "G2", "A2", "A2", "C3", "C3", "D3", "D3", "G2", "G2", "F2", "F2", "D2", "D2", "D2", "D2",
+                        "D2", "-", "F2", "-", "G2", "-", "A2", "-", "Bb2", "-", "A2", "-", "G2", "-", "F2", "-",
+                        "D2", "-", "D2", "F2", "G2", "-", "A2", "-", "D2", "-", "A2", "-", "D2", "-", "D2", "-"
+                    };
+                    drums = new string[]
+                    {
+                        "C", ".", "H", "H", "S", ".", "H", "H", "K", ".", "H", "H", "S", ".", "H", "O",
+                        "K", ".", "H", "H", "S", ".", "H", "H", "K", "K", "H", "H", "S", ".", "H", "O",
+                        "K", ".", "H", "H", "S", ".", "H", "H", "K", ".", "H", "H", "S", "H", "S", "O",
+                        "K", "H", "K", "H", "S", ".", "H", "H", "K", "K", "H", "H", "S", "S", "H", "C",
+                        "C", ".", "H", "H", "S", ".", "H", "H", "K", ".", "H", "H", "S", ".", "H", "O",
+                        "K", ".", "H", "H", "S", ".", "H", "H", "K", "K", "H", "H", "S", ".", "H", "O",
+                        "K", ".", "H", "H", "S", ".", "H", "H", "K", ".", "H", "H", "S", "H", "S", "O",
+                        "K", "K", "K", "K", "S", "S", "S", "S", "K", "K", "H", "H", "S", "S", "C", "C"
+                    };
+                    break;
+
+                case "stage_palace":
+                    // 「궁궐의 폭풍전야」 (160 BPM, G 우조 휘모리 장단) - 7장 광화문 & 8장 근정전 & 9장 집현전
+                    bpm = 160f;
+                    totalSteps = 128;
+                    ch0Prog = 59;  // Muted Trumpet (태평소 당당한 궁중 취타 팡파르)
+                    ch1Prog = 73;  // Flute (대금 화음 고음 선율)
+                    ch2Prog = 48;  // String Ensemble 1 (웅장한 궁중 오케스트라)
+                    ch3Prog = 32;  // Acoustic Bass (위엄 있는 베이스)
+                    melody = new string[]
+                    {
+                        "G4", "G4", "D5", "D5", "E5", "E5", "G5", "E5", "D5", "E5", "D5", "B4", "A4", "B4", "D5", "E5",
+                        "G5", "G5", "A5", "G5", "E5", "D5", "B4", "A4", "G4", "A4", "B4", "D5", "B4", "A4", "G4", "-",
+                        "D5", "E5", "G5", "A5", "B5", "A5", "G5", "E5", "D5", "E5", "G5", "E5", "D5", "B4", "A4", "B4",
+                        "D5", "D5", "E5", "G5", "A5", "B5", "D6", "B5", "A5", "G5", "E5", "D5", "B4", "A4", "G4", "-",
+                        "G5", "D6", "B5", "A5", "G5", "A5", "B5", "D6", "E6", "D6", "B5", "A5", "G5", "E5", "D5", "E5",
+                        "G5", "A5", "B5", "D6", "B5", "A5", "G5", "E5", "D5", "E5", "D5", "B4", "A4", "B4", "D5", "-",
+                        "B5", "A5", "G5", "E5", "D5", "B4", "A4", "G4", "A4", "B4", "D5", "E5", "G5", "E5", "D5", "B4",
+                        "G4", "B4", "D5", "G5", "E5", "D5", "B4", "A4", "G4", "G4", "B4", "D5", "G5", "-", "G5", "-"
+                    };
+                    bass = new string[]
+                    {
+                        "G2", "-", "G2", "G2", "B2", "-", "B2", "B2", "D3", "-", "D3", "D3", "E3", "-", "D3", "B2",
+                        "G2", "-", "G2", "G2", "A2", "-", "A2", "A2", "B2", "-", "B2", "B2", "D3", "B2", "A2", "G2",
+                        "D2", "-", "D2", "D2", "G2", "-", "G2", "G2", "A2", "-", "A2", "A2", "B2", "-", "A2", "G2",
+                        "G2", "-", "A2", "A2", "B2", "-", "D3", "D3", "B2", "-", "A2", "G2", "D2", "-", "D2", "-",
+                        "G2", "G2", "B2", "B2", "D3", "D3", "E3", "E3", "G3", "G3", "E3", "E3", "D3", "D3", "B2", "B2",
+                        "G2", "G2", "A2", "A2", "B2", "B2", "D3", "D3", "B2", "B2", "A2", "A2", "G2", "G2", "D2", "D2",
+                        "E2", "E2", "G2", "G2", "A2", "A2", "B2", "B2", "D3", "D3", "B2", "B2", "A2", "A2", "G2", "G2",
+                        "G2", "-", "B2", "-", "D3", "-", "G3", "-", "G2", "-", "D3", "-", "G2", "-", "G2", "-"
                     };
                     drums = new string[]
                     {
@@ -224,7 +407,7 @@ namespace HanlangGame.Engine
                     };
                     break;
 
-                default: // "stage" - 「한양 저잣거리 활극」 (148 BPM, E 계면조 / G 평조, 자진모리 장단, 128 스텝)
+                default: // "stage_market" / "stage" - 「한양 저잣거리 활극」 (148 BPM, E 계면조 / G 평조 자진모리 장단, 128 스텝)
                     bpm = 148f;
                     totalSteps = 128;
                     ch0Prog = 107; // Koto (가야금 청명한 활극 리프)
@@ -307,15 +490,15 @@ namespace HanlangGame.Engine
             {
                 int stepTick = s * stepTicks;
 
-                // --- Channel 0: Melody (Koto / 가야금) ---
+                // --- Channel 0: Melody (Koto / 가야금 / 해금 / 태평소) ---
                 string mStr = melody[s % melody.Length];
                 int mNote = NoteToMidi(mStr);
                 if (mNote >= 0)
                 {
-                    // Check ties for duration
+                    // Check ties or rests for duration
                     int durTicks = stepTicks;
                     int lookAhead = s + 1;
-                    while (lookAhead < totalSteps && melody[lookAhead % melody.Length] == "=")
+                    while (lookAhead < totalSteps && (melody[lookAhead % melody.Length] == "=" || melody[lookAhead % melody.Length] == "-"))
                     {
                         durTicks += stepTicks;
                         lookAhead++;
@@ -325,7 +508,18 @@ namespace HanlangGame.Engine
                     events.Add(new TimedEvent(stepTick, new byte[] { 0x90, (byte)mNote, 105 }, 1));
                     events.Add(new TimedEvent(stepTick + gateTicks, new byte[] { 0x80, (byte)mNote, 0 }, 0));
 
-                    // --- Channel 1: Daegeum / Flute Counter-melody / Harmonic Accent ---
+                    // 한국 전통 가야금/해금 농현(弄絃, Pitch Bend 시김새)
+                    // 지속음(2스텝 이상)일 때 줄을 눌렀다 놓는 피치 벤드 진동 삽입
+                    if (durTicks >= stepTicks * 2)
+                    {
+                        int bendTick1 = stepTick + (durTicks / 2);
+                        int bendTick2 = stepTick + (durTicks * 3 / 4);
+                        events.Add(new TimedEvent(bendTick1, new byte[] { 0xE0, 0x00, 0x54 }, 1)); // 미세 올림
+                        events.Add(new TimedEvent(bendTick2, new byte[] { 0xE0, 0x00, 0x34 }, 1)); // 미세 내림
+                        events.Add(new TimedEvent(stepTick + gateTicks, new byte[] { 0xE0, 0x00, 0x40 }, 0)); // 원위치 복귀
+                    }
+
+                    // --- Channel 1: Woodwind / Counter-melody (대금 / 피리 시김새 & 비브라토) ---
                     // Flute joins in unison or 1 octave higher for sustained/strong notes
                     if (durTicks >= stepTicks * 2 || (s % 4 == 0))
                     {
@@ -333,6 +527,14 @@ namespace HanlangGame.Engine
                         int fGate = Math.Max(16, durTicks - 2);
                         events.Add(new TimedEvent(stepTick, new byte[] { 0x91, (byte)fNote, 90 }, 1));
                         events.Add(new TimedEvent(stepTick + fGate, new byte[] { 0x81, (byte)fNote, 0 }, 0));
+
+                        // 대금/피리 지속음 비브라토 모듈레이션 (CC 0x01)
+                        if (durTicks >= stepTicks * 2)
+                        {
+                            int vibTick = stepTick + (durTicks / 2);
+                            events.Add(new TimedEvent(vibTick, new byte[] { 0xB1, 0x01, 64 }, 1)); // Vibrato ON
+                            events.Add(new TimedEvent(stepTick + fGate, new byte[] { 0xB1, 0x01, 0 }, 0)); // Vibrato OFF
+                        }
                     }
                 }
 
@@ -343,7 +545,7 @@ namespace HanlangGame.Engine
                 {
                     int durTicks = stepTicks;
                     int lookAhead = s + 1;
-                    while (lookAhead < totalSteps && bass[lookAhead % bass.Length] == "=")
+                    while (lookAhead < totalSteps && (bass[lookAhead % bass.Length] == "=" || bass[lookAhead % bass.Length] == "-"))
                     {
                         durTicks += stepTicks;
                         lookAhead++;
@@ -369,21 +571,26 @@ namespace HanlangGame.Engine
                     }
                 }
 
-                // --- Channel 9 (MIDI Ch 10): Percussion & Drums ---
+                // --- Channel 9 (MIDI Ch 10): Percussion & Drums (장구/북/징 다이내믹스) ---
                 string dStr = drums[s % drums.Length];
+                bool isAccent = (s % 8 == 0 || s % 8 == 4);
+                byte kVel = (byte)(isAccent ? 115 : 85);
+                byte sVel = (byte)(isAccent ? 105 : 75);
+                byte hVel = (byte)(isAccent ? 80 : 60);
+
                 if (dStr.Contains('K')) // Taiko / Bass Drum (Note 35 / 36)
                 {
-                    events.Add(new TimedEvent(stepTick, new byte[] { 0x99, 35, 110 }, 1));
+                    events.Add(new TimedEvent(stepTick, new byte[] { 0x99, 35, kVel }, 1));
                     events.Add(new TimedEvent(stepTick + 12, new byte[] { 0x89, 35, 0 }, 0));
                 }
                 if (dStr.Contains('S')) // Janggu Chae / Snare (Note 38 / 40)
                 {
-                    events.Add(new TimedEvent(stepTick, new byte[] { 0x99, 38, 100 }, 1));
+                    events.Add(new TimedEvent(stepTick, new byte[] { 0x99, 38, sVel }, 1));
                     events.Add(new TimedEvent(stepTick + 12, new byte[] { 0x89, 38, 0 }, 0));
                 }
                 if (dStr.Contains('H')) // Closed Hi-Hat (Note 42)
                 {
-                    events.Add(new TimedEvent(stepTick, new byte[] { 0x99, 42, 75 }, 1));
+                    events.Add(new TimedEvent(stepTick, new byte[] { 0x99, 42, hVel }, 1));
                     events.Add(new TimedEvent(stepTick + 8, new byte[] { 0x89, 42, 0 }, 0));
                 }
                 if (dStr.Contains('O')) // Open Hi-Hat (Note 46)

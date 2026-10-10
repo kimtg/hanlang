@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Linq;
 using HanlangGame.Entities;
 using HanlangGame.Systems;
 using HanlangGame.Visuals;
@@ -1018,6 +1019,85 @@ namespace HanlangGame.Tests
             SaveLoadSystem.Load(loadedRuneStatus, out int loadedRuneStage);
             Assert("저장된 룬 개수와 로드된 룬 개수 일치", loadedRuneStatus.Runes.Count == runeStatus.Runes.Count);
             Assert("로드된 상태에서도 용비어천가 공명 자동 활성화", loadedRuneStatus.ActiveResonances.Contains("용비어천가"));
+
+            // Test 39: 권역별 스테이지 테마 BGM SMF 생성 및 포맷 검증
+            string[] stageTrackNames = new[] { "stage_market", "stage_fortress", "stage_night", "stage_palace" };
+            foreach (var track in stageTrackNames)
+            {
+                byte[] mid = MidiGenerator.GenerateBgmMid(track);
+                Assert($"권역 테마 MIDI({track}) 생성 성공", mid != null && mid.Length > 200);
+                Assert($"권역 테마 MIDI({track}) MThd 헤더 일치", mid != null && mid.Length >= 4 && mid[0] == 'M' && mid[1] == 'T' && mid[2] == 'h' && mid[3] == 'd');
+            }
+
+            // Test 40: 보스전 분리 BGM (중간보스 midboss vs 최종보스 finalboss) SMF 생성 검증
+            byte[] midbossMid = MidiGenerator.GenerateBgmMid("midboss");
+            Assert("중간보스전 MIDI(midboss) 생성 성공", midbossMid != null && midbossMid.Length > 200);
+            Assert("중간보스전 MIDI MThd 헤더 일치", midbossMid != null && midbossMid.Length >= 4 && midbossMid[0] == 'M' && midbossMid[1] == 'T' && midbossMid[2] == 'h' && midbossMid[3] == 'd');
+
+            byte[] finalbossMid = MidiGenerator.GenerateBgmMid("finalboss");
+            Assert("최종보스전 MIDI(finalboss) 생성 성공", finalbossMid != null && finalbossMid.Length > 200);
+            Assert("최종보스전 MIDI MThd 헤더 일치", finalbossMid != null && finalbossMid.Length >= 4 && finalbossMid[0] == 'M' && finalbossMid[1] == 'T' && finalbossMid[2] == 'h' && finalbossMid[3] == 'd');
+            Assert("중간보스와 최종보스 BGM 데이터 차별화 (바이너리 불일치)", !midbossMid.SequenceEqual(finalbossMid));
+
+            // Test 41: 국악 시김새 농현(Pitch Bend: 0xE0) 이벤트 검출
+            byte[] marketMid = MidiGenerator.GenerateBgmMid("stage_market");
+            bool hasPitchBend = false;
+            for (int i = 0; i < marketMid.Length - 2; i++)
+            {
+                if (marketMid[i] == 0xE0 && marketMid[i + 2] == 0x54)
+                {
+                    hasPitchBend = true;
+                    break;
+                }
+            }
+            Assert("가야금/해금 농현(Pitch Bend) 이벤트 포함 검증", hasPitchBend);
+
+            // Test 42: 관악기 시김새 비브라토(Modulation Wheel CC 01: 0xB1 0x01) 이벤트 검출
+            byte[] fortressMid = MidiGenerator.GenerateBgmMid("stage_fortress");
+            bool hasModulation = false;
+            for (int i = 0; i < fortressMid.Length - 2; i++)
+            {
+                if (fortressMid[i] == 0xB1 && fortressMid[i + 1] == 0x01)
+                {
+                    hasModulation = true;
+                    break;
+                }
+            }
+            Assert("대금/피리 시김새 비브라토(Modulation Wheel) 이벤트 포함 검증", hasModulation);
+
+            // Test 43: 전 9개 스테이지 권역별 BGM 매핑 검증
+            Assert("1장 저잣거리 테마 매핑", MidiGenerator.GetStageBgmTrack(1) == "stage_market");
+            Assert("2장 저잣거리 테마 매핑", MidiGenerator.GetStageBgmTrack(2) == "stage_market");
+            Assert("3장 성곽 테마 매핑", MidiGenerator.GetStageBgmTrack(3) == "stage_fortress");
+            Assert("4장 성곽 테마 매핑", MidiGenerator.GetStageBgmTrack(4) == "stage_fortress");
+            Assert("5장 야간 육조거리 테마 매핑", MidiGenerator.GetStageBgmTrack(5) == "stage_night");
+            Assert("6장 야간 육조거리 테마 매핑", MidiGenerator.GetStageBgmTrack(6) == "stage_night");
+            Assert("7장 궁궐 테마 매핑", MidiGenerator.GetStageBgmTrack(7) == "stage_palace");
+            Assert("8장 궁궐 테마 매핑", MidiGenerator.GetStageBgmTrack(8) == "stage_palace");
+            Assert("9장 궁궐 테마 매핑", MidiGenerator.GetStageBgmTrack(9) == "stage_palace");
+
+            // Test 44: 인게임 상황별 BGM 동적 라우팅 (GameScene.GetCurrentGameplayBgmTrack) 검증
+            var bgmScene = new GameScene();
+            bgmScene.Initialize();
+            bgmScene.StageManager.LoadStage(1);
+            Assert("1장 일반 상태 BGM은 stage_market", bgmScene.GetCurrentGameplayBgmTrack() == "stage_market");
+
+            bgmScene.StageManager.LoadStage(3);
+            Assert("3장 중간보스 조우 시 BGM은 midboss", bgmScene.GetCurrentGameplayBgmTrack() == "midboss");
+            if (bgmScene.StageManager.CurrentBoss != null)
+            {
+                bgmScene.StageManager.CurrentBoss.TakeDamage(99999);
+            }
+            Assert("3장 중간보스 격파 후 BGM은 stage_fortress로 환원", bgmScene.GetCurrentGameplayBgmTrack() == "stage_fortress");
+
+            bgmScene.StageManager.LoadStage(9);
+            Assert("9장 최종보스 흑호 조우 시 BGM은 finalboss", bgmScene.GetCurrentGameplayBgmTrack() == "finalboss");
+            if (bgmScene.StageManager.CurrentBoss != null)
+            {
+                bgmScene.StageManager.CurrentBoss.TakeDamage(99999);
+            }
+            Assert("9장 최종보스 격파 후 BGM은 stage_palace로 환원", bgmScene.GetCurrentGameplayBgmTrack() == "stage_palace");
+            SoundSynth.StopBgm();
 
             Console.WriteLine("----------------------------------------------------");
             Console.WriteLine($" 총 테스트 결과: {passed} / {total} 통과 ({(passed == total ? "100% 성공" : "실패 항목 있음")})");

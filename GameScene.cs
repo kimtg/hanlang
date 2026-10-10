@@ -85,6 +85,15 @@ namespace HanlangGame
             _hitStopTimer = Math.Max(_hitStopTimer, duration);
         }
 
+        public string GetCurrentGameplayBgmTrack()
+        {
+            if (_stageManager.CurrentBoss != null && _stageManager.CurrentBoss.IsAlive)
+            {
+                return (_stageManager.CurrentStage == StageManager.MaxStage) ? "finalboss" : "midboss";
+            }
+            return MidiGenerator.GetStageBgmTrack(_stageManager.CurrentStage);
+        }
+
         public void StartNewGame()
         {
             _status = new StatusSystem();
@@ -96,7 +105,7 @@ namespace HanlangGame
             _combatSystem.DamageNumbers.Clear();
             _cameraX = 0f;
             State = GameState.Playing;
-            SoundSynth.PlayBgm("stage");
+            SoundSynth.PlayBgm(GetCurrentGameplayBgmTrack());
             ShowNotification(_stageManager.GetStageName(1) + "에 도달했습니다!");
         }
 
@@ -114,7 +123,7 @@ namespace HanlangGame
                 _combatSystem.DamageNumbers.Clear();
                 _cameraX = 0f;
                 State = GameState.Playing;
-                SoundSynth.PlayBgm("stage");
+                SoundSynth.PlayBgm(GetCurrentGameplayBgmTrack());
                 ShowNotification($"기록을 불러왔습니다! (LV.{_status.Level}, {_stageManager.GetStageName(_stageManager.CurrentStage)})");
             }
             else
@@ -154,7 +163,7 @@ namespace HanlangGame
             _gameOverTimer = 0f;
             State = GameState.Playing;
 
-            SoundSynth.PlayBgm((_stageManager.CurrentBoss != null && _stageManager.CurrentBoss.IsAlive) ? "boss" : "stage");
+            SoundSynth.PlayBgm(GetCurrentGameplayBgmTrack());
 
             if (originalStage > 1)
             {
@@ -209,7 +218,7 @@ namespace HanlangGame
                     if (closeShop)
                     {
                         State = GameState.Playing;
-                        SoundSynth.PlayBgm((_stageManager.CurrentBoss != null && _stageManager.CurrentBoss.IsAlive) ? "boss" : "stage");
+                        SoundSynth.PlayBgm(GetCurrentGameplayBgmTrack());
                     }
                     break;
 
@@ -287,15 +296,8 @@ namespace HanlangGame
 
             _dialogueBox.Update(dt);
 
-            // BGM 전환 (보스 출현 여부)
-            if (_stageManager.CurrentBoss != null && _stageManager.CurrentBoss.IsAlive)
-            {
-                SoundSynth.PlayBgm("boss");
-            }
-            else
-            {
-                SoundSynth.PlayBgm("stage");
-            }
+            // BGM 전환 (보스 출현 여부 및 스테이지별 테마곡)
+            SoundSynth.PlayBgm(GetCurrentGameplayBgmTrack());
 
             // 화면 흔들림 감쇠
             if (ScreenShakeTimer > 0)
