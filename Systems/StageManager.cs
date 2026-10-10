@@ -69,20 +69,20 @@ namespace HanlangGame.Systems
                     break;
 
                 case 4:
-                    // 4장: 남산 성곽길 - 암흑 결사대 난입
+                    // 4장: 남산 성곽길 - 암흑 결사대 & 성곽 궁수 난입
                     Enemies.Add(new Enemy(EnemyType.Ninja, 260f, 160f, stage));
                     Enemies.Add(new Enemy(EnemyType.Scholar, 400f, 190f, stage));
                     Enemies.Add(new Enemy(EnemyType.Ninja, 540f, 175f, stage));
-                    Enemies.Add(new Enemy(EnemyType.Ninja, 680f, 205f, stage));
+                    Enemies.Add(new Enemy(EnemyType.Archer, 680f, 205f, stage));
                     Enemies.Add(new Enemy(EnemyType.Scholar, 790f, 180f, stage));
                     break;
 
                 case 5:
-                    // 5장: 도성 주막거리 - 야간 습격
+                    // 5장: 도성 주막거리 - 야간 습격 & 철갑 방패무사
                     Enemies.Add(new Enemy(EnemyType.Thug, 240f, 170f, stage));
                     Enemies.Add(new Enemy(EnemyType.Ninja, 380f, 200f, stage));
                     Enemies.Add(new Enemy(EnemyType.Scholar, 520f, 165f, stage));
-                    Enemies.Add(new Enemy(EnemyType.Ninja, 660f, 185f, stage));
+                    Enemies.Add(new Enemy(EnemyType.ShieldGuard, 660f, 185f, stage));
                     Enemies.Add(new Enemy(EnemyType.Ninja, 780f, 210f, stage));
                     break;
 
@@ -95,20 +95,20 @@ namespace HanlangGame.Systems
                     break;
 
                 case 7:
-                    // 7장: 광화문 앞뜰 - 정예 결사대 대공세
+                    // 7장: 광화문 앞뜰 - 정예 결사대 대공세 (궁수 & 방패무사 협공)
                     Enemies.Add(new Enemy(EnemyType.Ninja, 250f, 170f, stage));
                     Enemies.Add(new Enemy(EnemyType.Scholar, 390f, 205f, stage));
-                    Enemies.Add(new Enemy(EnemyType.Ninja, 530f, 160f, stage));
-                    Enemies.Add(new Enemy(EnemyType.Ninja, 670f, 190f, stage));
+                    Enemies.Add(new Enemy(EnemyType.Archer, 530f, 160f, stage));
+                    Enemies.Add(new Enemy(EnemyType.ShieldGuard, 670f, 190f, stage));
                     Enemies.Add(new Enemy(EnemyType.Scholar, 790f, 175f, stage));
                     break;
 
                 case 8:
-                    // 8장: 경복궁 근정전 - 궁궐 침투
+                    // 8장: 경복궁 근정전 - 궁궐 정예 친위대 결전
                     Enemies.Add(new Enemy(EnemyType.Ninja, 260f, 165f, stage));
                     Enemies.Add(new Enemy(EnemyType.Scholar, 380f, 200f, stage));
-                    Enemies.Add(new Enemy(EnemyType.Ninja, 500f, 170f, stage));
-                    Enemies.Add(new Enemy(EnemyType.Ninja, 640f, 205f, stage));
+                    Enemies.Add(new Enemy(EnemyType.Archer, 500f, 170f, stage));
+                    Enemies.Add(new Enemy(EnemyType.ShieldGuard, 640f, 205f, stage));
                     Enemies.Add(new Enemy(EnemyType.Ninja, 760f, 180f, stage));
                     break;
 
@@ -207,7 +207,7 @@ namespace HanlangGame.Systems
             var rand = new Random();
             if (stage == 1 || stage == 2)
             {
-                // 가을 단풍잎
+                // 1, 2장: 흩날리는 가을 단풍잎
                 for (int i = 0; i < 35; i++)
                 {
                     float px = (float)rand.NextDouble() * PixelBuffer.Width;
@@ -220,7 +220,7 @@ namespace HanlangGame.Systems
             }
             else if (stage == 3)
             {
-                // 청계천 강물 안개 구름
+                // 3장: 청계천 강물 안개 구름
                 for (int i = 0; i < 18; i++)
                 {
                     float px = (float)rand.NextDouble() * PixelBuffer.Width;
@@ -229,9 +229,61 @@ namespace HanlangGame.Systems
                     _weatherParticles.Add((px, py, vx, 0f, 25f + (float)rand.NextDouble() * 20f, Color.FromArgb(50, 210, 225, 235)));
                 }
             }
+            else if (stage == 4)
+            {
+                // 4장: 남산 성곽길 황혼 - 은은하게 피어오르는 도깨비불 & 횃불 불씨
+                for (int i = 0; i < 32; i++)
+                {
+                    float px = (float)rand.NextDouble() * PixelBuffer.Width;
+                    float py = (float)rand.NextDouble() * PixelBuffer.Height;
+                    float vx = 12f + (float)rand.NextDouble() * 22f;
+                    float vy = -18f - (float)rand.NextDouble() * 26f;
+                    Color col = (i % 3 == 0) ? Color.FromArgb(210, 255, 140, 50) : (i % 3 == 1 ? Color.FromArgb(190, 255, 210, 80) : Color.FromArgb(170, 240, 80, 60));
+                    _weatherParticles.Add((px, py, vx, vy, 2.5f + (float)rand.NextDouble() * 3.5f, col));
+                }
+            }
+            else if (stage == 5)
+            {
+                // 5장: 도성 주막거리 - 밤바람 모래먼지 & 주막 등불 빛무리
+                for (int i = 0; i < 36; i++)
+                {
+                    float px = (float)rand.NextDouble() * PixelBuffer.Width;
+                    float py = (float)rand.NextDouble() * PixelBuffer.Height;
+                    float vx = -28f - (float)rand.NextDouble() * 32f;
+                    float vy = 10f + (float)rand.NextDouble() * 16f;
+                    Color col = (i % 2 == 0) ? Color.FromArgb(160, 225, 185, 110) : Color.FromArgb(140, 240, 200, 130);
+                    _weatherParticles.Add((px, py, vx, vy, 3f + (float)rand.NextDouble() * 3f, col));
+                }
+            }
+            else if (stage == 6)
+            {
+                // 6장: 육조거리 - 심야 황금 은행잎 & 서리
+                for (int i = 0; i < 38; i++)
+                {
+                    float px = (float)rand.NextDouble() * PixelBuffer.Width;
+                    float py = (float)rand.NextDouble() * PixelBuffer.Height;
+                    float vx = 22f + (float)rand.NextDouble() * 28f;
+                    float vy = 28f + (float)rand.NextDouble() * 32f;
+                    Color col = (i % 2 == 0) ? Color.FromArgb(220, 240, 205, 50) : Color.FromArgb(180, 220, 235, 255);
+                    _weatherParticles.Add((px, py, vx, vy, 3.5f + (float)rand.NextDouble() * 3.5f, col));
+                }
+            }
+            else if (stage == 7)
+            {
+                // 7장: 광화문 앞뜰 - 흩날리는 복사꽃 / 벚꽃잎
+                for (int i = 0; i < 42; i++)
+                {
+                    float px = (float)rand.NextDouble() * PixelBuffer.Width;
+                    float py = (float)rand.NextDouble() * PixelBuffer.Height;
+                    float vx = 30f + (float)rand.NextDouble() * 35f;
+                    float vy = 16f + (float)rand.NextDouble() * 22f;
+                    Color col = (i % 2 == 0) ? Color.FromArgb(220, 255, 180, 200) : Color.FromArgb(200, 255, 215, 230);
+                    _weatherParticles.Add((px, py, vx, vy, 4f + (float)rand.NextDouble() * 4f, col));
+                }
+            }
             else if (stage == 8 || stage == 9)
             {
-                // 궁궐 폭풍우 빗줄기
+                // 8, 9장: 궁궐 폭풍우 빗줄기
                 for (int i = 0; i < 65; i++)
                 {
                     float px = (float)rand.NextDouble() * PixelBuffer.Width;
@@ -253,9 +305,9 @@ namespace HanlangGame.Systems
                 var pt = _weatherParticles[p];
                 pt.x += pt.vx * dt;
                 pt.y += pt.vy * dt;
-                if (pt.y > PixelBuffer.Height + 20f || pt.x < -40f || pt.x > PixelBuffer.Width + 40f)
+                if (pt.y > PixelBuffer.Height + 20f || pt.y < -20f || pt.x < -40f || pt.x > PixelBuffer.Width + 40f)
                 {
-                    pt.y = -10f;
+                    pt.y = pt.vy < 0 ? PixelBuffer.Height + 10f : -10f;
                     pt.x = (float)new Random().NextDouble() * PixelBuffer.Width;
                 }
                 _weatherParticles[p] = pt;
@@ -973,6 +1025,32 @@ namespace HanlangGame.Systems
                     // 청계천 수면을 덮는 자욱한 안개 구름
                     using var mistBrush = new SolidBrush(pt.col);
                     g.FillEllipse(mistBrush, pt.x - pt.size, pt.y - pt.size * 0.4f, pt.size * 2f, pt.size * 0.8f);
+                }
+                else if (CurrentStage == 4)
+                {
+                    // 남산 성곽길 황혼 도깨비불 / 은은한 횃불 불씨
+                    using var emberBrush = new SolidBrush(pt.col);
+                    g.FillEllipse(emberBrush, pt.x, pt.y, pt.size, pt.size);
+                    using var haloBrush = new SolidBrush(Color.FromArgb(40, pt.col.R, pt.col.G, pt.col.B));
+                    g.FillEllipse(haloBrush, pt.x - pt.size, pt.y - pt.size, pt.size * 3f, pt.size * 3f);
+                }
+                else if (CurrentStage == 5)
+                {
+                    // 도성 주막거리 밤바람 모래먼지 & 주막 등불 빛무리
+                    using var dustBrush = new SolidBrush(pt.col);
+                    g.FillEllipse(dustBrush, pt.x, pt.y, pt.size * 1.4f, pt.size * 0.8f);
+                }
+                else if (CurrentStage == 6)
+                {
+                    // 육조거리 심야 황금 은행잎 & 서리
+                    using var ginkgoBrush = new SolidBrush(pt.col);
+                    g.FillEllipse(ginkgoBrush, pt.x, pt.y, pt.size, pt.size * 0.75f);
+                }
+                else if (CurrentStage == 7)
+                {
+                    // 광화문 앞뜰 흩날리는 연분홍 복사꽃 / 벚꽃잎
+                    using var petalBrush = new SolidBrush(pt.col);
+                    g.FillEllipse(petalBrush, pt.x, pt.y, pt.size * 1.2f, pt.size * 0.6f);
                 }
                 else if (CurrentStage == 8 || CurrentStage == 9)
                 {

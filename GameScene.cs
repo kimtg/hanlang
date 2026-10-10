@@ -273,10 +273,16 @@ namespace HanlangGame
                 }
             }
 
-            // 보스 격파 피니셔 배너 검사
+            // 보스 격파 피니셔 배너 검사 (완전소탕 / 격파 슬로우모션 연출)
             if (_stageManager.CurrentBoss != null && _stageManager.CurrentBoss.CurrentHp <= 0 && !_dialogueBox.FinisherActive)
             {
-                _dialogueBox.TriggerFinisher("격 파 (擊破)");
+                string finisherTitle = (_stageManager.CurrentStage == StageManager.MaxStage)
+                    ? "완 전 소 탕 (完 全 掃 蕩)"
+                    : "격 파 (擊破)";
+                _dialogueBox.TriggerFinisher(finisherTitle);
+                _hitStopTimer = 0.50f; // 보스 격파 순간의 극적인 역경직/슬로우모션
+                ScreenShakeTimer = 0.55f;
+                ScreenShakeIntensity = 6.0f;
             }
 
             _dialogueBox.Update(dt);

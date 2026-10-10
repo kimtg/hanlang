@@ -29,6 +29,7 @@ namespace HanlangGame.Entities
             State == "punch" || State == "kick" || State == "jumpkick" ||
             State == "dashpunch" || State == "dashkick" || State == "spin" ||
             State == "dragon" || State == "wave" || State == "swing" ||
+            State == "knee" || State == "giantswing" ||
             PostAttackDelayTimer > 0f;
 
         // 들기 시스템 (물체 및 쓰러진 적)
@@ -282,12 +283,25 @@ namespace HanlangGame.Entities
             {
                 if (IsCarrying)
                 {
-                    State = "swing";
-                    StateTimer = 0f;
-                    HasDealtDamage = false;
-                    CurrentAttackType = "swing";
-                    SoundSynth.PlayKick();
-                    return;
+                    if (CarriedEnemy != null)
+                    {
+                        // 잡은 적 무릎 치기 (Knee Strike)
+                        State = "knee";
+                        StateTimer = 0f;
+                        HasDealtDamage = false;
+                        CurrentAttackType = "knee";
+                        SoundSynth.PlayHit();
+                        return;
+                    }
+                    else
+                    {
+                        State = "swing";
+                        StateTimer = 0f;
+                        HasDealtDamage = false;
+                        CurrentAttackType = "swing";
+                        SoundSynth.PlayKick();
+                        return;
+                    }
                 }
                 else
                 {
@@ -375,16 +389,30 @@ namespace HanlangGame.Entities
                     }
                 }
             }
-            // 5. Space키: 삼대 삼한 비기 (훈민선풍각 / 용비어천격 / 월인천강포)
+            // 5. Space키: 잡은 적이 있으면 자이언트 스윙, 아니면 삼대 삼한 비기 (훈민선풍각 / 용비어천격 / 월인천강포)
             else if (input.IsJustPressed(Keys.Space))
             {
+                int giantSwingCost = Status.GetSpecialMpCost(10);
+                if (CarriedEnemy != null && Status.CurrentMp >= giantSwingCost)
+                {
+                    // 잡은 적 자이언트 스윙 (Giant Swing) [Space]
+                    Status.CurrentMp -= giantSwingCost;
+                    State = "giantswing";
+                    StateTimer = 0f;
+                    HasDealtDamage = false;
+                    CurrentAttackType = "giantswing";
+                    SoundSynth.PlaySpecial();
+                    return;
+                }
+
                 if (input.IsHeld(Keys.Down))
                 {
                     // 제3 비기: 월인천강포 (Moon Wave) [↓ + Space]
-                    if (Status.CurrentMp >= 25)
+                    int waveCost = Status.GetSpecialMpCost(25);
+                    if (Status.CurrentMp >= waveCost)
                     {
                         DropCarried();
-                        Status.CurrentMp -= 25;
+                        Status.CurrentMp -= waveCost;
                         State = "wave";
                         StateTimer = 0f;
                         HasDealtDamage = false;
@@ -399,10 +427,11 @@ namespace HanlangGame.Entities
                 else if (input.IsHeld(Keys.Up))
                 {
                     // 제2 비기: 용비어천격 (Dragon Uppercut) [↑ + Space]
-                    if (Status.CurrentMp >= 20)
+                    int dragonCost = Status.GetSpecialMpCost(20);
+                    if (Status.CurrentMp >= dragonCost)
                     {
                         DropCarried();
-                        Status.CurrentMp -= 20;
+                        Status.CurrentMp -= dragonCost;
                         State = "dragon";
                         StateTimer = 0f;
                         HasDealtDamage = false;
@@ -417,10 +446,11 @@ namespace HanlangGame.Entities
                 else
                 {
                     // 제1 비기: 훈민선풍각 (Hunmin Whirlwind Kick) [Space]
-                    if (Status.CurrentMp >= 15)
+                    int spinCost = Status.GetSpecialMpCost(15);
+                    if (Status.CurrentMp >= spinCost)
                     {
                         DropCarried();
-                        Status.CurrentMp -= 15;
+                        Status.CurrentMp -= spinCost;
                         State = "spin";
                         StateTimer = 0f;
                         HasDealtDamage = false;
@@ -651,6 +681,44 @@ namespace HanlangGame.Entities
                     ParryCooldownTimer = 0.28f;
                 }
             }
+            else if (State == "knee")
+            {
+                Vx = 0f;
+                if (StateTimer > 0.24f)
+                {
+                    State = "idle";
+                    HasDealtDamage = false;
+                    ParryCooldownTimer = 0.20f;
+                }
+            }
+            else if (State == "giantswing")
+            {
+                Vx = (float)(Math.Sin(StateTimer * 22f) * 35f);
+                if (CarriedEnemy != null)
+                {
+                    CarriedEnemy.X = X + (float)Math.Cos(StateTimer * 22f) * 26f;
+                    CarriedEnemy.Y = Y + (float)Math.Sin(StateTimer * 22f) * 12f;
+                    CarriedEnemy.Z = Z + 12f;
+                }
+                if (StateTimer > 0.44f)
+                {
+                    if (CarriedEnemy != null)
+                    {
+                        var e = CarriedEnemy;
+                        CarriedEnemy = null;
+                        e.IsCarried = false;
+                        e.IsFlying = true;
+                        e.State = "down";
+                        e.StateTimer = 0f;
+                        e.Vx = (FacingRight ? 1f : -1f) * 280f;
+                        e.Vz = 70f;
+                        SoundSynth.PlaySpecial();
+                    }
+                    State = "idle";
+                    HasDealtDamage = false;
+                    ParryCooldownTimer = 0.28f;
+                }
+            }
             else if (State == "hit")
             {
                 Vx *= 0.85f;
@@ -676,7 +744,7 @@ namespace HanlangGame.Entities
 
         public RectangleF? GetAttackHitbox()
         {
-            if (State != "punch" && State != "kick" && State != "jumpkick" && State != "spin" && State != "swing" && State != "dashpunch" && State != "dashkick" && State != "dragon" && State != "wave")
+            if (State != "punch" && State != "kick" && State != "jumpkick" && State != "spin" && State != "swing" && State != "dashpunch" && State != "dashkick" && State != "dragon" && State != "wave" && State != "knee" && State != "giantswing")
                 return null;
 
             // 격투 게임식 판정: 공격 후딜레이(Recovery) 구간에는 타격 판정 소멸
@@ -685,9 +753,23 @@ namespace HanlangGame.Entities
             if (State == "dashpunch" && StateTimer > 0.20f) return null;
             if (State == "dashkick" && StateTimer > 0.22f) return null;
             if (State == "swing" && StateTimer > 0.20f) return null;
+            if (State == "knee" && StateTimer > 0.18f) return null;
             if (State == "spin" && StateTimer > 0.32f) return null;
             if (State == "dragon" && StateTimer > 0.30f) return null;
             if (State == "wave" && StateTimer > 0.36f) return null;
+            if (State == "giantswing" && StateTimer > 0.40f) return null;
+
+            if (State == "giantswing")
+            {
+                // 자이언트 스윙: 360도 전방위 70px 회전 타격 판정
+                return new RectangleF(X - 35f, Y - Z - 24f, 70f, 26f);
+            }
+            if (State == "knee")
+            {
+                float reachKnee = 18f;
+                float attackX = FacingRight ? X + 2f : X - 2f - reachKnee;
+                return new RectangleF(attackX, Y - Z - 24f, reachKnee + 6f, 22f);
+            }
 
             if (State == "dragon")
             {
@@ -829,6 +911,8 @@ namespace HanlangGame.Entities
                 "dragon" => AnimFrame > 0 ? "player_dragon_1" : "player_dragon_0",
                 "wave" => AnimFrame > 0 ? "player_wave_1" : "player_wave_0",
                 "swing" => "player_swing",
+                "knee" => "player_kick_0",
+                "giantswing" => $"player_spin_{AnimFrame}",
                 "dashpunch" => "player_punch_2",
                 "dashkick" => "player_kick_2",
                 "punch" => $"player_punch_{AnimFrame}",

@@ -8,12 +8,14 @@ namespace HanlangGame.Entities
 {
     public enum EnemyType
     {
-        Thug,       // 골목 깡패
-        Scholar,    // 불량 훈도
-        Ninja,      // 암흑 결사대 (후반부 정예)
-        MidBoss1,   // 3장 중간보스: 괴력 건달 마달
-        MidBoss2,   // 6장 중간보스: 무과 배신자 철웅
-        Boss        // 9장 최종 보스: 마도학사 흑호
+        Thug,        // 골목 깡패
+        Scholar,     // 불량 훈도
+        Ninja,       // 암흑 결사대 (후반부 정예)
+        Archer,      // 흑호단 궁수 (원거리 화살 견제)
+        ShieldGuard, // 철갑 방패무사 (전방 가드 / 가드 브레이크)
+        MidBoss1,    // 3장 중간보스: 괴력 건달 마달
+        MidBoss2,    // 6장 중간보스: 무과 배신자 철웅
+        Boss         // 9장 최종 보스: 마도학사 흑호
     }
 
     public class Enemy : Entity
@@ -25,6 +27,9 @@ namespace HanlangGame.Entities
         public int AttackPower { get; set; }
         public int ExpReward { get; set; }
         public int GoldReward { get; set; }
+        public int ShieldHp { get; set; } = 0; // 철갑 방패 내구도
+
+        public Action<float, float>? OnWallBounce;
 
         public bool IsBossType => Type == EnemyType.Boss || Type == EnemyType.MidBoss1 || Type == EnemyType.MidBoss2;
         public bool IsRaging { get; set; } = false;
@@ -95,6 +100,26 @@ namespace HanlangGame.Entities
             StateTimer = 0f;
         }
 
+        public void ShootArrow(Player player, System.Collections.Generic.List<WorldObject>? worldObjects)
+        {
+            if (worldObjects == null) return;
+            FacingRight = player.X >= X;
+            var arrow = new WorldObject(ObjectType.Arrow, X + (FacingRight ? 16f : -16f), Y)
+            {
+                IsFlying = true,
+                ThrownByPlayer = false,
+                Z = Z + 14f,
+                Vx = (FacingRight ? 1f : -1f) * 260f,
+                Vz = 0f,
+                Durability = 1,
+                FacingRight = FacingRight
+            };
+            worldObjects.Add(arrow);
+            SoundSynth.PlayWhoosh();
+            State = "punch";
+            StateTimer = 0f;
+        }
+
         public Enemy(EnemyType type, float x, float y, int stage = 1)
         {
             Type = type;
@@ -131,6 +156,25 @@ namespace HanlangGame.Entities
                     AttackPower = 15 + stageBonusAtk;
                     ExpReward = 75 + stage * 8;
                     GoldReward = 40 + stage * 5;
+                    break;
+
+                case EnemyType.Archer:
+                    Name = "흑호단 궁수";
+                    MaxHp = 50 + stageBonusHp;
+                    AttackPower = 10 + stageBonusAtk;
+                    ExpReward = 55 + stage * 6;
+                    GoldReward = 32 + stage * 4;
+                    break;
+
+                case EnemyType.ShieldGuard:
+                    Name = "철갑 방패무사";
+                    MaxHp = 80 + stageBonusHp;
+                    AttackPower = 12 + stageBonusAtk;
+                    ExpReward = 70 + stage * 7;
+                    GoldReward = 38 + stage * 5;
+                    ShieldHp = 3;
+                    Width = 28;
+                    Height = 34;
                     break;
 
                 case EnemyType.MidBoss1:
@@ -192,6 +236,28 @@ namespace HanlangGame.Entities
             float dist = (float)Math.Sqrt(dx * dx + dy * dy);
 
             FacingRight = dx > 0;
+
+            // 2-1. 궁수(Archer)의 원거리 활 사격 AI
+            if (Type == EnemyType.Archer)
+            {
+                if (worldObjects != null && _throwCooldown <= 0 && dist >= 45f && Math.Abs(dy) < 20f)
+                {
+                    _throwCooldown = 2.4f + (float)new Random().NextDouble() * 1.2f;
+                    ShootArrow(player, worldObjects);
+                    return;
+                }
+
+                // 플레이어와 적정 사거리(130px)를 유지하며 거리 벌리기 / Y축 정렬
+                float targetDist = 135f;
+                float desiredX = player.X + (player.FacingRight ? -targetDist : targetDist);
+                float dirX = Math.Sign(desiredX - X);
+                float dirY = Math.Sign(dy);
+                Vx = dirX * 62f;
+                Vy = dirY * 50f;
+                State = (Math.Abs(Vx) > 5f || Math.Abs(Vy) > 5f) ? "walk" : "idle";
+                FacingRight = player.X >= X;
+                return;
+            }
 
             // 1. 이미 물체를 들고 있는 상태에서의 투척 AI
             if (IsCarrying)
@@ -344,6 +410,29 @@ namespace HanlangGame.Entities
                 }
             }
 
+            // 벽 바운드 (Wall Bounce / Slam) 판정
+            if ((IsFlying || State == "down") && Math.Abs(Vx) > 95f)
+            {
+                if (X <= 18f && Vx < 0)
+                {
+                    X = 18f;
+                    Vx = -Vx * 0.60f;
+                    Vz = 135f;
+                    CurrentHp = Math.Max(0, CurrentHp - 12);
+                    SoundSynth.PlayHit();
+                    OnWallBounce?.Invoke(X, Y);
+                }
+                else if (X >= 305f && Vx > 0)
+                {
+                    X = 305f;
+                    Vx = -Vx * 0.60f;
+                    Vz = 135f;
+                    CurrentHp = Math.Max(0, CurrentHp - 12);
+                    SoundSynth.PlayHit();
+                    OnWallBounce?.Invoke(X, Y);
+                }
+            }
+
             Y = Math.Clamp(Y, 145f, 225f);
 
             if (State == "punch" && StateTimer > 0.20f) State = "idle";
@@ -388,6 +477,37 @@ namespace HanlangGame.Entities
             if (InvincibleTimer > 0) return;
 
             DropCarried(); // 피격 시 들고 있던 물체 떨어뜨림
+
+            // 철갑 방패무사의 전방 가드 판정
+            if (Type == EnemyType.ShieldGuard && ShieldHp > 0)
+            {
+                bool isFrontal = (FacingRight && knockbackDir < 0) || (!FacingRight && knockbackDir > 0);
+                if (isFrontal)
+                {
+                    if (damage >= 25)
+                    {
+                        // 강력한 비기/강타: 가드 파쇄 (Guard Break!)
+                        ShieldHp = 0;
+                        CurrentHp -= damage;
+                        isKnockedDown = true;
+                        State = "hit";
+                        StateTimer = -1.2f; // 1.2초 스턴
+                        SoundSynth.PlayShatter();
+                        Vx = knockbackDir * 50f;
+                        return;
+                    }
+                    else
+                    {
+                        // 일반 공격: 방패로 가드 (피해 0 & 막기 경직)
+                        ShieldHp--;
+                        SoundSynth.PlayGuard();
+                        State = "hit";
+                        StateTimer = 0.08f;
+                        Vx = knockbackDir * 20f;
+                        return;
+                    }
+                }
+            }
 
             CurrentHp -= damage;
             SoundSynth.PlayHit();
@@ -435,6 +555,8 @@ namespace HanlangGame.Entities
                 EnemyType.Thug => "enemy1",
                 EnemyType.Scholar => "enemy2",
                 EnemyType.Ninja => "enemy3",
+                EnemyType.Archer => "archer",
+                EnemyType.ShieldGuard => "shieldguard",
                 EnemyType.MidBoss1 => "midboss1",
                 EnemyType.MidBoss2 => "midboss2",
                 EnemyType.Boss => "boss",

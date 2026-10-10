@@ -45,6 +45,12 @@ namespace HanlangGame.Visuals
             // 7. 최종 보스: 마도학사 흑호 (갓 쓴 머리, 칠흑빛 관복)
             RegisterChibiHeroSet("boss", Color.FromArgb(25, 25, 32), Color.FromArgb(180, 25, 25), Color.FromArgb(255, 215, 0), isBoss: true, scaleW: 32, scaleH: 36, headgear: HeadgearType.Gat);
 
+            // 8. 신규 적: 흑호단 궁수 (상투 머리, 암녹색 무복)
+            RegisterChibiHeroSet("archer", Color.FromArgb(45, 95, 60), Color.FromArgb(30, 60, 40), Color.FromArgb(180, 140, 30), isEnemy: true, headgear: HeadgearType.Topknot);
+
+            // 9. 신규 적: 철갑 방패무사 (상투 머리, 묵직한 강철 갑주)
+            RegisterChibiHeroSet("shieldguard", Color.FromArgb(85, 90, 100), Color.FromArgb(55, 60, 70), Color.FromArgb(200, 150, 40), isEnemy: true, scaleW: 32, scaleH: 35, headgear: HeadgearType.Topknot);
+
             // 드롭 아이템
             _cache["item_coin"]   = CreateCoin();
             _cache["item_rice"]   = CreateRiceBall();
@@ -60,6 +66,7 @@ namespace HanlangGame.Visuals
             _cache["obj_table"]    = CreateTable();     // 대형 주막 탁자 / 서당 책상
             _cache["obj_bench"]    = CreateBench();     // 대형 주막 평상 / 긴 의자
             _cache["obj_ricesack"] = CreateRiceSack();  // 볏짚 쌀가마니
+            _cache["obj_arrow"]    = CreateArrow();     // 흑호단 궁수 화살
         }
 
         private static void RegisterChibiHeroSet(string prefix, Color robeColor, Color vestColor, Color beltColor, bool isEnemy = false, bool isBoss = false, int scaleW = 30, int scaleH = 34, HeadgearType headgear = HeadgearType.Topknot)
@@ -1352,6 +1359,32 @@ namespace HanlangGame.Visuals
             // 4. 중앙 붉은 낙관 각인
             g.FillRectangle(bRed, 11, 7, 3, 4);
             g.FillRectangle(bStrawLt, 12, 8, 1, 2);
+
+            return bmp;
+        }
+
+        private static Bitmap CreateArrow()
+        {
+            var bmp = new Bitmap(18, 6);
+            using var g = System.Drawing.Graphics.FromImage(bmp);
+            g.Clear(Color.Transparent);
+
+            using var bShaft = new SolidBrush(Color.FromArgb(180, 140, 70));
+            using var bHead = new SolidBrush(Color.FromArgb(210, 215, 225));
+            using var bHeadDk = new SolidBrush(Color.FromArgb(90, 95, 105));
+            using var bFeather = new SolidBrush(Color.FromArgb(235, 235, 240));
+            using var bFeatherDk = new SolidBrush(Color.FromArgb(160, 40, 40));
+
+            // 화살대 (대나무살)
+            g.FillRectangle(bShaft, 3, 2, 11, 2);
+
+            // 깃 (꿩 깃털 / 붉은 실)
+            g.FillRectangle(bFeather, 0, 1, 3, 4);
+            g.FillRectangle(bFeatherDk, 2, 2, 2, 2);
+
+            // 화살촉 (쇠촉 철촉)
+            g.FillPolygon(bHead, new Point[] { new Point(14, 0), new Point(18, 3), new Point(14, 5) });
+            g.FillPolygon(bHeadDk, new Point[] { new Point(14, 2), new Point(17, 3), new Point(14, 4) });
 
             return bmp;
         }

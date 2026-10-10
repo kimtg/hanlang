@@ -125,14 +125,53 @@ namespace HanlangGame.UI
             buffer.DrawRoundedRect(stageX, 16, 120, 40, 6f, Color.FromArgb(100, 140, 220), 1.5f);
             buffer.DrawOutlinedText($"제 {currentStage} 장", stageX + 28, 26, Color.FromArgb(220, 235, 255), Color.FromArgb(20, 20, 40), buffer.FontHeader, 1.5f);
 
+            // ========================================================
+            // 3-1. 획득한 한글 음절 룬 및 단어 공명 표시 (Jade Hangul Rune Tablets)
+            // ========================================================
+            if (status.Runes.Count > 0)
+            {
+                int runeY = 76;
+                int rCount = status.Runes.Count;
+                int pillW = 28;
+                int pillH = 26;
+                int totalW = rCount * (pillW + 4) + 12 + (status.ActiveResonances.Count > 0 ? 175 : 0);
+                int runeX = 16;
+
+                buffer.FillRoundedRect(runeX, runeY, totalW, 30, 6f, Color.FromArgb(210, 15, 30, 24));
+                buffer.DrawRoundedRect(runeX, runeY, totalW, 30, 6f, Color.FromArgb(225, 185, 65), 1.4f);
+
+                int currRx = runeX + 6;
+                foreach (var r in status.Runes)
+                {
+                    buffer.FillRoundedRect(currRx, runeY + 2, pillW, pillH, 4f, Color.FromArgb(235, 22, 70, 50));
+                    buffer.DrawRoundedRect(currRx, runeY + 2, pillW, pillH, 4f, Color.FromArgb(255, 220, 85), 1.2f);
+                    buffer.DrawOutlinedText(r, currRx + 6, runeY + 5, Color.FromArgb(255, 250, 220), Color.FromArgb(10, 30, 20), buffer.FontBody, 1.2f);
+                    currRx += pillW + 4;
+                }
+
+                if (status.ActiveResonances.Count > 0)
+                {
+                    string resText = string.Join(" / ", status.ActiveResonances);
+                    buffer.DrawOutlinedText($"★공명: {resText}", currRx + 6, runeY + 6, Color.FromArgb(255, 235, 90), Color.FromArgb(20, 20, 10), buffer.FontTiny, 1.2f);
+                }
+            }
+
             // 들기 상태 조작 안내
             if (player.IsCarrying)
             {
-                int guideW = 340;
+                int guideW = player.CarriedEnemy != null ? 480 : 360;
                 int guideX = (PixelBuffer.Width - guideW) / 2;
                 buffer.FillRoundedRect(guideX, 82, guideW, 32, 6f, Color.FromArgb(230, 25, 20, 35));
                 buffer.DrawRoundedRect(guideX, 82, guideW, 32, 6f, Color.FromArgb(255, 210, 60), 1.5f);
-                buffer.DrawOutlinedText("들기 상태 [ Z: 들고 때리기 | X: 던지기 ]", guideX + 16, 88, Color.FromArgb(255, 235, 130), Color.Black, buffer.FontBody, 1.2f);
+
+                if (player.CarriedEnemy != null)
+                {
+                    buffer.DrawOutlinedText("적 포박 [ Z: 무릎치기 | X: 던지기 | Space: 대차륜 스윙 ]", guideX + 16, 88, Color.FromArgb(255, 235, 130), Color.Black, buffer.FontBody, 1.2f);
+                }
+                else
+                {
+                    buffer.DrawOutlinedText("기물 파지 [ Z: 휘두르기 | X: 투척 / 굴리기 ]", guideX + 18, 88, Color.FromArgb(255, 235, 130), Color.Black, buffer.FontBody, 1.2f);
+                }
             }
 
             // ========================================================

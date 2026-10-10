@@ -118,6 +118,37 @@ namespace HanlangGame.UI
                 }
             }
 
+            // 5-1. 획득한 한글 음절 룬 및 단어 공명 효과
+            int runeSecY = winY + 396;
+            buffer.DrawLine(winX + 16, runeSecY - 4, winX + winW - 16, runeSecY - 4, Color.FromArgb(200, 185, 155), 1.5f);
+            buffer.DrawOutlinedText("【 훈민정음 신기 문자 룬 & 단어 공명 】", winX + 24, runeSecY, Color.FromArgb(70, 45, 30), Color.Transparent, buffer.FontHeader);
+
+            if (status.Runes.Count == 0)
+            {
+                buffer.DrawOutlinedText("아직 수집된 문자 룬이 없습니다. (적 처치 또는 기물 파괴 시 획득)", winX + 32, runeSecY + 28, Color.FromArgb(130, 120, 110), Color.Transparent, buffer.FontBody);
+            }
+            else
+            {
+                int rX = winX + 28;
+                foreach (var r in status.Runes)
+                {
+                    buffer.FillRoundedRect(rX, runeSecY + 24, 30, 30, 4f, Color.FromArgb(235, 25, 75, 55));
+                    buffer.DrawRoundedRect(rX, runeSecY + 24, 30, 30, 4f, Color.FromArgb(255, 215, 80), 1.2f);
+                    buffer.DrawOutlinedText(r, rX + 7, runeSecY + 27, Color.FromArgb(255, 250, 220), Color.FromArgb(10, 30, 20), buffer.FontHeader, 1f);
+                    rX += 36;
+                }
+
+                if (status.ActiveResonances.Count > 0)
+                {
+                    string resDesc = string.Join(" | ", status.ActiveResonances);
+                    buffer.DrawOutlinedText($"★ 발동 공명: {resDesc}", rX + 10, runeSecY + 28, Color.FromArgb(180, 50, 20), Color.Transparent, buffer.FontBody);
+                }
+                else
+                {
+                    buffer.DrawOutlinedText("조합 공명 대기 중 ([용]+[풍]=질풍용격, [철]+[화]=강철화염, [용]+[비]+[어]+[천]+[가]=천명각성)", rX + 10, runeSecY + 28, Color.FromArgb(120, 110, 100), Color.Transparent, buffer.FontSmall);
+                }
+            }
+
             // 6. 하단 조작 가이드
             int bottomY = winY + winH - 42;
             buffer.DrawLine(winX + 16, bottomY - 6, winX + winW - 16, bottomY - 6, Color.FromArgb(195, 175, 145), 1.5f);

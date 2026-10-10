@@ -15,7 +15,8 @@ namespace HanlangGame.Entities
         Cart,     // 대형 달구지 수레 (크고 무거움, 투척/타격 시 굴러가며 다수 적 분쇄)
         Table,    // 대형 주막 탁자 / 서당 책상 (넓은 면적, 강력한 내려치기와 파쇄 투척)
         Bench,    // 대형 주막 평상 / 긴 의자 (광역 가로 휩쓸기 및 적 다운)
-        RiceSack  // 볏짚 쌀가마니 (묵직한 타격, 충격 시 터지며 주먹밥/엽전 드롭)
+        RiceSack, // 볏짚 쌀가마니 (묵직한 타격, 충격 시 터지며 주먹밥/엽전 드롭)
+        Arrow     // 흑호단 궁수의 날아가는 화살 (패링 시 반사 가능!)
     }
 
     public class WorldObject : Entity
@@ -79,6 +80,11 @@ namespace HanlangGame.Entities
                 case ObjectType.RiceSack:
                     Width = 24;
                     Height = 18;
+                    Durability = 1;
+                    break;
+                case ObjectType.Arrow:
+                    Width = 18;
+                    Height = 6;
                     Durability = 1;
                     break;
             }
@@ -162,6 +168,7 @@ namespace HanlangGame.Entities
                 ObjectType.Table => "obj_table",
                 ObjectType.Bench => "obj_bench",
                 ObjectType.RiceSack => "obj_ricesack",
+                ObjectType.Arrow => "obj_arrow",
                 _ => "obj_club"
             };
 

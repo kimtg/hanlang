@@ -9,12 +9,14 @@ namespace HanlangGame.Entities
     {
         Coin,       // 엽전 (골드 획득)
         RiceBall,   // 주먹밥 (HP 30 회복)
-        Scroll      // 자모 두루마리 (EXP 40 획득)
+        Scroll,     // 자모 두루마리 (EXP 40 획득)
+        Rune        // 한글 음절 룬 (훈민정음 신기 문자)
     }
 
     public class Item : Entity
     {
         public ItemType Type { get; set; }
+        public string RuneWord { get; set; } = "용"; // 룬 문자 ("용", "비", "어", "천", "가", "풍", "철", "화")
         public float LifeTime { get; set; } = 12f; // 12초 후 소멸
 
         public Item(float x, float y, ItemType type)
@@ -65,6 +67,26 @@ namespace HanlangGame.Entities
             float drawH = Height * p;
             float sx = projX - drawW / 2f;
             float sy = (Y - Z) - drawH;
+
+            if (Type == ItemType.Rune)
+            {
+                // 청옥빛 룬 패 (Jade Hangul Rune Tablet)
+                int rw = Math.Max(20, (int)(24 * p));
+                int rh = Math.Max(24, (int)(28 * p));
+                float rx = projX - rw / 2f;
+                float ry = (Y - Z) - rh;
+
+                // 은은한 옥빛 오라
+                using (var auraBrush = new SolidBrush(Color.FromArgb(60, 60, 240, 180)))
+                {
+                    buffer.Graphics.FillEllipse(auraBrush, rx - 5, ry - 5, rw + 10, rh + 10);
+                }
+
+                buffer.FillRoundedRect(rx, ry, rw, rh, 5f, Color.FromArgb(235, 18, 55, 42));
+                buffer.DrawRoundedRect(rx, ry, rw, rh, 5f, Color.FromArgb(255, 225, 95), 1.6f);
+                buffer.DrawOutlinedText(RuneWord, rx + 4, ry + 3, Color.FromArgb(255, 255, 230), Color.FromArgb(10, 30, 20), buffer.FontHeader, 1.2f);
+                return;
+            }
 
             Bitmap? sprite = Type switch
             {

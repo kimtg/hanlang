@@ -852,6 +852,173 @@ namespace HanlangGame.Tests
             activePlayer.StateTimer = 0.25f; // 0.18초 초과 후딜레이 구간
             Assert("공격 후딜레이(Recovery Frames) 구간에서는 타격 판정 자동 소멸", !activePlayer.GetAttackHitbox().HasValue);
 
+            // Test 33: 잡은 적 파생기 (Knee Strike & Giant Swing) 검증
+            var grabPlayer = new Player(new StatusSystem());
+            var grabEnemy = new Enemy(EnemyType.Thug, 100f, 150f, 1);
+            grabPlayer.CarriedEnemy = grabEnemy;
+            grabEnemy.IsCarried = true;
+            Assert("적을 붙잡은 상태 (IsCarrying true)", grabPlayer.IsCarrying);
+
+            // Z 입력 시 무릎 치기 (knee)
+            var kneeInput = new Input();
+            kneeInput.OnKeyDown(Keys.Z);
+            grabPlayer.HandleInput(kneeInput);
+            Assert("붙잡은 상태에서 Z 입력 시 무릎치기(knee) 상태 전이", grabPlayer.State == "knee");
+            Assert("무릎치기 공격 타입 설정", grabPlayer.CurrentAttackType == "knee");
+
+            var grabCombat = new CombatSystem();
+            int hpBeforeKnee = grabEnemy.CurrentHp;
+            grabCombat.CheckCollisions(grabPlayer, new System.Collections.Generic.List<Enemy> { grabEnemy }, new System.Collections.Generic.List<WorldObject>());
+            Assert("무릎치기 타격으로 잡힌 적에게 직접 15 피해 적용", grabEnemy.CurrentHp == hpBeforeKnee - 15);
+
+            // Space 입력 시 자이언트 스윙 (giantswing)
+            var swingPlayer = new Player(new StatusSystem());
+            var gSwingEnemy = new Enemy(EnemyType.Thug, 100f, 150f, 1);
+            swingPlayer.CarriedEnemy = gSwingEnemy;
+            gSwingEnemy.IsCarried = true;
+            int mpBeforeSwing = swingPlayer.Status.CurrentMp;
+
+            var swingInput = new Input();
+            swingInput.OnKeyDown(Keys.Space);
+            swingPlayer.HandleInput(swingInput);
+            Assert("붙잡은 상태에서 Space 입력 시 자이언트 스윙(giantswing) 상태 전이", swingPlayer.State == "giantswing");
+            Assert("자이언트 스윙 발동 시 기력(MP) 소모", swingPlayer.Status.CurrentMp < mpBeforeSwing);
+
+            // 자이언트 스윙 0.44초 종료 후 전방 고속 투척 확인
+            swingPlayer.Update(0.50f);
+            Assert("스윙 종료 후 적 포박 해제", swingPlayer.CarriedEnemy == null);
+            Assert("던져진 적은 비행 상태(IsFlying true)", gSwingEnemy.IsFlying);
+            Assert("던져진 적에게 고속 전방 수평속도 부여", Math.Abs(gSwingEnemy.Vx) > 200f);
+
+            // Test 34: 공중 추격타 (Airborne Juggle Spike) 검증
+            var jugglePlayer = new Player(new StatusSystem());
+            jugglePlayer.X = 100f;
+            jugglePlayer.Y = 150f;
+            jugglePlayer.Z = 20f;
+            jugglePlayer.State = "jumpkick";
+            jugglePlayer.CurrentAttackType = "jumpkick";
+            jugglePlayer.FacingRight = true;
+
+            var airEnemy = new Enemy(EnemyType.Thug, 120f, 150f, 1);
+            airEnemy.Z = 18f; // 공중 체공 상태
+            airEnemy.State = "hit";
+            int hpBeforeSpike = airEnemy.CurrentHp;
+
+            var juggleCombat = new CombatSystem();
+            bool spikeScreenShook = false;
+            juggleCombat.OnScreenShake = (mag, dur) => { spikeScreenShook = true; };
+            juggleCombat.CheckCollisions(jugglePlayer, new System.Collections.Generic.List<Enemy> { airEnemy }, new System.Collections.Generic.List<WorldObject>());
+
+            Assert("공중 적 날라차기 타격 시 추가 스파이크 피해 적용 (기본14 + 스파이크16 = 30 피해)", airEnemy.CurrentHp <= hpBeforeSpike - 30);
+            Assert("공중 스파이크 강타로 적이 지면으로 급강하(Vz < -200)", airEnemy.Vz < -200f);
+            Assert("적 다운(down) 상태 전이", airEnemy.State == "down");
+            Assert("공중 강타 시 화면 흔들림 콜백 트리거", spikeScreenShook);
+
+            // Test 35: 벽 바운드(Wall Bounce) 물리 검증
+            var bounceEnemy = new Enemy(EnemyType.Thug, 22f, 150f, 1);
+            bounceEnemy.State = "down";
+            bounceEnemy.Vx = -110f; // 좌측 벽면(X <= 18)을 향해 고속 날아감
+            bool wallBounced = false;
+            bounceEnemy.OnWallBounce = (bx, by) => { wallBounced = true; };
+            int hpBeforeWall = bounceEnemy.CurrentHp;
+
+            bounceEnemy.Update(0.05f); // 경계 X <= 18 도달
+            Assert("벽 충돌 시 수평 속도 반전(Vx > 0)", bounceEnemy.Vx > 0);
+            Assert("벽 바운드로 공중 솟구침(Vz > 100)", bounceEnemy.Vz > 100f);
+            Assert("벽 충돌 추가 데미지(12) 적용", bounceEnemy.CurrentHp == hpBeforeWall - 12);
+            Assert("벽 바운드 이벤트 콜백 트리거", wallBounced);
+
+            // Test 36: 궁수(Archer) AI, 화살 발사 및 저스트 패링 반사(Arrow Reflection) 검증
+            var archer = new Enemy(EnemyType.Archer, 250f, 150f, 1);
+            var targetPlayer = new Player(new StatusSystem());
+            targetPlayer.X = 100f;
+            targetPlayer.Y = 150f;
+            var arrowObjects = new System.Collections.Generic.List<WorldObject>();
+
+            archer.ShootArrow(targetPlayer, arrowObjects);
+            Assert("궁수 화살 발사 시 화살 오브젝트 생성", arrowObjects.Count == 1);
+            var arrow = arrowObjects[0];
+            Assert("생성된 오브젝트 타입은 Arrow", arrow.Type == ObjectType.Arrow);
+            Assert("궁수가 쏜 화살은 ThrownByPlayer가 false", !arrow.ThrownByPlayer);
+            Assert("화살이 플레이어를 향해 날아감 (Vx < 0)", arrow.Vx < 0);
+
+            // 플레이어가 저스트 패링(ParryWindowTimer > 0)으로 화살 반사
+            targetPlayer.ParryWindowTimer = 0.15f;
+            arrow.X = targetPlayer.X + 10f;
+            arrow.Y = targetPlayer.Y;
+            var parryCombat = new CombatSystem();
+            int playerHpBeforeArrow = targetPlayer.Status.CurrentHp;
+
+            parryCombat.CheckCollisions(targetPlayer, new System.Collections.Generic.List<Enemy> { archer }, arrowObjects);
+            Assert("화살 저스트 패링 시 플레이어 피해 0", targetPlayer.Status.CurrentHp == playerHpBeforeArrow);
+            Assert("패링된 화살은 플레이어 소유로 반사 (ThrownByPlayer true)", arrow.ThrownByPlayer);
+            Assert("패링된 화살 속도가 반전되어 적을 향해 날아감 (Vx > 0)", arrow.Vx > 0);
+
+            // Test 37: 방패무사(ShieldGuard) 정면 가드 및 가드 브레이크(Guard Break) 검증
+            var shieldGuard = new Enemy(EnemyType.ShieldGuard, 120f, 150f, 1);
+            shieldGuard.FacingRight = false; // 좌측(플레이어 방향)을 바라보고 방패 전개
+            int shieldHpBefore = shieldGuard.ShieldHp;
+            int sgHpBefore = shieldGuard.CurrentHp;
+
+            // 1) 정면 일반 공격 (punch 8 데미지) -> 방패로 막아 0 피해
+            shieldGuard.TakeDamage(8, 1f, out bool sgDown);
+            Assert("방패무사 정면 공격 완전 방어 (HP 감소 없음)", shieldGuard.CurrentHp == sgHpBefore);
+            Assert("방패 내구도 1 감소", shieldGuard.ShieldHp == shieldHpBefore - 1);
+            Assert("정면 가드 시 다운되지 않음", !sgDown);
+
+            // 2) 후방 기습 공격 (-1f 방향) -> 방패 방어 불가로 데미지 적용
+            shieldGuard.TakeDamage(10, -1f, out _);
+            Assert("후방 기습 공격 시 방패 방어 불가 및 본체 데미지 적용", shieldGuard.CurrentHp < sgHpBefore);
+
+            // 3) 강력한 강타 (25 이상 데미지) -> 가드 브레이크 (ShieldHp = 0, 1.2초 스턴)
+            shieldGuard.TakeDamage(28, 1f, out _);
+            Assert("25 이상 강타 피격 시 가드 브레이크 발동 (ShieldHp 0)", shieldGuard.ShieldHp <= 0);
+            Assert("가드 브레이크 시 적 기절 상태(hit) 전이", shieldGuard.State == "hit");
+            Assert("가드 브레이크 시 장시간(1초 이상) 스턴", shieldGuard.StateTimer <= -1.0f);
+
+            // Test 38: 훈민정음 신기 문자 룬 시스템 및 단어 공명 검증
+            var runeStatus = new StatusSystem();
+            Assert("초기 문자 룬 개수 0", runeStatus.Runes.Count == 0);
+            Assert("초기 활성 공명 개수 0", runeStatus.ActiveResonances.Count == 0);
+
+            // '용' 룬 획득
+            bool gotYong = runeStatus.AddRune("용", out string? res1);
+            Assert("'용' 룬 획득 성공", gotYong);
+            Assert("'용' 룬 단독일 때는 조합 공명 없음", res1 == null);
+            Assert("'용' 룬 보유 시 비기 MP 25% 경감 확인", runeStatus.GetSpecialMpCost(20) == 15);
+
+            // '풍' 룬 획득 -> "용풍: 질풍용격" 공명 발동
+            float speedBefore = runeStatus.MoveSpeed;
+            bool gotPung = runeStatus.AddRune("풍", out string? res2);
+            Assert("'풍' 룬 획득 성공", gotPung);
+            Assert("'용풍' 2음절 조합으로 질풍용격 공명 발동", res2 != null && res2.Contains("용풍"));
+            Assert("질풍용격 공명으로 이동 속도 대폭 증가", runeStatus.MoveSpeed > speedBefore * 1.2f);
+
+            // '철' + '화' -> "철화: 강철화염" 공명 발동
+            int hpBeforeIron = runeStatus.MaxHp;
+            int punchBeforeFire = runeStatus.PunchDamage;
+            runeStatus.AddRune("철", out _);
+            runeStatus.AddRune("화", out string? resIronFire);
+            Assert("'철화' 조합으로 강철화염 공명 발동", resIronFire != null && resIronFire.Contains("철화"));
+            Assert("철화 공명으로 최대 체력 증가", runeStatus.MaxHp > hpBeforeIron);
+            Assert("철화 공명으로 기본 주먹 공격력 증가", runeStatus.PunchDamage > punchBeforeFire);
+
+            // '비', '어', '천', '가' 모두 수집하여 "용비어천가: 천명각성" 궁극 공명 완성
+            runeStatus.AddRune("비", out _);
+            runeStatus.AddRune("어", out _);
+            runeStatus.AddRune("천", out _);
+            runeStatus.AddRune("가", out string? resUltimate);
+            Assert("5음절 완성으로 용비어천가(천명각성) 공명 발동", resUltimate != null && resUltimate.Contains("용비어천가"));
+            Assert("천명각성 발동 시 비기 MP 소모 50% 절감", runeStatus.GetSpecialMpCost(20) == 10);
+            Assert("천명각성 발동 시 비기 공격력 대폭 상승", runeStatus.SpecialDamage > 50);
+
+            // 세이브 및 로드 무결성 검증
+            SaveLoadSystem.Save(runeStatus, 5);
+            var loadedRuneStatus = new StatusSystem();
+            SaveLoadSystem.Load(loadedRuneStatus, out int loadedRuneStage);
+            Assert("저장된 룬 개수와 로드된 룬 개수 일치", loadedRuneStatus.Runes.Count == runeStatus.Runes.Count);
+            Assert("로드된 상태에서도 용비어천가 공명 자동 활성화", loadedRuneStatus.ActiveResonances.Contains("용비어천가"));
+
             Console.WriteLine("----------------------------------------------------");
             Console.WriteLine($" 총 테스트 결과: {passed} / {total} 통과 ({(passed == total ? "100% 성공" : "실패 항목 있음")})");
             Console.WriteLine("====================================================");
