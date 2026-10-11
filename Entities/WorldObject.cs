@@ -120,6 +120,9 @@ namespace HanlangGame.Entities
 
             base.Update(dt);
 
+            // 히트스탑(역경직) 중에는 물리 이동 및 상태 갱신 일시 정지
+            if (IsInHitStop) return;
+
             Y = Math.Clamp(Y, 145f, 225f);
 
             if (IsRolling)

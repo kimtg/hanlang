@@ -42,6 +42,7 @@ namespace HanlangGame.UI
             int boxW = (int)size.Width + 24;
             int boxH = (int)size.Height + 10;
             int boxX = (int)(scx - boxW / 2);
+            boxX = Math.Clamp(boxX, 10, PixelBuffer.Width - boxW - 10);
             int boxY = (int)(scy - boxH - 10);
 
             // 말풍선 부드러운 그림자

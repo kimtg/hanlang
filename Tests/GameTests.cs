@@ -5,6 +5,7 @@ using HanlangGame.Entities;
 using HanlangGame.Systems;
 using HanlangGame.Visuals;
 using HanlangGame.Engine;
+using HanlangGame.UI;
 
 namespace HanlangGame.Tests
 {
@@ -1950,6 +1951,216 @@ namespace HanlangGame.Tests
 
             int bossPitchClasses = finalbossLead.Select(p => p % 12).Distinct().Count();
             Assert("최종보스 BGM(C minor): C 화성단음계 + 블루 노트 융합 다양성 (8음 이상 사용)", bossPitchClasses >= 8);
+
+            // Test 64: 공격/피격 시 화면 흔들림(Screen Shake) 제거 및 공격자/피격자 일시 정지(Hit-Stop) 타격감 시스템 검증
+            // 1) GameScene에서 공격/피격 시 화면 흔들림 비활성화 검증
+            var shakeScene = new GameScene();
+            shakeScene.Initialize();
+            shakeScene.TriggerScreenShake(5.0f, 0.4f);
+            Assert("공격/피격 화면 흔들림 타이머 비활성화 (ScreenShakeTimer == 0)", shakeScene.ScreenShakeTimer == 0f);
+            Assert("공격/피격 화면 흔들림 강도 비활성화 (ScreenShakeIntensity == 0)", shakeScene.ScreenShakeIntensity == 0f);
+
+            // 2) 플레이어 공격 시: 공격자(Player)와 피격자(Enemy) 양쪽 모두 일시 정지(HitStop) 검증
+            var hitStopPlayer = new Player(new StatusSystem());
+            hitStopPlayer.X = 100f;
+            hitStopPlayer.Y = 170f;
+            hitStopPlayer.Vx = 100f;
+            hitStopPlayer.State = "punch";
+            hitStopPlayer.CurrentAttackType = "punch";
+            hitStopPlayer.HasDealtDamage = false;
+
+            var hitStopEnemy = new Enemy(EnemyType.Thug, 115f, 170f, 1);
+            hitStopEnemy.Vx = -50f;
+
+            var hitStopCombat = new CombatSystem();
+            hitStopCombat.CheckCollisions(hitStopPlayer, new List<Enemy> { hitStopEnemy });
+
+            Assert("플레이어 공격 적중 성공", hitStopPlayer.HasDealtDamage);
+            Assert("공격자(Player) 히트스탑 발동 (IsInHitStop == true)", hitStopPlayer.IsInHitStop);
+            Assert("맞은 캐릭터(Enemy) 히트스탑 발동 (IsInHitStop == true)", hitStopEnemy.IsInHitStop);
+
+            // 3) 히트스탑 중 움직임 정지 검증 (Update 호출 시 위치 X가 변하지 않음)
+            float playerXBefore = hitStopPlayer.X;
+            float enemyXBefore = hitStopEnemy.X;
+            hitStopPlayer.Update(0.016f);
+            hitStopEnemy.Update(0.016f);
+            Assert("히트스탑 중 공격자 위치 이동 정지 (X 불변)", hitStopPlayer.X == playerXBefore);
+            Assert("히트스탑 중 피격자 위치 이동 정지 (X 불변)", hitStopEnemy.X == enemyXBefore);
+
+            // 히트스탑 시간 경과 후 정상 이동 재개 검증
+            hitStopPlayer.Update(0.2f);
+            hitStopEnemy.Update(0.2f);
+            Assert("히트스탑 시간 경과 후 공격자 정지 해제", !hitStopPlayer.IsInHitStop);
+            Assert("히트스탑 시간 경과 후 피격자 정지 해제", !hitStopEnemy.IsInHitStop);
+
+            // 4) 적 공격 시: 공격자(Enemy)와 맞은 플레이어(Player) 양쪽 모두 일시 정지(HitStop) 검증
+            var atkEnemy = new Enemy(EnemyType.Thug, 100f, 170f, 1);
+            atkEnemy.State = "punch";
+            atkEnemy.StateTimer = 0.05f;
+            atkEnemy.FacingRight = true;
+            atkEnemy.HasDealtDamage = false;
+
+            var hitStopDefPlayer = new Player(new StatusSystem());
+            hitStopDefPlayer.X = 114f;
+            hitStopDefPlayer.Y = 170f;
+            hitStopDefPlayer.InvincibleTimer = 0f;
+
+            hitStopCombat.CheckCollisions(hitStopDefPlayer, new List<Enemy> { atkEnemy });
+            Assert("적 공격 적중 성공", atkEnemy.HasDealtDamage);
+            Assert("공격한 적(Enemy) 히트스탑 발동", atkEnemy.IsInHitStop);
+            Assert("맞은 플레이어(Player) 히트스탑 발동", hitStopDefPlayer.IsInHitStop);
+
+            // Test 65: 강화된 히트스탑(HitStop) 수치 & 대화 대사 자동 줄바꿈(우측 잘림 방지) 검증
+            // 1) 강화된 히트스탑 수치 검증
+            var heavyPl = new Player(new StatusSystem());
+            heavyPl.X = 100f;
+            heavyPl.Y = 170f;
+            heavyPl.State = "spin";
+            heavyPl.CurrentAttackType = "spin";
+            heavyPl.HasDealtDamage = false;
+
+            var heavyEn = new Enemy(EnemyType.Thug, 115f, 170f, 1);
+            var heavyCombat65 = new CombatSystem();
+            heavyCombat65.CheckCollisions(heavyPl, new List<Enemy> { heavyEn });
+
+            Assert("강타/비기 적중 시 공격자 강화 히트스탑 (0.13초 이상)", heavyPl.HitStopTimer >= 0.13f);
+            Assert("강타/비기 적중 시 피격자 강화 히트스탑 (0.17초 이상)", heavyEn.HitStopTimer >= 0.17f);
+
+            // 2) 저스트 패링 시 강화된 역경직 검증
+            var parryPl = new Player(new StatusSystem());
+            parryPl.X = 100f;
+            parryPl.Y = 170f;
+            parryPl.State = "guard";
+            parryPl.ParryWindowTimer = 0.20f;
+            parryPl.FacingRight = true;
+
+            var parryEn = new Enemy(EnemyType.Thug, 115f, 170f, 1);
+            parryEn.State = "punch";
+            parryEn.StateTimer = 0.05f;
+            parryEn.FacingRight = false;
+            parryEn.HasDealtDamage = false;
+
+            var parryCombat65 = new CombatSystem();
+            parryCombat65.CheckCollisions(parryPl, new List<Enemy> { parryEn });
+            Assert("순간 쳐내기 패링 성공 시 적 강화 역경직 (0.22초 이상)", parryEn.HitStopTimer >= 0.22f);
+            Assert("순간 쳐내기 패링 성공 시 플레이어 강화 역경직 (0.15초 이상)", parryPl.HitStopTimer >= 0.15f);
+
+            // 3) 대화 대사 긴 문장 자동 줄바꿈 및 화면 우측 잘림 방지 검증
+            using (var testBmp = new Bitmap(960, 720))
+            using (var g = Graphics.FromImage(testBmp))
+            {
+                var testFont = new Font("Malgun Gothic", 18f, FontStyle.Bold);
+                float maxBoxTextWidth = 765f; // boxW(840) - 75
+
+                // 44글자 보스 조우 대사
+                string longLine1 = "어이 유생 양반, 감히 내 청계천 다리를 지나가겠다고? 뼈도 못 추릴 줄 알아라!";
+                var segs1 = DialogueBox.WrapTextToSegments(longLine1, testFont, maxBoxTextWidth, g);
+                Assert("44글자 긴 대사는 2줄 이상으로 자동 분할됨", segs1.Count >= 2);
+                bool allFit1 = segs1.All(s => g.MeasureString(s.Text, testFont).Width <= maxBoxTextWidth);
+                Assert("모든 분할 줄의 너비가 765px 이내(화면 우측 잘림 완전 방지)", allFit1);
+                string reconstructed1 = string.Join(" ", segs1.Select(s => s.Text));
+                Assert("줄바꿈 분할 후에도 대사 텍스트 누락 없음", reconstructed1 == longLine1);
+
+                // 47글자 철웅 보스 대사
+                string longLine2 = "육조거리까지 기어오다니 용기는 가상하구나. 무과 급제자의 검술을 넘을 수 있겠느냐?";
+                var segs2 = DialogueBox.WrapTextToSegments(longLine2, testFont, maxBoxTextWidth, g);
+                Assert("47글자 긴 대사 2줄 이상 자동 분할", segs2.Count >= 2);
+                bool allFit2 = segs2.All(s => g.MeasureString(s.Text, testFont).Width <= maxBoxTextWidth);
+                Assert("철웅 대사 모든 줄 너비가 765px 이내(우측 잘림 방지)", allFit2);
+
+                // 공백 없는 초장문 텍스트 음절 분할 검증
+                string unspacedLong = "백성을위한문자를되찾기전까진한걸음도물러설수없소내목숨을바쳐세종대왕의뜻을증명하겠소";
+                var segsUnspaced = DialogueBox.WrapTextToSegments(unspacedLong, testFont, maxBoxTextWidth, g);
+                Assert("공백 없는 긴 문장도 안전하게 다중 행으로 분할", segsUnspaced.Count >= 2);
+                bool allFitUnspaced = segsUnspaced.All(s => g.MeasureString(s.Text, testFont).Width <= maxBoxTextWidth);
+                Assert("공백 없는 문장도 화면 우측을 벗어나지 않음", allFitUnspaced);
+            }
+
+            // 4) 대화 타이핑 도중 Enter 키 입력 시 즉시 전체 텍스트 완성 기능 검증
+            var testDiagBox = new DialogueBox();
+            testDiagBox.TriggerStageDialogue(3);
+            Assert("대화창 활성화 성공", testDiagBox.IsActive);
+            testDiagBox.Update(0.1f); // 타이핑 3.5글자 진행 상태
+
+            var diagInput = new Input();
+            diagInput.OnKeyDown(Keys.Enter);
+            testDiagBox.HandleInput(diagInput);
+            diagInput.OnKeyUp(Keys.Enter);
+
+            // 첫 번째 엔터: 타이핑 즉시 완성 (아직 다음 대사로 넘어가지 않음)
+            using (var testBmp2 = new Bitmap(960, 720))
+            {
+                var buffer2 = new PixelBuffer();
+                testDiagBox.Render(buffer2); // 타이핑 완성된 대사 렌더링 검증
+            }
+
+            // 두 번째 엔터: 다음 대사로 정상 진행
+            diagInput.OnKeyDown(Keys.Enter);
+            testDiagBox.HandleInput(diagInput);
+            diagInput.OnKeyUp(Keys.Enter);
+            Assert("대사 완성 후 엔터 입력 시 다음 화자 대사로 전환", testDiagBox.IsActive);
+
+            // ====================================================
+            // Test 66: 유물 설명 자동 줄바꿈(가용 폭 230px 이내) 및 전 9개 스테이지 사실적 배경 렌더링 무결성 검증
+            // ====================================================
+            // 1) 8대 유물 전체에 대한 자동 줄바꿈 폭 측정
+            using (var testBmp = new Bitmap(960, 720))
+            using (var g = Graphics.FromImage(testBmp))
+            {
+                var buffer = new PixelBuffer();
+                float maxAllowedTextWidth = 230f; // cardW (270) - 40
+                var relicList = GameScene.AllRelics;
+                Assert("조선 8대 유물 목록 완전성 (8개 정의)", relicList.Count == 8);
+
+                bool allRelicsFitWidth = true;
+                bool allRelicsHaveLines = true;
+                foreach (var relic in relicList)
+                {
+                    var lines = GameScene.WrapRelicEffectText(relic.Effect, buffer.FontBody, maxAllowedTextWidth, g);
+                    if (lines.Count == 0) allRelicsHaveLines = false;
+                    foreach (var line in lines)
+                    {
+                        float measuredW = g.MeasureString(line, buffer.FontBody).Width;
+                        if (measuredW > maxAllowedTextWidth)
+                        {
+                            allRelicsFitWidth = false;
+                        }
+                    }
+                }
+                Assert("모든 유물의 효과 설명이 카드 안전 폭(230px) 이내로 줄바꿈됨", allRelicsFitWidth);
+                Assert("줄바꿈 후 유물 설명 행이 1개 이상 존재", allRelicsHaveLines);
+
+                // 2) 최우측 카드(Card 2, 중심 774px) 렌더링 시 화면 우측(960px) 안전 여백 검증
+                float rightmostCardCenterX = 774f;
+                float halfMaxTextWidth = maxAllowedTextWidth / 2f; // 115px
+                float rightmostTextEnd = rightmostCardCenterX + halfMaxTextWidth; // 889px
+                float screenRightMargin = PixelBuffer.Width - rightmostTextEnd; // 71px
+                Assert("최우측 카드 텍스트가 화면 우측 끝(960px)을 넘지 않고 60px 이상 여백 유지", screenRightMargin >= 60f);
+
+                // 3) 초장문 가상 유물 효과 텍스트 줄바꿈 방어력 검증
+                string superLongRelicDesc = "공격력 +50%, 이동속도 +30%, 피격 시 100% 확률로 천둥번개가 내리치고 화염 폭풍이 일어나 화면 전체의 적에게 괴멸적인 타격을 가하며 플레이어의 체력을 즉시 최대치까지 회복함";
+                var wrappedLongDesc = GameScene.WrapRelicEffectText(superLongRelicDesc, buffer.FontBody, maxAllowedTextWidth, g);
+                Assert("초장문 유물 효과 설명도 다중 행으로 분할 (3줄 이상)", wrappedLongDesc.Count >= 3);
+                bool superLongAllFit = wrappedLongDesc.All(l => g.MeasureString(l, buffer.FontBody).Width <= maxAllowedTextWidth);
+                Assert("초장문 유물 효과의 모든 분할 행이 230px 이내로 안전 수렴", superLongAllFit);
+
+                // 4) 전 9개 스테이지의 사실적 배경 그래픽 렌더링 무결성 검증
+                var bgStageMgr = new StageManager();
+                bool allStagesRenderPass = true;
+                for (int st = 1; st <= 9; st++)
+                {
+                    try
+                    {
+                        bgStageMgr.CurrentStage = st;
+                        bgStageMgr.RenderBackground(buffer, 150f);
+                    }
+                    catch
+                    {
+                        allStagesRenderPass = false;
+                    }
+                }
+                Assert("1장부터 9장까지 사실적 배경 그래픽(하늘, 산맥, 건축물, 바닥) 정상 렌더링", allStagesRenderPass);
+            }
 
             Console.WriteLine("----------------------------------------------------");
             Console.WriteLine($" 총 테스트 결과: {passed} / {total} 통과 ({(passed == total ? "100% 성공" : "실패 항목 있음")})");

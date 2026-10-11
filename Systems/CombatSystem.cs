@@ -183,6 +183,8 @@ namespace HanlangGame.Systems
                 SoundSynth.PlayLevelUp();
                 OnScreenShake?.Invoke(6.5f, 0.45f);
                 OnHitStop?.Invoke(0.12f);
+                boss.TriggerHitStop(0.24f);
+                player.TriggerHitStop(0.16f);
                 DamageNumbers.Add(new DamageNumber(35, boss.X, boss.Y - boss.Height - 12f, false));
                 Bubbles.Add(new SpeechBubble("격파! (그로기 상태)", boss.X, boss.Y - boss.Height - 20f));
             }
@@ -208,6 +210,8 @@ namespace HanlangGame.Systems
             if (player.CurrentAttackType == "knee" && player.CarriedEnemy != null && !player.HasDealtDamage)
             {
                 player.HasDealtDamage = true;
+                player.TriggerHitStop(0.12f);
+                player.CarriedEnemy.TriggerHitStop(0.14f);
                 player.CarriedEnemy.TakeDamage(15, 0f, out _);
                 DamageNumbers.Add(new DamageNumber(15, player.CarriedEnemy.X, player.CarriedEnemy.Y - player.CarriedEnemy.Z - player.CarriedEnemy.Height - 8f, isPlayerHit: false));
                 AddHitSparks(player.CarriedEnemy.X, player.CarriedEnemy.Y - player.CarriedEnemy.Z - 14f, count: 8);
@@ -241,6 +245,8 @@ namespace HanlangGame.Systems
                         SoundSynth.PlaySpecial();
                         OnScreenShake?.Invoke(5.0f, 0.35f);
                         OnHitStop?.Invoke(0.1f);
+                        player.TriggerHitStop(0.16f);
+                        enemy.TriggerHitStop(0.20f);
                         Bubbles.Add(new SpeechBubble("합(合)!", (player.X + enemy.X) * 0.5f, player.Y - player.Height - 20f));
                         return;
                     }
@@ -438,18 +444,27 @@ namespace HanlangGame.Systems
                             enemy.Vx = knockDir * 110f;
                             OnScreenShake?.Invoke(4.6f, 0.22f);
                             OnHitStop?.Invoke(0.065f);
+                            player.TriggerHitStop(0.15f);
+                            enemy.TriggerHitStop(0.22f);
                             AddHitSparks(enemy.X, enemy.Y - enemy.Z - 16f, count: 12);
                             AddDust(enemy.X, enemy.Y, count: 6);
                             Bubbles.Add(new SpeechBubble("공중 강타!", enemy.X, enemy.Y - enemy.Z - enemy.Height - 18f));
                         }
 
-                        // 타격감 극대화: 히트스톱 역경직, 화면 흔들림, 충격 스파크 방출!
+                        // 타격감 극대화: 공격자와 맞은 캐릭터 일시 멈춤(Hit-Stop Freeze), 충격 스파크 방출!
                         bool isHeavy = player.CurrentAttackType == "spin" || player.CurrentAttackType == "dragon" ||
                                        player.CurrentAttackType == "wave" || player.CurrentAttackType == "ex_spin" ||
                                        player.CurrentAttackType == "ex_dragon" || player.CurrentAttackType == "ex_wave" ||
                                        player.CurrentAttackType == "cudgel_swing" || player.CurrentAttackType == "spear_stab" ||
                                        player.CurrentAttackType == "dashpunch" || player.CurrentAttackType == "dashkick" ||
                                        player.CurrentAttackType == "swing" || isKnockedDown;
+                        bool isExOrSpecial = player.CurrentAttackType == "ex_spin" || player.CurrentAttackType == "ex_dragon" ||
+                                             player.CurrentAttackType == "ex_wave" || player.CurrentAttackType == "giantswing";
+
+                        float atkFreeze = isExOrSpecial ? 0.160f : (isHeavy ? 0.135f : 0.080f);
+                        float defFreeze = isExOrSpecial ? 0.220f : (isHeavy ? 0.180f : 0.120f);
+                        player.TriggerHitStop(atkFreeze);
+                        enemy.TriggerHitStop(defFreeze);
                         OnScreenShake?.Invoke(isHeavy ? 3.8f : 1.8f, isHeavy ? 0.22f : 0.09f);
                         OnHitStop?.Invoke(isHeavy ? 0.055f : 0.025f);
                         float hitSparkY = (player.CurrentAttackType == "jumpkick") ? (player.Y - player.Z - 12f) : (enemy.Y - enemy.Z - 16f);
@@ -506,6 +521,8 @@ namespace HanlangGame.Systems
                                 // 신기전 화차 타격 시 전방 다연장 로켓 화살 8발 일제 발사!
                                 SoundSynth.PlaySpecial();
                                 OnScreenShake?.Invoke(4.5f, 0.3f);
+                                player.TriggerHitStop(0.12f);
+                                obj.TriggerHitStop(0.12f);
                                 float objSparkY = (player.CurrentAttackType == "jumpkick") ? (player.Y - player.Z - 12f) : (obj.Y - 14f);
                                 AddHitSparks(obj.X, objSparkY, count: 12);
                                 Bubbles.Add(new SpeechBubble("신기전 일제 발사!", obj.X, obj.Y - 32f));
@@ -608,6 +625,8 @@ namespace HanlangGame.Systems
                                 float dir = Math.Sign(obj.Vx);
                                 if (dir == 0) dir = 1f;
 
+                                enemy.TriggerHitStop(0.18f);
+                                obj.TriggerHitStop(0.12f);
                                 enemy.TakeDamage(throwDamage, dir, out _);
                                 if (obj.Type == ObjectType.Barrel || obj.Type == ObjectType.Cart || obj.Type == ObjectType.Bench)
                                 {
@@ -688,6 +707,8 @@ namespace HanlangGame.Systems
                                             obj.ThrownByPlayer = true;
                                             obj.Vx = (player.FacingRight ? 1f : -1f) * 360f;
                                             obj.Vz = 10f;
+                                            player.TriggerHitStop(0.14f);
+                                            obj.TriggerHitStop(0.10f);
                                             OnScreenShake?.Invoke(4.0f, 0.20f);
                                             OnHitStop?.Invoke(0.07f);
                                             AddHitSparks(player.X, player.Y - 14f, count: 12);
@@ -697,6 +718,7 @@ namespace HanlangGame.Systems
                                         else if (guarded)
                                         {
                                             obj.IsDead = true;
+                                            player.TriggerHitStop(0.10f);
                                             OnScreenShake?.Invoke(1.5f, 0.08f);
                                             AddHitSparks(player.X, player.Y - 14f, count: 5);
                                             DamageNumbers.Add(new DamageNumber(4, player.X, player.Y - player.Height - 8f, isPlayerHit: true));
@@ -706,6 +728,7 @@ namespace HanlangGame.Systems
                                         else
                                         {
                                             obj.IsDead = true;
+                                            player.TriggerHitStop(0.14f);
                                             int arrowDmg = counterHit ? 16 : 12;
                                             OnScreenShake?.Invoke(2.4f, 0.14f);
                                             AddHitSparks(player.X, player.Y - 14f, count: 7);
@@ -728,6 +751,8 @@ namespace HanlangGame.Systems
                                     float dir = Math.Sign(obj.Vx);
                                     if (dir == 0) dir = 1f;
 
+                                    player.TriggerHitStop(0.14f);
+                                    obj.TriggerHitStop(0.10f);
                                     player.TakeDamage(throwDamage, dir);
                                     DamageNumbers.Add(new DamageNumber(throwDamage, player.X, player.Y - player.Z - player.Height - 8f, isPlayerHit: true));
                                     Bubbles.Add(new SpeechBubble("따끔!", player.X, player.Y - player.Z - player.Height - 18f));
@@ -763,6 +788,8 @@ namespace HanlangGame.Systems
                         float dir = Math.Sign(thrownEnemy.Vx);
                         if (dir == 0) dir = 1f;
 
+                        target.TriggerHitStop(0.18f);
+                        thrownEnemy.TriggerHitStop(0.18f);
                         target.TakeDamage(25, dir, out _);
                         thrownEnemy.TakeDamage(18, -dir, out _);
 
@@ -839,6 +866,8 @@ namespace HanlangGame.Systems
                                 enemy.State = "hit";
                                 enemy.StateTimer = -0.9f;
                                 enemy.Vx = (player.FacingRight ? 1f : -1f) * 90f;
+                                enemy.TriggerHitStop(0.24f);
+                                player.TriggerHitStop(0.16f);
                                 OnScreenShake?.Invoke(4.2f, 0.22f);
                                 OnHitStop?.Invoke(0.08f);
                                 AddHitSparks(player.X, player.Y - player.Z - 16f, count: 12);
@@ -863,6 +892,8 @@ namespace HanlangGame.Systems
                             {
                                 // 철벽 가드 (Guard): 70% 피해 감소, 경직/넉다운 방지
                                 int reducedDmg = Math.Max(1, (int)(enemy.AttackPower * 0.30f));
+                                enemy.TriggerHitStop(0.12f);
+                                player.TriggerHitStop(0.12f);
                                 OnScreenShake?.Invoke(1.6f, 0.10f);
                                 OnHitStop?.Invoke(0.03f);
                                 AddHitSparks(player.X, player.Y - player.Z - 16f, count: 5);
@@ -873,6 +904,8 @@ namespace HanlangGame.Systems
                             {
                                 // 카운터 피격! (공격 동작 중 또는 공격 후딜레이 중 피격 시 +25% 증폭 데미지, 큰 화면 흔들림)
                                 int counterDmg = (int)(enemy.AttackPower * 1.25f);
+                                enemy.TriggerHitStop(0.14f);
+                                player.TriggerHitStop(0.20f);
                                 OnScreenShake?.Invoke(4.5f, 0.24f);
                                 OnHitStop?.Invoke(0.065f);
                                 AddHitSparks(player.X, player.Y - player.Z - 16f, count: 10);
@@ -883,6 +916,8 @@ namespace HanlangGame.Systems
                             {
                                 // 통상 피격 (다운 전이 시 강한 충격 연출)
                                 bool isKnockedDown = player.State == "down";
+                                enemy.TriggerHitStop(0.10f);
+                                player.TriggerHitStop(isKnockedDown ? 0.20f : 0.14f);
                                 OnScreenShake?.Invoke(isKnockedDown ? 4.0f : 2.4f, isKnockedDown ? 0.22f : 0.14f);
                                 OnHitStop?.Invoke(isKnockedDown ? 0.065f : 0.045f);
                                 AddHitSparks(player.X, player.Y - player.Z - 16f, count: isKnockedDown ? 10 : 7);

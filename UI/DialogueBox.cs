@@ -113,6 +113,18 @@ namespace HanlangGame.UI
 
             if (input.IsJustPressed(Keys.Enter) || input.IsJustPressed(Keys.Space))
             {
+                if (_currentIndex < _dialogueQueue.Count)
+                {
+                    string currentLine = _dialogueQueue[_currentIndex].line;
+                    if ((int)_charRevealTimer < currentLine.Length)
+                    {
+                        // 아직 타이핑 중일 때 누르면 전체 대사를 즉시 완성하여 표시
+                        _charRevealTimer = currentLine.Length;
+                        SoundSynth.PlayHit();
+                        return;
+                    }
+                }
+
                 _currentIndex++;
                 _charRevealTimer = 0f;
                 SoundSynth.PlayPunch();
@@ -135,9 +147,9 @@ namespace HanlangGame.UI
                 var (speaker, line, nameCol) = _dialogueQueue[_currentIndex];
 
                 int boxX = 60;
-                int boxY = PixelBuffer.Height - 165;
+                int boxY = PixelBuffer.Height - 175;
                 int boxW = PixelBuffer.Width - 120;
-                int boxH = 135;
+                int boxH = 145;
 
                 // 대화창 비단 바탕 및 전통 문양 테두리
                 buffer.FillRoundedRect(boxX, boxY, boxW, boxH, 12f, Color.FromArgb(240, 18, 16, 26));
@@ -154,16 +166,30 @@ namespace HanlangGame.UI
                 buffer.DrawRoundedRect(tagX, tagY, tagW, tagH, 8f, nameCol, 2.5f);
                 buffer.DrawOutlinedTextCenteredAt(speaker, tagX + (tagW / 2f), tagY + 8, nameCol, Color.Black, buffer.FontSubtitle, 2f);
 
-                // 텍스트 출력 (글자 타이핑 효과)
-                int charCount = Math.Min(line.Length, (int)_charRevealTimer);
-                string revealedText = line.Substring(0, charCount);
+                // 텍스트 출력: 긴 대사 화면 오른쪽 잘림 방지 (자동 줄바꿈 + 글자 타이핑 효과)
+                float maxTextWidth = boxW - 75f;
+                var font = buffer.FontSubtitle;
+                var segments = WrapTextToSegments(line, font, maxTextWidth, g);
 
-                buffer.DrawOutlinedText(revealedText, boxX + 35, boxY + 40, Color.FromArgb(250, 245, 235), Color.FromArgb(20, 15, 10), buffer.FontTitle, 2f);
+                int charCount = Math.Min(line.Length, (int)_charRevealTimer);
+                for (int i = 0; i < segments.Count; i++)
+                {
+                    var seg = segments[i];
+                    if (charCount <= seg.StartIndex) break;
+
+                    int showCount = Math.Min(charCount - seg.StartIndex, seg.Length);
+                    if (showCount > 0)
+                    {
+                        string revealedPart = seg.Text.Substring(0, showCount);
+                        float lineY = boxY + 36 + i * 32f;
+                        buffer.DrawOutlinedText(revealedPart, boxX + 35, lineY, Color.FromArgb(250, 245, 235), Color.FromArgb(20, 15, 10), font, 2f);
+                    }
+                }
 
                 // 다음 진행 안내 깜빡임
                 if (((int)(DateTime.UtcNow.Millisecond / 300) % 2 == 0))
                 {
-                    buffer.DrawOutlinedText("[ ENTER : 계속 ]", boxX + boxW - 170, boxY + boxH - 28, Color.FromArgb(255, 225, 90), Color.Black, buffer.FontBody, 1.5f);
+                    buffer.DrawOutlinedText("[ ENTER : 계속 ]", boxX + boxW - 170, boxY + boxH - 26, Color.FromArgb(255, 225, 90), Color.Black, buffer.FontBody, 1.5f);
                 }
             }
 
@@ -172,6 +198,87 @@ namespace HanlangGame.UI
             {
                 RenderFinisherBanner(buffer);
             }
+        }
+
+        public readonly struct DialogueLineSegment
+        {
+            public int StartIndex { get; }
+            public int Length { get; }
+            public string Text { get; }
+
+            public DialogueLineSegment(int startIndex, int length, string text)
+            {
+                StartIndex = startIndex;
+                Length = length;
+                Text = text;
+            }
+        }
+
+        /// <summary>
+        /// 대화 대사가 길 때 화면 오른쪽으로 잘리지 않도록 단어/음절 단위로 줄바꿈 구간을 분할합니다.
+        /// </summary>
+        public static List<DialogueLineSegment> WrapTextToSegments(string text, Font font, float maxWidth, Graphics g)
+        {
+            var segments = new List<DialogueLineSegment>();
+            if (string.IsNullOrEmpty(text)) return segments;
+
+            int lineStart = 0;
+            int current = 0;
+            int lastSpace = -1;
+
+            while (current < text.Length)
+            {
+                if (text[current] == '\n')
+                {
+                    int segLen = current - lineStart;
+                    segments.Add(new DialogueLineSegment(lineStart, segLen, text.Substring(lineStart, segLen)));
+                    lineStart = current + 1;
+                    lastSpace = -1;
+                    current = lineStart;
+                    continue;
+                }
+
+                if (text[current] == ' ')
+                {
+                    lastSpace = current;
+                }
+
+                int curLen = current - lineStart + 1;
+                string sub = text.Substring(lineStart, curLen);
+                float width = g.MeasureString(sub, font).Width;
+
+                if (width > maxWidth)
+                {
+                    if (lastSpace > lineStart)
+                    {
+                        int segLen = lastSpace - lineStart;
+                        segments.Add(new DialogueLineSegment(lineStart, segLen, text.Substring(lineStart, segLen)));
+                        lineStart = lastSpace + 1;
+                        lastSpace = -1;
+                        current = lineStart;
+                    }
+                    else
+                    {
+                        int segLen = Math.Max(1, current - lineStart);
+                        segments.Add(new DialogueLineSegment(lineStart, segLen, text.Substring(lineStart, segLen)));
+                        lineStart += segLen;
+                        lastSpace = -1;
+                        current = lineStart;
+                    }
+                }
+                else
+                {
+                    current++;
+                }
+            }
+
+            if (lineStart < text.Length)
+            {
+                int remLen = text.Length - lineStart;
+                segments.Add(new DialogueLineSegment(lineStart, remLen, text.Substring(lineStart, remLen)));
+            }
+
+            return segments;
         }
 
         private void RenderFinisherBanner(PixelBuffer buffer)

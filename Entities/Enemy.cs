@@ -230,6 +230,9 @@ namespace HanlangGame.Entities
                 SoundSynth.PlaySpecial();
             }
 
+            // 히트스탑(역경직) 중에는 적 AI 판단 및 쿨다운 일시 정지
+            if (IsInHitStop) return;
+
             if (State == "hit" || State == "down" || IsDead || IsCarried || IsFlying) return;
 
             _attackCooldown -= dt;
@@ -380,6 +383,9 @@ namespace HanlangGame.Entities
             if (IsCarried) return; // 플레이어 머리 위에서 위치 제어
 
             base.Update(dt);
+
+            // 히트스탑(역경직) 중에는 적의 상태 전이 및 추가 이동 로직 일시 정지
+            if (IsInHitStop) return;
 
             if (InvincibleTimer > 0)
             {

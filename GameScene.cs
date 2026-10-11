@@ -47,7 +47,7 @@ namespace HanlangGame
         private float _notifyTimer = 0f;
         private float _gameOverTimer = 0f;
 
-        private static readonly List<RelicOption> AllRelics = new()
+        public static readonly List<RelicOption> AllRelics = new()
         {
             new RelicOption("cheolgap", "철갑 흉경", "鐵甲胸鏡", "방어력 +6, 상시 받는 피해 4 감소", Color.FromArgb(70, 130, 180)),
             new RelicOption("spark", "단전 벼락구슬", "丹田雷珠", "비기 피해 +40%, 저스트 패링 시 적에게 낙뢰 28 방출", Color.FromArgb(255, 215, 0)),
@@ -86,16 +86,18 @@ namespace HanlangGame
             _pauseMenu = new PauseMenu();
             _dialogueBox = new DialogueBox();
 
-            _combatSystem.OnScreenShake = (intensity, duration) => TriggerScreenShake(intensity, duration);
-            _combatSystem.OnHitStop = (duration) => TriggerHitStop(duration);
+            // 공격/피격 시 화면 흔들림을 없애고, 공격자와 맞은 캐릭터의 개별 Hit-Stop 프리즈로 타격감 구현
+            _combatSystem.OnScreenShake = (intensity, duration) => { /* 공격이나 피격 시 화면 흔들림 비활성화 */ };
+            _combatSystem.OnHitStop = (duration) => { /* 공격자 및 피격자 개별 HitStop으로 타격감 구현 */ };
 
             SoundSynth.PlayBgm("title");
         }
 
         public void TriggerScreenShake(float intensity, float duration)
         {
-            ScreenShakeIntensity = intensity;
-            ScreenShakeTimer = duration;
+            // 공격/피격 시 화면 흔들림 비활성화 (화면 안정화)
+            ScreenShakeIntensity = 0f;
+            ScreenShakeTimer = 0f;
         }
 
         public void TriggerHitStop(float duration)
@@ -431,9 +433,11 @@ namespace HanlangGame
                     ? "완 전 소 탕 (完 全 掃 蕩)"
                     : "격 파 (擊破)";
                 _dialogueBox.TriggerFinisher(finisherTitle);
-                _hitStopTimer = 0.50f; // 보스 격파 순간의 극적인 역경직/슬로우모션
-                ScreenShakeTimer = 0.55f;
-                ScreenShakeIntensity = 6.0f;
+                _hitStopTimer = 0.60f; // 보스 격파 순간의 극적인 역경직/슬로우모션
+                _player.TriggerHitStop(0.60f);
+                _stageManager.CurrentBoss.TriggerHitStop(0.60f);
+                ScreenShakeTimer = 0f;
+                ScreenShakeIntensity = 0f;
             }
 
             _dialogueBox.Update(dt);
@@ -702,15 +706,30 @@ namespace HanlangGame
                 _buffer.DrawOutlinedTextCenteredAt(relic.Name, cardCenterX, cy + 90, nameCol, Color.Black, _buffer.FontSubtitle, 1.8f);
 
                 // 분할선
-                _buffer.DrawLine(cx + 25, cy + 130, cx + cardW - 25, cy + 130, Color.FromArgb(150, 130, 90), 1.5f);
+                _buffer.DrawLine(cx + 25, cy + 124, cx + cardW - 25, cy + 124, Color.FromArgb(150, 130, 90), 1.5f);
 
-                // 효과 설명
-                string[] words = relic.Effect.Split(',', StringSplitOptions.TrimEntries);
-                int effY = cy + 148;
-                foreach (var line in words)
+                // 효과 설명 패널 (안정적인 다크 비단 배경 박스)
+                int descBoxX = cx + 14;
+                int descBoxY = cy + 130;
+                int descBoxW = cardW - 28;
+                int descBoxH = cardH - 192;
+                _buffer.FillRoundedRect(descBoxX, descBoxY, descBoxW, descBoxH, 6f, Color.FromArgb(140, 15, 12, 22));
+                _buffer.DrawRoundedRect(descBoxX, descBoxY, descBoxW, descBoxH, 6f, Color.FromArgb(70, 140, 120, 80), 1f);
+
+                // 효과 설명 자동 줄바꿈 렌더링 (최대 가용 폭: cardW - 40 = 230px, 화면 우측 잘림 완벽 방지)
+                float maxTextWidth = cardW - 40f;
+                var font = _buffer.FontBody;
+                var effectLines = WrapRelicEffectText(relic.Effect, font, maxTextWidth, _buffer.Graphics);
+
+                int lineCount = effectLines.Count;
+                int lineSpacing = (lineCount >= 4) ? 22 : (lineCount == 3 ? 24 : 26);
+                int totalTextH = lineCount * lineSpacing;
+                int effStartY = descBoxY + Math.Max(8, (descBoxH - totalTextH) / 2);
+
+                for (int l = 0; l < effectLines.Count; l++)
                 {
-                    _buffer.DrawOutlinedTextCenteredAt(line, cardCenterX, effY, Color.FromArgb(220, 225, 235), Color.Black, _buffer.FontBody, 1.2f);
-                    effY += 28;
+                    float lineY = effStartY + l * lineSpacing;
+                    _buffer.DrawOutlinedTextCenteredAt(effectLines[l], cardCenterX, lineY, Color.FromArgb(235, 230, 215), Color.Black, font, 1.2f);
                 }
 
                 // 하단 선택 표시
@@ -722,6 +741,70 @@ namespace HanlangGame
             }
 
             _buffer.DrawOutlinedTextCentered("[ ← → 방향키 : 선택  |  Z / Enter : 기연 전승 ]", 615, Color.FromArgb(255, 235, 140), Color.Black, _buffer.FontHeader, 1.8f);
+        }
+
+        /// <summary>
+        /// 유물 카드의 폭(270px) 내부 안전 영역(230px)에 맞춰 긴 유물 설명을 단어/구문 단위로 자동 줄바꿈합니다.
+        /// </summary>
+        public static List<string> WrapRelicEffectText(string effect, Font font, float maxLineWidth, Graphics g)
+        {
+            var result = new List<string>();
+            if (string.IsNullOrEmpty(effect)) return result;
+
+            // 콤마(,) 단위로 주요 효과 구문 분할
+            var clauses = effect.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+            foreach (var clause in clauses)
+            {
+                if (g.MeasureString(clause, font).Width <= maxLineWidth)
+                {
+                    result.Add(clause);
+                }
+                else
+                {
+                    // 구문이 maxLineWidth보다 길 경우 공백(단어) 단위로 추가 줄바꿈
+                    string[] words = clause.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                    string curLine = "";
+                    foreach (var word in words)
+                    {
+                        string testLine = string.IsNullOrEmpty(curLine) ? word : curLine + " " + word;
+                        if (g.MeasureString(testLine, font).Width <= maxLineWidth)
+                        {
+                            curLine = testLine;
+                        }
+                        else
+                        {
+                            if (!string.IsNullOrEmpty(curLine))
+                            {
+                                result.Add(curLine);
+                                curLine = word;
+                            }
+                            else
+                            {
+                                // 단어 하나가 이미 maxLineWidth를 초과하는 경우 음절 단위 분할
+                                string sub = "";
+                                foreach (char c in word)
+                                {
+                                    if (g.MeasureString(sub + c, font).Width <= maxLineWidth)
+                                    {
+                                        sub += c;
+                                    }
+                                    else
+                                    {
+                                        if (!string.IsNullOrEmpty(sub)) result.Add(sub);
+                                        sub = c.ToString();
+                                    }
+                                }
+                                curLine = sub;
+                            }
+                        }
+                    }
+                    if (!string.IsNullOrEmpty(curLine))
+                    {
+                        result.Add(curLine);
+                    }
+                }
+            }
+            return result;
         }
 
         private void RenderGameOver()

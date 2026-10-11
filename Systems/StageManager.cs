@@ -580,6 +580,15 @@ namespace HanlangGame.Systems
                 g.FillRectangle(skyBrush, 0, 0, PixelBuffer.Width, groundY);
             }
 
+            // 1-1. 대기 원근법 수평 연무 (Atmospheric Horizon Haze: 지평선과 원경을 융합하는 대기 산란)
+            using (var hazeBrush = new System.Drawing.Drawing2D.LinearGradientBrush(
+                new Point(0, groundY - 75), new Point(0, groundY),
+                Color.FromArgb(0, skyBottom.R, skyBottom.G, skyBottom.B),
+                Color.FromArgb(90, skyBottom.R, skyBottom.G, skyBottom.B)))
+            {
+                g.FillRectangle(hazeBrush, 0, groundY - 75, PixelBuffer.Width, 75);
+            }
+
             // 2. 장별 특수 천체 및 원경 (달, 해, 먹구름, 번개 등)
             RenderSkyFeatures(buffer, cameraX, CurrentStage, groundY);
 
@@ -625,18 +634,59 @@ namespace HanlangGame.Systems
         {
             var g = buffer.Graphics;
 
+            // 1. 주간/황혼 하늘의 부드러운 층운 및 권운 구름층 (Soft Layered Clouds)
+            if (stage <= 4)
+            {
+                float cloudCam = cameraX * 0.08f * PixelBuffer.Scale;
+                int cloudUnit = 360;
+                Color cloudCol = (stage <= 2)
+                    ? Color.FromArgb(45, 255, 255, 255)
+                    : Color.FromArgb(55, 255, 160, 110);
+
+                using (var cloudBrush = new SolidBrush(cloudCol))
+                {
+                    for (int x = -cloudUnit; x < PixelBuffer.Width + cloudUnit; x += cloudUnit)
+                    {
+                        int cx = x - (int)(cloudCam % cloudUnit);
+                        g.FillEllipse(cloudBrush, cx + 20, 45, 160, 32);
+                        g.FillEllipse(cloudBrush, cx + 80, 35, 130, 38);
+                        g.FillEllipse(cloudBrush, cx + 180, 60, 140, 28);
+                        g.FillEllipse(cloudBrush, cx + 220, 50, 110, 34);
+                    }
+                }
+            }
+
+            // 2. 야간 하늘의 반짝이는 북두칠성과 밤하늘 성단 (Twinkling Starfield)
+            if (stage == 5 || stage == 6 || stage == 8 || stage == 9)
+            {
+                for (int s = 0; s < 45; s++)
+                {
+                    int starBaseX = (s * 47 + 23) % PixelBuffer.Width;
+                    int starBaseY = (s * 31 + 17) % (groundY - 140);
+                    float twinkle = (float)(Math.Sin(DateTime.UtcNow.Millisecond * 0.005f + s * 1.7f) * 0.5 + 0.5);
+                    int starAlpha = 80 + (int)(twinkle * 160);
+                    Color starCol = (stage == 8)
+                        ? Color.FromArgb(starAlpha, 255, 180, 190)
+                        : Color.FromArgb(starAlpha, 230, 240, 255);
+
+                    using var starBrush = new SolidBrush(starCol);
+                    int starSize = (s % 5 == 0) ? 3 : 2;
+                    g.FillRectangle(starBrush, starBaseX, starBaseY, starSize, starSize);
+                }
+            }
+
             if (stage == 1 || stage == 2)
             {
-                // 따스한 태양 & 은은한 방사형 빛무리
+                // 따스한 태양 & 은은한 다층 방사형 빛무리
                 int sunX = 720;
                 int sunY = 90;
-                using (var haloBrush = new SolidBrush(Color.FromArgb(40, 255, 245, 180)))
+                using (var outerHalo = new SolidBrush(Color.FromArgb(25, 255, 235, 160)))
+                using (var haloBrush = new SolidBrush(Color.FromArgb(50, 255, 245, 180)))
+                using (var sunBrush = new SolidBrush(Color.FromArgb(255, 255, 235)))
                 {
-                    g.FillEllipse(haloBrush, sunX - 60, sunY - 60, 120, 120);
-                }
-                using (var sunBrush = new SolidBrush(Color.FromArgb(255, 250, 180)))
-                {
-                    g.FillEllipse(sunBrush, sunX - 35, sunY - 35, 70, 70);
+                    g.FillEllipse(outerHalo, sunX - 90, sunY - 90, 180, 180);
+                    g.FillEllipse(haloBrush, sunX - 55, sunY - 55, 110, 110);
+                    g.FillEllipse(sunBrush, sunX - 32, sunY - 32, 64, 64);
                 }
             }
             else if (stage == 3 || stage == 4)
@@ -644,27 +694,29 @@ namespace HanlangGame.Systems
                 // 석양의 거대한 붉은 해 & 황금빛 노을 후광
                 int sunX = 660;
                 int sunY = 160;
-                using (var haloBrush = new SolidBrush(Color.FromArgb(60, 255, 120, 60)))
+                using (var outerHalo = new SolidBrush(Color.FromArgb(35, 255, 90, 40)))
+                using (var haloBrush = new SolidBrush(Color.FromArgb(65, 255, 140, 60)))
+                using (var sunBrush = new SolidBrush(Color.FromArgb(255, 110, 60)))
                 {
-                    g.FillEllipse(haloBrush, sunX - 80, sunY - 80, 160, 160);
-                }
-                using (var sunBrush = new SolidBrush(Color.FromArgb(255, 105, 65)))
-                {
-                    g.FillEllipse(sunBrush, sunX - 45, sunY - 45, 90, 90);
+                    g.FillEllipse(outerHalo, sunX - 110, sunY - 110, 220, 220);
+                    g.FillEllipse(haloBrush, sunX - 70, sunY - 70, 140, 140);
+                    g.FillEllipse(sunBrush, sunX - 42, sunY - 42, 84, 84);
                 }
             }
             else if (stage == 5 || stage == 6)
             {
-                // 은은한 상현달 & 달무리
+                // 은은한 상현달 & 달의 바다(Maria) 음영 질감
                 int moonX = 700;
                 int moonY = 85;
                 using (var haloBrush = new SolidBrush(Color.FromArgb(30, 255, 245, 200)))
+                using (var moonBrush = new SolidBrush(Color.FromArgb(255, 250, 215)))
+                using (var craterBrush = new SolidBrush(Color.FromArgb(40, 90, 85, 75)))
                 {
                     g.FillEllipse(haloBrush, moonX - 45, moonY - 45, 90, 90);
-                }
-                using (var moonBrush = new SolidBrush(Color.FromArgb(255, 248, 210)))
-                {
                     g.FillEllipse(moonBrush, moonX - 25, moonY - 25, 50, 50);
+                    g.FillEllipse(craterBrush, moonX - 16, moonY - 14, 14, 12);
+                    g.FillEllipse(craterBrush, moonX - 6, moonY + 2, 10, 9);
+                    g.FillEllipse(craterBrush, moonX - 18, moonY + 4, 8, 8);
                 }
             }
             else if (stage == 8)
@@ -672,31 +724,36 @@ namespace HanlangGame.Systems
                 // 붉은 핏빛 보름달 & 불길한 붉은 안개
                 int moonX = 680;
                 int moonY = 95;
-                using (var haloBrush = new SolidBrush(Color.FromArgb(70, 255, 40, 50)))
+                using (var haloBrush = new SolidBrush(Color.FromArgb(65, 255, 40, 50)))
+                using (var moonBrush = new SolidBrush(Color.FromArgb(255, 75, 70)))
+                using (var darkBrush = new SolidBrush(Color.FromArgb(65, 80, 10, 15)))
                 {
-                    g.FillEllipse(haloBrush, moonX - 70, moonY - 70, 140, 140);
-                }
-                using (var moonBrush = new SolidBrush(Color.FromArgb(255, 60, 60)))
-                {
+                    g.FillEllipse(haloBrush, moonX - 75, moonY - 75, 150, 150);
                     g.FillEllipse(moonBrush, moonX - 38, moonY - 38, 76, 76);
+                    g.FillEllipse(darkBrush, moonX - 22, moonY - 18, 22, 18);
+                    g.FillEllipse(darkBrush, moonX - 8, moonY + 5, 16, 14);
                 }
             }
             else if (stage == 9)
             {
-                // 간헐적 번개 플래시 및 번개 줄기
-                bool flash = (DateTime.UtcNow.Millisecond < 100);
+                // 간헐적 번개 플래시 및 지그재그 번개 줄기
+                bool flash = (DateTime.UtcNow.Millisecond < 120);
                 if (flash)
                 {
-                    using (var flashBrush = new SolidBrush(Color.FromArgb(160, 200, 220, 255)))
+                    using (var flashBrush = new SolidBrush(Color.FromArgb(140, 190, 215, 255)))
                     {
                         g.FillRectangle(flashBrush, 0, 0, PixelBuffer.Width, groundY);
                     }
                     using (var boltPen = new Pen(Color.FromArgb(255, 255, 255), 3.5f))
+                    using (var subBoltPen = new Pen(Color.FromArgb(210, 230, 255), 1.8f))
                     {
                         g.DrawLine(boltPen, 480, 0, 460, 90);
                         g.DrawLine(boltPen, 460, 90, 510, 170);
                         g.DrawLine(boltPen, 510, 170, 475, 280);
                         g.DrawLine(boltPen, 475, 280, 530, groundY);
+
+                        g.DrawLine(subBoltPen, 460, 90, 430, 150);
+                        g.DrawLine(subBoltPen, 510, 170, 555, 240);
                     }
                 }
                 int moonX = 720;
@@ -712,36 +769,77 @@ namespace HanlangGame.Systems
         {
             var g = buffer.Graphics;
             Color mtnColor = GetMountainColor(stage);
-            Color farColor = Color.FromArgb(Math.Min(255, mtnColor.R + 25), Math.Min(255, mtnColor.G + 25), Math.Min(255, mtnColor.B + 25));
+            Color farColor = Color.FromArgb(Math.Min(255, mtnColor.R + 28), Math.Min(255, mtnColor.G + 28), Math.Min(255, mtnColor.B + 32));
+            Color cliffColor = Color.FromArgb(Math.Max(0, mtnColor.R - 25), Math.Max(0, mtnColor.G - 25), Math.Max(0, mtnColor.B - 25));
 
-            // 1. 원거리 원경 산맥 (패럴랙스: 0.15배)
-            float farCam = cameraX * 0.15f * PixelBuffer.Scale;
-            for (int x = -300; x < PixelBuffer.Width + 300; x += 320)
+            // 1. 원거리 원경 산맥 (패럴랙스: 0.12배 - 진경산수화풍 굽이치는 능선)
+            float farCam = cameraX * 0.12f * PixelBuffer.Scale;
+            int farUnit = 380;
+            for (int x = -farUnit; x < PixelBuffer.Width + farUnit; x += farUnit)
             {
-                int mx = x - (int)(farCam % 320);
-                Point[] pts =
+                int mx = x - (int)(farCam % farUnit);
+                Point[] farRidge =
                 {
                     new Point(mx, groundY),
-                    new Point(mx + 160, groundY - 210),
-                    new Point(mx + 320, groundY)
+                    new Point(mx + 30, groundY - 110),
+                    new Point(mx + 75, groundY - 170),
+                    new Point(mx + 120, groundY - 145),
+                    new Point(mx + 175, groundY - 240), // 인왕산/북악산 주봉 실루엣
+                    new Point(mx + 230, groundY - 190),
+                    new Point(mx + 280, groundY - 215), // 제2봉
+                    new Point(mx + 330, groundY - 130),
+                    new Point(mx + farUnit, groundY)
                 };
-                using var brush = new SolidBrush(farColor);
-                g.FillPolygon(brush, pts);
+                using var farBrush = new SolidBrush(farColor);
+                g.FillPolygon(farBrush, farRidge);
             }
 
-            // 2. 근거리 원경 산맥 (패럴랙스: 0.28배)
-            float nearCam = cameraX * 0.28f * PixelBuffer.Scale;
-            for (int x = -260; x < PixelBuffer.Width + 260; x += 260)
+            // 산골짜기 운무 띠 (Valley Fog / Mountain Mist)
+            using (var mistBrush = new SolidBrush(Color.FromArgb(40, 235, 240, 250)))
             {
-                int mx = x - (int)(nearCam % 260);
-                Point[] pts =
+                g.FillRectangle(mistBrush, 0, groundY - 145, PixelBuffer.Width, 32);
+            }
+
+            // 2. 근거리 원경 산맥 (패럴랙스: 0.25배 - 험준한 화강암 암벽과 울창한 수목 능선)
+            float nearCam = cameraX * 0.25f * PixelBuffer.Scale;
+            int nearUnit = 320;
+            for (int x = -nearUnit; x < PixelBuffer.Width + nearUnit; x += nearUnit)
+            {
+                int mx = x - (int)(nearCam % nearUnit);
+                Point[] nearRidge =
                 {
                     new Point(mx, groundY),
-                    new Point(mx + 130, groundY - 150),
-                    new Point(mx + 260, groundY)
+                    new Point(mx + 35, groundY - 90),
+                    new Point(mx + 80, groundY - 155),
+                    new Point(mx + 125, groundY - 130),
+                    new Point(mx + 160, groundY - 190), // 기암괴석 봉우리
+                    new Point(mx + 205, groundY - 140),
+                    new Point(mx + 250, groundY - 175),
+                    new Point(mx + 290, groundY - 110),
+                    new Point(mx + nearUnit, groundY)
                 };
-                using var brush = new SolidBrush(mtnColor);
-                g.FillPolygon(brush, pts);
+                using var nearBrush = new SolidBrush(mtnColor);
+                g.FillPolygon(nearBrush, nearRidge);
+
+                // 화강암 암벽 그늘 음영면 (Cliff Shadow Facet)
+                Point[] cliffPts =
+                {
+                    new Point(mx + 160, groundY - 190),
+                    new Point(mx + 205, groundY - 140),
+                    new Point(mx + 185, groundY - 70),
+                    new Point(mx + 145, groundY - 110)
+                };
+                using var cBrush = new SolidBrush(cliffColor);
+                g.FillPolygon(cBrush, cliffPts);
+
+                // 산등성이 소나무 숲 텍스처 (Pine Skyline Texture)
+                using var pinePen = new Pen(cliffColor, 2f);
+                for (int px = mx + 20; px < mx + nearUnit - 20; px += 20)
+                {
+                    int py = groundY - 100 - (int)(Math.Sin((px - mx) * 0.02f) * 60);
+                    g.DrawLine(pinePen, px, py, px, py - 6);
+                    g.DrawLine(pinePen, px - 3, py - 3, px + 3, py - 3);
+                }
             }
         }
 
@@ -752,153 +850,318 @@ namespace HanlangGame.Systems
 
             if (stage <= 2)
             {
-                // 1~2장: 저잣거리 한옥 지붕 & 주막 기둥
+                // 1~2장: 저잣거리 한옥 (유려한 곡선 팔작지붕, 입체 기와골, 창호지 세살문 호롱불빛, 단청 서까래)
                 int unitW = 340;
                 for (int i = 0; i < 6; i++)
                 {
                     int bx = (int)(i * unitW - (archCam % unitW));
                     int by = groundY - 180;
 
-                    // 벽체 (황토벽)
-                    using (var wallBrush = new SolidBrush(Color.FromArgb(230, 218, 195)))
+                    // 1) 기단 장대석 및 주춧돌 (Granite Plinth Base)
+                    using (var plinthBrush = new SolidBrush(Color.FromArgb(170, 165, 155)))
+                    using (var stonePen = new Pen(Color.FromArgb(120, 115, 105), 1.2f))
                     {
-                        g.FillRectangle(wallBrush, bx + 20, by + 45, unitW - 40, 135);
+                        g.FillRectangle(plinthBrush, bx + 16, by + 162, unitW - 32, 18);
+                        g.DrawRectangle(stonePen, bx + 16, by + 162, unitW - 32, 18);
+                        // 주춧돌
+                        g.FillRectangle(plinthBrush, bx + 22, by + 154, 24, 10);
+                        g.FillRectangle(plinthBrush, bx + unitW - 46, by + 154, 24, 10);
+                        g.FillRectangle(plinthBrush, bx + 157, by + 154, 24, 10);
                     }
 
-                    // 목조 기둥 & 서까래
-                    using (var woodBrush = new SolidBrush(Color.FromArgb(115, 65, 25)))
+                    // 2) 전통 황토벽 (Ochre Mud Wall)
+                    using (var wallBrush = new SolidBrush(Color.FromArgb(232, 218, 192)))
                     {
-                        g.FillRectangle(woodBrush, bx + 25, by + 45, 18, 135);
-                        g.FillRectangle(woodBrush, bx + unitW - 43, by + 45, 18, 135);
-                        g.FillRectangle(woodBrush, bx + 160, by + 45, 18, 135);
+                        g.FillRectangle(wallBrush, bx + 20, by + 45, unitW - 40, 118);
+                    }
+
+                    // 3) 창호지 세살문 & 따스한 호롱불빛 (Changhoji Lattice with Warm Amber Lamp Light)
+                    int winW = 75;
+                    int winH = 68;
+                    int winY = by + 68;
+                    int winX1 = bx + 55;
+                    int winX2 = bx + 195;
+
+                    using (var lampGlow = new SolidBrush(Color.FromArgb(180, 255, 225, 130)))
+                    using (var frameBrush = new SolidBrush(Color.FromArgb(95, 50, 20)))
+                    using (var gridPen = new Pen(Color.FromArgb(115, 65, 25), 1.2f))
+                    {
+                        // 창틀 외곽
+                        g.FillRectangle(frameBrush, winX1 - 4, winY - 4, winW + 8, winH + 8);
+                        g.FillRectangle(frameBrush, winX2 - 4, winY - 4, winW + 8, winH + 8);
+
+                        // 창호지 내부 온화한 불빛
+                        g.FillRectangle(lampGlow, winX1, winY, winW, winH);
+                        g.FillRectangle(lampGlow, winX2, winY, winW, winH);
+
+                        // 전통 세살문 격자 창살 (Lattice Grids)
+                        for (int gx = winX1 + 15; gx < winX1 + winW; gx += 15) g.DrawLine(gridPen, gx, winY, gx, winY + winH);
+                        for (int gy = winY + 14; gy < winY + winH; gy += 14) g.DrawLine(gridPen, winX1, gy, winX1 + winW, gy);
+
+                        for (int gx = winX2 + 15; gx < winX2 + winW; gx += 15) g.DrawLine(gridPen, gx, winY, gx, winY + winH);
+                        for (int gy = winY + 14; gy < winY + winH; gy += 14) g.DrawLine(gridPen, winX2, gy, winX2 + winW, gy);
+                    }
+
+                    // 4) 목조 기둥 & 창방/인방 (Wooden Pillars & Beams)
+                    using (var woodBrush = new SolidBrush(Color.FromArgb(115, 60, 25)))
+                    using (var darkWood = new SolidBrush(Color.FromArgb(80, 40, 15)))
+                    {
+                        // 좌, 우, 중앙 기둥
+                        g.FillRectangle(woodBrush, bx + 24, by + 45, 18, 117);
+                        g.FillRectangle(woodBrush, bx + unitW - 42, by + 45, 18, 117);
+                        g.FillRectangle(woodBrush, bx + 159, by + 45, 18, 117);
+
+                        // 상단 가로 인방
                         g.FillRectangle(woodBrush, bx + 20, by + 40, unitW - 40, 12);
+                        g.FillRectangle(darkWood, bx + 20, by + 48, unitW - 40, 4);
                     }
 
-                    // 기와지붕 (전통 곡선 팔작지붕 느낌)
-                    Point[] roofPts =
+                    // 5) 단청 서까래열 (Dancheong Eaves Rafters)
+                    using (var rafterGreen = new SolidBrush(Color.FromArgb(60, 125, 90)))
+                    using (var rafterRed = new SolidBrush(Color.FromArgb(170, 45, 45)))
                     {
-                        new Point(bx - 15, by + 45),
-                        new Point(bx + unitW / 2, by),
-                        new Point(bx + unitW + 15, by + 45)
+                        for (int rx = bx - 10; rx <= bx + unitW + 10; rx += 14)
+                        {
+                            var rBrush = ((rx / 14) % 2 == 0) ? rafterGreen : rafterRed;
+                            g.FillRectangle(rBrush, rx, by + 42, 8, 8);
+                        }
+                    }
+
+                    // 6) 유려한 곡선 팔작지붕 & 입체 기와골 (Curved Korean Eaves & Fluted Roof Tiles)
+                    Point[] roofOutline =
+                    {
+                        new Point(bx - 20, by + 50),
+                        new Point(bx + 40, by + 38),
+                        new Point(bx + unitW / 2, by + 4),
+                        new Point(bx + unitW - 40, by + 38),
+                        new Point(bx + unitW + 20, by + 50),
+                        new Point(bx + unitW + 10, by + 60),
+                        new Point(bx + unitW / 2, by + 28),
+                        new Point(bx - 10, by + 60)
                     };
-                    using (var roofBrush = new SolidBrush(Color.FromArgb(45, 50, 62)))
+                    using (var roofBrush = new SolidBrush(Color.FromArgb(42, 46, 58)))
                     {
-                        g.FillPolygon(roofBrush, roofPts);
-                    }
-                    using (var ridgePen = new Pen(Color.FromArgb(65, 70, 85), 3f))
-                    {
-                        g.DrawLines(ridgePen, roofPts);
+                        g.FillPolygon(roofBrush, roofOutline);
                     }
 
-                    // 청사초롱 (홍사/청사)
+                    // 입체 기와골 세로 줄눈 (Roof Tile Flutes)
+                    using (var tilePen = new Pen(Color.FromArgb(28, 32, 42), 1.5f))
+                    using (var tileHighlight = new Pen(Color.FromArgb(68, 74, 90), 1f))
+                    {
+                        for (int tx = bx + 15; tx < bx + unitW - 15; tx += 12)
+                        {
+                            float tRatio = (tx - bx) / (float)unitW;
+                            float curTopY = by + 6 + Math.Abs(tRatio - 0.5f) * 64f;
+                            float curBotY = by + 32 + Math.Abs(tRatio - 0.5f) * 54f;
+                            g.DrawLine(tilePen, tx, curTopY, tx, curBotY);
+                            g.DrawLine(tileHighlight, tx + 1, curTopY, tx + 1, curBotY);
+                        }
+                    }
+
+                    // 용마루 및 처마끝 금빛 라인
+                    using (var ridgePen = new Pen(Color.FromArgb(85, 90, 105), 3.5f))
+                    using (var eavePen = new Pen(Color.FromArgb(215, 175, 55), 2f))
+                    {
+                        g.DrawLine(ridgePen, bx + 40, by + 6, bx + unitW - 40, by + 6);
+                        g.DrawLines(eavePen, new Point[] {
+                            new Point(bx - 20, by + 50),
+                            new Point(bx + unitW / 2, by + 24),
+                            new Point(bx + unitW + 20, by + 50)
+                        });
+                    }
+
+                    // 7) 청사초롱 (홍사/청사 & 은은한 등불 빛무리)
                     int lanternX = bx + unitW - 25;
-                    int lanternY = by + 65;
-                    using (var redBrush = new SolidBrush(Color.FromArgb(225, 45, 45)))
-                    using (var blueBrush = new SolidBrush(Color.FromArgb(40, 70, 210)))
-                    using (var glowBrush = new SolidBrush(Color.FromArgb(50, 255, 180, 50)))
+                    int lanternY = by + 68;
+                    using (var redBrush = new SolidBrush(Color.FromArgb(235, 45, 45)))
+                    using (var blueBrush = new SolidBrush(Color.FromArgb(35, 75, 215)))
+                    using (var tasselBrush = new SolidBrush(Color.FromArgb(210, 180, 50)))
+                    using (var glowBrush = new SolidBrush(Color.FromArgb(60, 255, 190, 60)))
                     {
                         g.FillEllipse(glowBrush, lanternX - 25, lanternY - 10, 50, 60);
-                        g.FillRectangle(redBrush, lanternX - 10, lanternY, 20, 18);
-                        g.FillRectangle(blueBrush, lanternX - 10, lanternY + 18, 20, 18);
+                        // 고리
+                        using var hookPen = new Pen(Color.FromArgb(70, 70, 70), 1.5f);
+                        g.DrawLine(hookPen, lanternX, by + 55, lanternX, lanternY);
+                        // 초롱 본체
+                        g.FillRectangle(redBrush, lanternX - 10, lanternY, 20, 17);
+                        g.FillRectangle(blueBrush, lanternX - 10, lanternY + 17, 20, 17);
+                        // 술 (Tassel)
+                        g.FillRectangle(tasselBrush, lanternX - 4, lanternY + 34, 8, 12);
                     }
                 }
             }
             else if (stage == 3)
             {
-                // 3장: 청계천 돌다리 석축 & 늘어진 수양버들
+                // 3장: 청계천 돌다리 석축 & 늘어진 수양버들 (정밀 화강암 돌담, 아치 수문, 드리운 버들잎)
                 int unitW = 280;
                 for (int i = 0; i < 6; i++)
                 {
                     int px = (int)(i * unitW - (archCam % unitW));
-                    int py = groundY - 130;
+                    int py = groundY - 140;
 
-                    // 돌다리 난간 및 석축
+                    // 화강암 다듬돌 석축 (Ashlar Granite Masonry)
                     using (var stoneBrush = new SolidBrush(Color.FromArgb(145, 150, 158)))
-                    using (var capBrush = new SolidBrush(Color.FromArgb(175, 180, 188)))
+                    using (var mortarPen = new Pen(Color.FromArgb(95, 100, 108), 1.5f))
+                    using (var capBrush = new SolidBrush(Color.FromArgb(185, 190, 198)))
                     {
-                        g.FillRectangle(stoneBrush, px + 20, py + 20, unitW - 40, 25);
-                        g.FillRectangle(stoneBrush, px + 30, py, 26, 110);
-                        g.FillRectangle(capBrush, px + 24, py - 10, 38, 16);
+                        g.FillRectangle(stoneBrush, px, py + 25, unitW, 115);
 
-                        g.FillRectangle(stoneBrush, px + unitW - 56, py, 26, 110);
-                        g.FillRectangle(capBrush, px + unitW - 62, py - 10, 38, 16);
+                        // 벽돌식 엇갈린 줄눈 패턴
+                        for (int ly = py + 25; ly < groundY; ly += 24)
+                        {
+                            g.DrawLine(mortarPen, px, ly, px + unitW, ly);
+                        }
+                        for (int r = 0; r < 5; r++)
+                        {
+                            int rowTop = py + 25 + r * 24;
+                            int shift = (r % 2 == 0) ? 0 : 28;
+                            for (int lx = px + shift; lx < px + unitW; lx += 56)
+                            {
+                                g.DrawLine(mortarPen, lx, rowTop, lx, rowTop + 24);
+                            }
+                        }
+
+                        // 아치 수문 (홍예 아치)
+                        int archW = 76;
+                        int archX = px + unitW / 2 - archW / 2;
+                        using var archBrush = new SolidBrush(Color.FromArgb(30, 35, 45));
+                        g.FillRectangle(archBrush, archX, py + 70, archW, 70);
+                        g.FillPie(archBrush, archX, py + 35, archW, 70, 180, 180);
+
+                        // 난간 상단 갑석 (Coping Stones)
+                        g.FillRectangle(capBrush, px, py + 12, unitW, 14);
+                        g.FillRectangle(capBrush, px + 24, py - 12, 36, 24);
+                        g.FillRectangle(capBrush, px + unitW - 60, py - 12, 36, 24);
                     }
 
-                    // 수양버들 나무
-                    using (var leafBrush = new SolidBrush(Color.FromArgb(75, 135, 70)))
-                    using (var trunkBrush = new SolidBrush(Color.FromArgb(90, 60, 35)))
+                    // 수양버들 나무 (Weeping Willow Trees with Cascading Foliage)
+                    int treeX = px + 125;
+                    using (var trunkBrush = new SolidBrush(Color.FromArgb(85, 55, 30)))
+                    using (var leafDark = new SolidBrush(Color.FromArgb(60, 120, 55)))
+                    using (var leafLight = new SolidBrush(Color.FromArgb(95, 165, 80)))
                     {
-                        g.FillRectangle(trunkBrush, px + 130, py - 60, 16, 150);
-                        g.FillEllipse(leafBrush, px + 90, py - 110, 100, 75);
+                        g.FillRectangle(trunkBrush, treeX, py - 70, 18, 160);
+                        // 풍성한 나뭇잎 돔
+                        g.FillEllipse(leafDark, treeX - 55, py - 125, 130, 85);
+                        g.FillEllipse(leafLight, treeX - 45, py - 115, 110, 70);
+
+                        // 아래로 드리워진 버들가지 (Cascading tendrils)
+                        using var vinePen = new Pen(Color.FromArgb(75, 145, 65), 2.2f);
+                        for (int vx = treeX - 45; vx <= treeX + 65; vx += 15)
+                        {
+                            int vLen = 45 + (int)(Math.Sin(vx * 1.5f) * 20);
+                            g.DrawLine(vinePen, vx, py - 60, vx - 5, py - 60 + vLen);
+                        }
                     }
                 }
             }
             else if (stage == 4)
             {
-                // 4장: 남산 성곽길 (여장 성벽과 불타는 횃불)
+                // 4장: 남산 성곽길 (한양도성 여장 성벽, 총안, 타오르는 쇠화로 횃불)
                 int unitW = 270;
                 for (int i = 0; i < 6; i++)
                 {
                     int wx = (int)(i * unitW - (archCam % unitW));
-                    int wy = groundY - 150;
+                    int wy = groundY - 155;
 
-                    using (var wallBrush = new SolidBrush(Color.FromArgb(95, 90, 85)))
-                    using (var stonePen = new Pen(Color.FromArgb(65, 60, 55), 1.5f))
+                    using (var wallBrush = new SolidBrush(Color.FromArgb(105, 98, 92)))
+                    using (var stonePen = new Pen(Color.FromArgb(68, 62, 58), 1.8f))
+                    using (var highlightPen = new Pen(Color.FromArgb(135, 128, 120), 1f))
                     {
-                        g.FillRectangle(wallBrush, wx, wy + 30, unitW, 120);
+                        g.FillRectangle(wallBrush, wx, wy + 32, unitW, 123);
 
-                        // 여장 성벽 요철
-                        g.FillRectangle(wallBrush, wx + 15, wy, 80, 35);
-                        g.FillRectangle(wallBrush, wx + 145, wy, 80, 35);
+                        // 여장(성벽 윗부분) 요철 및 총안 (Crenels & Embrasures)
+                        g.FillRectangle(wallBrush, wx + 15, wy, 80, 36);
+                        g.FillRectangle(wallBrush, wx + 145, wy, 80, 36);
 
-                        // 성벽 화강암 벽돌 줄눈
-                        for (int lineY = wy + 40; lineY < groundY; lineY += 28)
+                        // 총안 구멍 (Arrow slit)
+                        using var embrasureBrush = new SolidBrush(Color.FromArgb(25, 22, 20));
+                        g.FillRectangle(embrasureBrush, wx + 48, wy + 14, 14, 18);
+                        g.FillRectangle(embrasureBrush, wx + 178, wy + 14, 14, 18);
+
+                        // 성벽 화강암 석재 줄눈 및 하이라이트
+                        for (int lineY = wy + 32; lineY < groundY; lineY += 26)
                         {
                             g.DrawLine(stonePen, wx, lineY, wx + unitW, lineY);
+                            g.DrawLine(highlightPen, wx, lineY + 1, wx + unitW, lineY + 1);
+                        }
+                        for (int r = 0; r < 5; r++)
+                        {
+                            int rY = wy + 32 + r * 26;
+                            int shift = (r % 2 == 0) ? 0 : 28;
+                            for (int lx = wx + shift; lx < wx + unitW; lx += 56)
+                            {
+                                g.DrawLine(stonePen, lx, rY, lx, rY + 26);
+                            }
                         }
                     }
 
-                    // 성벽 위 타오르는 횃불
+                    // 성벽 위 타오르는 쇠화로 횃불 (Flickering Iron Torch Brazier with Ember Sparks)
                     int torchX = wx + 115;
-                    int torchY = wy + 40;
-                    using (var glowBrush = new SolidBrush(Color.FromArgb(60, 255, 140, 30)))
-                    using (var flameBrush = new SolidBrush(Color.FromArgb(255, 170, 40)))
-                    using (var coreBrush = new SolidBrush(Color.FromArgb(255, 240, 120)))
+                    int torchY = wy + 42;
+                    float flicker = (float)(Math.Sin(DateTime.UtcNow.Millisecond * 0.02f + i * 2.1f) * 4);
+
+                    using (var outerGlow = new SolidBrush(Color.FromArgb(45, 255, 120, 20)))
+                    using (var glowBrush = new SolidBrush(Color.FromArgb(75, 255, 160, 40)))
+                    using (var flameBrush = new SolidBrush(Color.FromArgb(255, 175, 40)))
+                    using (var coreBrush = new SolidBrush(Color.FromArgb(255, 245, 140)))
+                    using (var ironBrush = new SolidBrush(Color.FromArgb(45, 42, 40)))
                     {
-                        g.FillEllipse(glowBrush, torchX - 25, torchY - 35, 50, 50);
-                        g.FillEllipse(flameBrush, torchX - 10, torchY - 20, 20, 26);
-                        g.FillEllipse(coreBrush, torchX - 5, torchY - 15, 10, 16);
+                        // 반경 70px 화로 조명
+                        g.FillEllipse(outerGlow, torchX - 35, torchY - 45 + flicker, 70, 70);
+                        g.FillEllipse(glowBrush, torchX - 22, torchY - 35 + flicker, 44, 44);
+
+                        // 불꽃 심지
+                        g.FillEllipse(flameBrush, torchX - 11, torchY - 24 + flicker, 22, 28);
+                        g.FillEllipse(coreBrush, torchX - 5, torchY - 18 + flicker, 10, 18);
+
+                        // 쇠화로 기둥 및 받침
+                        g.FillRectangle(ironBrush, torchX - 3, torchY - 2, 6, 26);
+                        g.FillRectangle(ironBrush, torchX - 8, torchY - 6, 16, 5);
                     }
                 }
             }
             else if (stage <= 6)
             {
-                // 5~6장: 관아 대문 및 웅장한 2층 누각
+                // 5~6장: 관아 대문 및 웅장한 2층 누각 (계자난간, 다층 지붕, 단청 포작)
                 int unitW = 380;
                 for (int i = 0; i < 5; i++)
                 {
                     int kx = (int)(i * unitW - (archCam % unitW));
-                    int ky = groundY - 210;
+                    int ky = groundY - 215;
 
-                    // 1층 및 2층 단청 벽체
-                    using (var dancheongBrush = new SolidBrush(Color.FromArgb(175, 50, 45)))
-                    using (var colBrush = new SolidBrush(Color.FromArgb(115, 25, 25)))
+                    // 1층 및 2층 단청 벽체 (Dancheong Vermilion Walls)
+                    using (var wallBrush = new SolidBrush(Color.FromArgb(175, 48, 42)))
+                    using (var colBrush = new SolidBrush(Color.FromArgb(110, 22, 20)))
+                    using (var railBrush = new SolidBrush(Color.FromArgb(85, 18, 15)))
                     {
-                        g.FillRectangle(dancheongBrush, kx + 25, ky + 55, unitW - 50, 155);
-                        g.FillRectangle(colBrush, kx + 35, ky + 55, 24, 155);
-                        g.FillRectangle(colBrush, kx + unitW - 59, ky + 55, 24, 155);
-                        g.FillRectangle(colBrush, kx + 175, ky + 55, 24, 155);
+                        g.FillRectangle(wallBrush, kx + 25, ky + 55, unitW - 50, 160);
+
+                        // 웅장한 기둥열
+                        g.FillRectangle(colBrush, kx + 35, ky + 55, 26, 160);
+                        g.FillRectangle(colBrush, kx + unitW - 61, ky + 55, 26, 160);
+                        g.FillRectangle(colBrush, kx + 177, ky + 55, 26, 160);
+
+                        // 2층 난간 (계자난간)
+                        g.FillRectangle(railBrush, kx + 25, ky + 115, unitW - 50, 10);
+                        for (int rx = kx + 35; rx < kx + unitW - 40; rx += 16)
+                        {
+                            g.FillRectangle(railBrush, rx, ky + 105, 4, 18);
+                        }
                     }
 
-                    // 웅장한 기와지붕
+                    // 2단 겹처마 기와지붕 (Double Tiered Roof)
                     Point[] roofPts =
                     {
-                        new Point(kx - 20, ky + 55),
-                        new Point(kx + unitW / 2, ky),
-                        new Point(kx + unitW + 20, ky + 55)
+                        new Point(kx - 22, ky + 52),
+                        new Point(kx + unitW / 2, ky - 5),
+                        new Point(kx + unitW + 22, ky + 52),
+                        new Point(kx + unitW + 12, ky + 62),
+                        new Point(kx + unitW / 2, ky + 25),
+                        new Point(kx - 12, ky + 62)
                     };
-                    using (var roofBrush = new SolidBrush(Color.FromArgb(30, 35, 48)))
-                    using (var roofPen = new Pen(Color.FromArgb(220, 180, 50), 3.5f))
+                    using (var roofBrush = new SolidBrush(Color.FromArgb(32, 36, 48)))
+                    using (var roofPen = new Pen(Color.FromArgb(225, 185, 55), 3.5f))
                     {
                         g.FillPolygon(roofBrush, roofPts);
                         g.DrawLines(roofPen, roofPts);
@@ -907,42 +1170,78 @@ namespace HanlangGame.Systems
             }
             else
             {
-                // 7~9장: 광화문 홍예문, 근정전 월대 및 집현전 황금 전각
+                // 7~9장: 광화문 홍예문, 근정전 월대 및 집현전 황금 전각 (오방색 단청, 잡상/어처구니 기와, 해태 월대 난간)
                 int unitW = 420;
                 for (int i = 0; i < 5; i++)
                 {
                     int gx = (int)(i * unitW - (archCam % unitW));
-                    int gy = groundY - 230;
+                    int gy = groundY - 235;
 
-                    // 궁궐 단청 붉은 벽
-                    using (var wallBrush = new SolidBrush(Color.FromArgb(145, 25, 25)))
-                    using (var colBrush = new SolidBrush(Color.FromArgb(95, 12, 12)))
+                    // 궁궐 단청 붉은 벽 & 화강암 기단 월대
+                    using (var wallBrush = new SolidBrush(Color.FromArgb(145, 22, 22)))
+                    using (var colBrush = new SolidBrush(Color.FromArgb(92, 10, 10)))
+                    using (var wolDaeBrush = new SolidBrush(Color.FromArgb(175, 170, 165)))
                     {
-                        g.FillRectangle(wallBrush, gx + 25, gy + 65, unitW - 50, 165);
-                        g.FillRectangle(colBrush, gx + 40, gy + 65, 26, 165);
-                        g.FillRectangle(colBrush, gx + unitW - 66, gy + 65, 26, 165);
+                        // 월대 기단
+                        g.FillRectangle(wolDaeBrush, gx + 15, gy + 195, unitW - 30, 40);
+
+                        // 벽체 및 기둥
+                        g.FillRectangle(wallBrush, gx + 25, gy + 65, unitW - 50, 135);
+                        g.FillRectangle(colBrush, gx + 38, gy + 65, 28, 135);
+                        g.FillRectangle(colBrush, gx + unitW - 66, gy + 65, 28, 135);
+                        g.FillRectangle(colBrush, gx + 196, gy + 65, 28, 135);
                     }
 
-                    // 궁궐 다포계 곡선 팔작지붕
+                    // 오방색 단청 띠 (Five-Color Dancheong Patterns)
+                    using (var dancheongBlue = new SolidBrush(Color.FromArgb(35, 95, 175)))
+                    using (var dancheongGreen = new SolidBrush(Color.FromArgb(40, 135, 95)))
+                    using (var dancheongGold = new SolidBrush(Color.FromArgb(235, 195, 55)))
+                    {
+                        g.FillRectangle(dancheongBlue, gx + 25, gy + 55, unitW - 50, 6);
+                        g.FillRectangle(dancheongGreen, gx + 25, gy + 61, unitW - 50, 5);
+                        g.FillRectangle(dancheongGold, gx + 25, gy + 66, unitW - 50, 4);
+                    }
+
+                    // 궁궐 다포계 곡선 팔작지붕 (Royal Hip-and-Gable Roof)
                     Point[] roofPts =
                     {
-                        new Point(gx - 25, gy + 65),
-                        new Point(gx + unitW / 2, gy),
-                        new Point(gx + unitW + 25, gy + 65)
+                        new Point(gx - 28, gy + 62),
+                        new Point(gx + unitW / 2, gy - 12),
+                        new Point(gx + unitW + 28, gy + 62),
+                        new Point(gx + unitW + 16, gy + 74),
+                        new Point(gx + unitW / 2, gy + 26),
+                        new Point(gx - 16, gy + 74)
                     };
-                    using (var roofBrush = new SolidBrush(Color.FromArgb(22, 22, 30)))
-                    using (var goldPen = new Pen(Color.FromArgb(245, 200, 60), 4f))
+                    using (var roofBrush = new SolidBrush(Color.FromArgb(22, 24, 32)))
+                    using (var goldPen = new Pen(Color.FromArgb(245, 205, 60), 4f))
                     {
                         g.FillPolygon(roofBrush, roofPts);
                         g.DrawLines(goldPen, roofPts);
                     }
 
-                    // 중앙 홍예문 (아치형 대문)
-                    int archX = gx + unitW / 2 - 45;
-                    using (var archBrush = new SolidBrush(Color.FromArgb(15, 12, 18)))
+                    // 어처구니 / 잡상 기와 장식 (Roof Ridge Guardian Figurines)
+                    using (var japsangBrush = new SolidBrush(Color.FromArgb(35, 38, 48)))
                     {
-                        g.FillRectangle(archBrush, archX, gy + 110, 90, 120);
-                        g.FillPie(archBrush, archX, gy + 75, 90, 70, 180, 180);
+                        for (int j = 1; j <= 5; j++)
+                        {
+                            int jxL = gx - 16 + j * 16;
+                            int jyL = gy + 60 - j * 8;
+                            g.FillRectangle(japsangBrush, jxL, jyL, 5, 8);
+
+                            int jxR = gx + unitW + 16 - j * 16;
+                            int jyR = gy + 60 - j * 8;
+                            g.FillRectangle(japsangBrush, jxR, jyR, 5, 8);
+                        }
+                    }
+
+                    // 중앙 웅장한 홍예문 (Granite Arched Gate)
+                    int archX = gx + unitW / 2 - 48;
+                    using (var archBrush = new SolidBrush(Color.FromArgb(14, 12, 16)))
+                    using (var doorFrame = new Pen(Color.FromArgb(185, 180, 170), 3f))
+                    {
+                        g.FillRectangle(archBrush, archX, gy + 115, 96, 120);
+                        g.FillPie(archBrush, archX, gy + 75, 96, 80, 180, 180);
+                        g.DrawArc(doorFrame, archX, gy + 75, 96, 80, 180, 180);
                     }
                 }
             }
@@ -975,7 +1274,29 @@ namespace HanlangGame.Systems
             if (stage == 1 || stage == 2 || stage == 5)
             {
                 // 1, 2, 5장: 저잣거리 흙길 (원근 패럴랙스 차등 스크롤)
-                // 1) 수레바퀴 자국 (깊이 Y = 168f, 212f): 소실점 원근 트랙
+                // 1) 지평선 경계 들풀(Wild Grass) 클러스터 (패럴랙스 스크롤: 0.85배)
+                float grassCam = cameraX * 0.85f * PixelBuffer.Scale;
+                using (var grassDark = new SolidBrush(Color.FromArgb(90, 75, 115, 55)))
+                using (var grassLight = new SolidBrush(Color.FromArgb(120, 110, 155, 75)))
+                {
+                    for (int gx = -40; gx < PixelBuffer.Width + 40; gx += 32)
+                    {
+                        int posX = gx - (int)(grassCam % 32);
+                        float sway = (float)Math.Sin(gx * 0.3f);
+                        g.FillPolygon(grassDark, new Point[] {
+                            new Point(posX - 4, groundY),
+                            new Point(posX + (int)(sway * 3), groundY - 9),
+                            new Point(posX + 4, groundY)
+                        });
+                        g.FillPolygon(grassLight, new Point[] {
+                            new Point(posX, groundY),
+                            new Point(posX + 3 + (int)(sway * 2), groundY - 12),
+                            new Point(posX + 6, groundY)
+                        });
+                    }
+                }
+
+                // 2) 수레바퀴 자국 (깊이 Y = 168f, 212f): 소실점 원근 트랙
                 float trackY1 = 168f;
                 float trackY2 = 212f;
                 float sTrackY1 = trackY1 * PixelBuffer.Scale;
@@ -983,9 +1304,12 @@ namespace HanlangGame.Systems
 
                 using (var trackPen1 = new Pen(Color.FromArgb(35, groundLine.R, groundLine.G, groundLine.B), 4.5f))
                 using (var trackPen2 = new Pen(Color.FromArgb(50, groundLine.R, groundLine.G, groundLine.B), 7.5f))
+                using (var rutHighlight = new Pen(Color.FromArgb(25, 255, 255, 255), 1.5f))
                 {
                     g.DrawLine(trackPen1, 0, sTrackY1, PixelBuffer.Width, sTrackY1);
+                    g.DrawLine(rutHighlight, 0, sTrackY1 - 2, PixelBuffer.Width, sTrackY1 - 2);
                     g.DrawLine(trackPen2, 0, sTrackY2, PixelBuffer.Width, sTrackY2);
+                    g.DrawLine(rutHighlight, 0, sTrackY2 - 3, PixelBuffer.Width, sTrackY2 - 3);
                 }
 
                 // 수레바퀴 바큇자국 마디 텍스처 (하단 바큇자국이 더 빠르게 스크롤됨!)
@@ -1010,7 +1334,7 @@ namespace HanlangGame.Systems
                     }
                 }
 
-                // 2) 4단계 깊이별 자갈/모래알 (화면 아래쪽 자갈이 더 크고 훨씬 빠르게 이동!)
+                // 3) 4단계 깊이별 자갈/모래알 (화면 아래쪽 자갈이 더 크고 훨씬 빠르게 이동!)
                 (float bandY, float step, int w, int h, int alpha)[] bands =
                 {
                     (152f, 45f, 6, 4, 60),   // 원경 자갈: 작고 느리게 스크롤
@@ -1039,6 +1363,7 @@ namespace HanlangGame.Systems
                 // 3, 4, 6, 7, 8, 9장: 돌길 및 궁궐 박석 (원근 소실점 방사형 줄눈 & 행별 차등 스크롤)
                 using (var stonePen = new Pen(Color.FromArgb(85, groundLine.R, groundLine.G, groundLine.B), 1.8f))
                 using (var shadowPen = new Pen(Color.FromArgb(40, 0, 0, 0), 1.2f))
+                using (var bevelHighlight = new Pen(Color.FromArgb(35, 255, 255, 255), 1.2f))
                 {
                     // 1) 가로 줄눈: 전면으로 올수록 간격이 기하급수적으로 넓어지는 원근 깊이 배열
                     float[] depthRatios = { 0.0f, 0.08f, 0.18f, 0.31f, 0.47f, 0.66f, 0.84f, 1.0f };
@@ -1052,6 +1377,7 @@ namespace HanlangGame.Systems
                         {
                             g.DrawLine(shadowPen, 0, rowY[i] + 1f, PixelBuffer.Width, rowY[i] + 1f);
                             g.DrawLine(stonePen, 0, rowY[i], PixelBuffer.Width, rowY[i]);
+                            g.DrawLine(bevelHighlight, 0, rowY[i] - 1f, PixelBuffer.Width, rowY[i] - 1f);
                         }
                     }
 
@@ -1081,6 +1407,43 @@ namespace HanlangGame.Systems
                             {
                                 g.DrawLine(stonePen, sxTop, yTop, sxBot, yBot);
                             }
+                        }
+                    }
+
+                    // 3) 7, 8, 9장 궁궐: 중앙 어도(御道, 삼도 三道) - 임금이 걷는 중앙 특별 화강암 어도 라인 & 박석 요철
+                    if (stage >= 7)
+                    {
+                        float eodoCenterWorldX = StageWidth * 0.5f; // 스테이지 중앙
+                        float eodoHalfW = 42f; // 어도 반폭
+
+                        float eodoL_Top = Perspective.ProjectScreenX(eodoCenterWorldX - eodoHalfW, cameraX, 140f);
+                        float eodoL_Bot = Perspective.ProjectScreenX(eodoCenterWorldX - eodoHalfW, cameraX, 240f);
+                        float eodoR_Top = Perspective.ProjectScreenX(eodoCenterWorldX + eodoHalfW, cameraX, 140f);
+                        float eodoR_Bot = Perspective.ProjectScreenX(eodoCenterWorldX + eodoHalfW, cameraX, 240f);
+
+                        // 어도 중앙 장대석 경계선
+                        using var eodoBorderPen = new Pen(Color.FromArgb(120, 215, 185, 95), 2.5f);
+                        using var eodoFillBrush = new SolidBrush(Color.FromArgb(28, 255, 235, 180));
+                        PointF[] eodoPoly =
+                        {
+                            new PointF(eodoL_Top, groundY),
+                            new PointF(eodoR_Top, groundY),
+                            new PointF(eodoR_Bot, PixelBuffer.Height),
+                            new PointF(eodoL_Bot, PixelBuffer.Height)
+                        };
+                        g.FillPolygon(eodoFillBrush, eodoPoly);
+                        g.DrawLine(eodoBorderPen, eodoL_Top, groundY, eodoL_Bot, PixelBuffer.Height);
+                        g.DrawLine(eodoBorderPen, eodoR_Top, groundY, eodoR_Bot, PixelBuffer.Height);
+
+                        // 거친 박석(薄石) 자연 요철 스펙클 (Granite grain flecks)
+                        using var fleckBrush = new SolidBrush(Color.FromArgb(30, 20, 15, 25));
+                        for (int fl = 0; fl < 30; fl++)
+                        {
+                            float fwX = (fl * 43 + 17) % StageWidth;
+                            float fy = 145f + (fl * 7) % 90;
+                            float fx = Perspective.ProjectScreenX(fwX, cameraX, fy);
+                            float sy = Perspective.ProjectScreenY(fy, 0f);
+                            g.FillRectangle(fleckBrush, fx, sy, 3, 2);
                         }
                     }
                 }

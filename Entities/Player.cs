@@ -220,6 +220,9 @@ namespace HanlangGame.Entities
 
         public void HandleInput(Input input, System.Collections.Generic.List<WorldObject>? worldObjects = null, System.Collections.Generic.List<Enemy>? enemies = null)
         {
+            // 히트스탑(역경직) 중에는 입력 및 모션 전이 정지
+            if (IsInHitStop) return;
+
             // 비상 낙법 (Ukemi): 공중 피격 또는 쓰러지는 도중(Z > 0 및 지면 28px 이내) C키 입력 시 즉시 착지 기상! (사망 시 불가능)
             if (Status.CurrentHp > 0 && (State == "hit" || State == "down") && Z > 0 && Z < 28f)
             {
@@ -716,6 +719,9 @@ namespace HanlangGame.Entities
         {
             base.Update(dt);
 
+            // 히트스탑(역경직) 중에는 플레이어의 물리 이동 및 상태 갱신 일시 정지
+            if (IsInHitStop) return;
+
             if (InvincibleTimer > 0)
             {
                 InvincibleTimer -= dt;
@@ -851,7 +857,7 @@ namespace HanlangGame.Entities
             else if (State == "swing")
             {
                 Vx *= 0.5f;
-                if (StateTimer > 0.28f)
+                if (StateTimer > 0.15f)
                 {
                     State = "idle";
                     HasDealtDamage = false;

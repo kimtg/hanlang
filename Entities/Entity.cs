@@ -29,6 +29,15 @@ namespace HanlangGame.Entities
         public float StateTimer { get; set; } = 0f;
         public int AnimFrame { get; set; } = 0;
 
+        // 히트스탑 (Hit-Stop / 역경직): 타격 및 피격 순간 움직임 정지 타이머
+        public float HitStopTimer { get; set; } = 0f;
+        public bool IsInHitStop => HitStopTimer > 0f;
+
+        public void TriggerHitStop(float duration)
+        {
+            HitStopTimer = Math.Max(HitStopTimer, duration);
+        }
+
         public virtual RectangleF GetBaseHitbox()
         {
             // 바닥 충돌 및 2.5D 위치 판정
@@ -43,6 +52,21 @@ namespace HanlangGame.Entities
 
         public virtual void Update(float dt)
         {
+            // 히트스탑 중에는 물리 이동, 중력, 애니메이션 진행을 일시 정지(Freeze)
+            if (HitStopTimer > 0f)
+            {
+                if (dt <= HitStopTimer)
+                {
+                    HitStopTimer -= dt;
+                    return;
+                }
+                else
+                {
+                    dt -= HitStopTimer;
+                    HitStopTimer = 0f;
+                }
+            }
+
             // 2.5D 물리 이동
             X += Vx * dt;
             Y += Vy * dt;
