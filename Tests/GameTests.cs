@@ -2162,6 +2162,91 @@ namespace HanlangGame.Tests
                 Assert("1장부터 9장까지 사실적 배경 그래픽(하늘, 산맥, 건축물, 바닥) 정상 렌더링", allStagesRenderPass);
             }
 
+            // ====================================================
+            // Test 67: 캐릭터 다운(down) 상태 피격 시 경직/히트스탑 면역 및 2초 기상 타이머 보존 검증
+            // ====================================================
+            // 1) 플레이어가 쓰러져 있을 때 적에게 연속 공격받는 상황
+            var downPlayer = new Player(new StatusSystem());
+            downPlayer.X = 100f;
+            downPlayer.Y = 170f;
+            downPlayer.State = "down";
+            downPlayer.StateTimer = 0.6f;
+            downPlayer.HitStopTimer = 0f;
+            downPlayer.InvincibleTimer = 0f;
+            int initialPlayerHp = downPlayer.Status.CurrentHp;
+
+            var hittingEnemy = new Enemy(EnemyType.Thug, 110f, 170f, 1);
+            hittingEnemy.State = "punch";
+            hittingEnemy.StateTimer = 0.05f;
+            hittingEnemy.FacingRight = false;
+            hittingEnemy.HasDealtDamage = false;
+
+            var combat67 = new CombatSystem();
+            combat67.CheckCollisions(downPlayer, new List<Enemy> { hittingEnemy });
+
+            Assert("다운 상태 플레이어 피격 시 적의 공격 적중", hittingEnemy.HasDealtDamage);
+            Assert("다운 상태 플레이어 피격 시 데미지 정상 적용(HP 감소)", downPlayer.Status.CurrentHp < initialPlayerHp);
+            Assert("다운 상태 플레이어 피격 시 'down' 상태 유지 (hit 상태로 변경 안 됨)", downPlayer.State == "down");
+            Assert("다운 상태 플레이어 피격 시 히트스탑/역경직 면역 (HitStopTimer == 0)", downPlayer.HitStopTimer == 0f && !downPlayer.IsInHitStop);
+            Assert("다운 상태 플레이어 피격 시 기상 타이머 리셋되지 않고 보존됨 (>= 0.6초)", downPlayer.StateTimer >= 0.6f);
+
+            // 추가 피격 발생 시에도 기상 타이머 보존 및 2초 후 기상 보장
+            hittingEnemy.HasDealtDamage = false;
+            combat67.CheckCollisions(downPlayer, new List<Enemy> { hittingEnemy });
+            Assert("연속 피격 시에도 기상 타이머 리셋 없음 (>= 0.6초)", downPlayer.StateTimer >= 0.6f);
+
+            // 1.5초 추가 경과 (총 2.1초) -> 히트스탑에 방해받지 않고 온전히 기상
+            downPlayer.Update(1.5f);
+            Assert("다운 상태에서 공격을 연속으로 맞아도 2초 후 정상 기상 (idle 전이)", downPlayer.State == "idle");
+            Assert("기상 후 1.0초 무적 시간 획득", downPlayer.InvincibleTimer >= 1.0f);
+
+            // 2) 적이 쓰러져 있을 때 플레이어에게 연속 공격받는 상황
+            var test67DownEnemy = new Enemy(EnemyType.Thug, 120f, 170f, 1);
+            test67DownEnemy.State = "down";
+            test67DownEnemy.StateTimer = 0.8f;
+            test67DownEnemy.HitStopTimer = 0f;
+            int test67InitialEnemyHp = test67DownEnemy.CurrentHp;
+
+            var hittingPlayer = new Player(new StatusSystem());
+            hittingPlayer.X = 110f;
+            hittingPlayer.Y = 170f;
+            hittingPlayer.FacingRight = true;
+            hittingPlayer.State = "punch";
+            hittingPlayer.CurrentAttackType = "punch";
+            hittingPlayer.HasDealtDamage = false;
+
+            combat67.CheckCollisions(hittingPlayer, new List<Enemy> { test67DownEnemy });
+
+            Assert("다운 상태 적 피격 시 플레이어 공격 적중", hittingPlayer.HasDealtDamage);
+            Assert("다운 상태 적 피격 시 데미지 정상 적용(HP 감소)", test67DownEnemy.CurrentHp < test67InitialEnemyHp);
+            Assert("다운 상태 적 피격 시 'down' 상태 유지", test67DownEnemy.State == "down");
+            Assert("다운 상태 적 피격 시 히트스탑 면역 (HitStopTimer == 0)", test67DownEnemy.HitStopTimer == 0f && !test67DownEnemy.IsInHitStop);
+            Assert("다운 상태 적 피격 시 기상 타이머 리셋되지 않고 보존됨 (>= 0.8초)", test67DownEnemy.StateTimer >= 0.8f);
+
+            // 1.3초 추가 경과 (총 2.1초) -> 히트스탑에 방해받지 않고 온전히 기상
+            test67DownEnemy.Update(1.3f);
+            Assert("다운 상태 적도 연속 피격과 무관하게 2초 후 정상 기상 (idle 전이)", test67DownEnemy.State == "idle");
+
+            // 3) 투척 물체에 피격되어도 다운된 적의 기상 타이머가 보존되는지 검증
+            var downEnemy2 = new Enemy(EnemyType.Thug, 150f, 170f, 1);
+            downEnemy2.State = "down";
+            downEnemy2.StateTimer = 1.0f;
+            int hpBeforeThrow = downEnemy2.CurrentHp;
+
+            var thrownRock = new WorldObject(ObjectType.Rock, 140f, 170f)
+            {
+                IsFlying = true,
+                ThrownByPlayer = true,
+                Vx = 200f
+            };
+            combat67.CheckCollisions(new Player(new StatusSystem()) { X = 0f, Y = 170f }, new List<Enemy> { downEnemy2 }, new List<WorldObject> { thrownRock });
+
+            Assert("투척물에 맞은 다운 적 데미지 입음", downEnemy2.CurrentHp < hpBeforeThrow);
+            Assert("투척물에 맞아도 다운 적 히트스탑 면역", downEnemy2.HitStopTimer == 0f);
+            Assert("투척물에 맞아도 다운 적 기상 타이머 보존 (>= 1.0초)", downEnemy2.StateTimer >= 1.0f);
+            downEnemy2.Update(1.1f);
+            Assert("투척물에 피격된 후에도 2초 후 정상 기상", downEnemy2.State == "idle");
+
             Console.WriteLine("----------------------------------------------------");
             Console.WriteLine($" 총 테스트 결과: {passed} / {total} 통과 ({(passed == total ? "100% 성공" : "실패 항목 있음")})");
             Console.WriteLine("====================================================");

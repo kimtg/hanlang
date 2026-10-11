@@ -1143,7 +1143,20 @@ namespace HanlangGame.Entities
             guarded = false;
             counterHit = false;
 
-            if (InvincibleTimer > 0 || State == "down") return;
+            if (InvincibleTimer > 0) return;
+
+            // 쓰러진 상태(down)에서 피격 시: 데미지는 입되 경직(hit 전이, 넉백, 기상 타이머 리셋, 히트스탑) 발생 금지!
+            if (State == "down")
+            {
+                int actualDmg = damage;
+                if (Status.HasRelic("cheolgap")) actualDmg = Math.Max(1, actualDmg - 4);
+
+                Status.CurrentHp = Math.Max(0, Status.CurrentHp - actualDmg);
+                SoundSynth.PlayHit();
+                HitStopTimer = 0f; // 역경직/히트스탑 면역
+                // State 및 StateTimer는 리셋하지 않고 보존하여 2초 기상 타이머 정상 진행
+                return;
+            }
 
             // 도깨비 감투 유물: 대시(달리기) 중 완전 무적
             if (State == "run" && Status.HasRelic("dokkaebi")) return;
@@ -1185,6 +1198,7 @@ namespace HanlangGame.Entities
                     Status.CurrentHp = 0;
                     State = "down";
                     StateTimer = 0f;
+                    HitStopTimer = 0f;
                     Vz = 120f;
                     Vx = knockbackDir * 100f;
                 }
@@ -1218,6 +1232,7 @@ namespace HanlangGame.Entities
                 Status.CurrentHp = 0;
                 State = "down";
                 StateTimer = 0f;
+                HitStopTimer = 0f;
                 Vz = 120f;
                 Vx = knockbackDir * (counterHit ? 120f : 100f);
             }
@@ -1236,6 +1251,7 @@ namespace HanlangGame.Entities
                 {
                     State = "down";
                     StateTimer = 0f;
+                    HitStopTimer = 0f;
                     Vz = 120f;
                     Vx = knockbackDir * (counterHit ? 120f : 100f);
                 }

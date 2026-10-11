@@ -531,14 +531,24 @@ namespace HanlangGame.Entities
                 IsRaging = true;
             }
 
-            bool wasAlreadyDownOrFlying = State == "down" || IsFlying;
+            // 쓰러진 상태(down)에서 피격 시: 데미지는 이미 입었으므로 경직(hit 전이, 넉백, 체공, 기상 타이머 리셋, 히트스탑) 없이 반환!
+            if (State == "down")
+            {
+                isKnockedDown = false;
+                HitStopTimer = 0f; // 역경직/히트스탑 면역
+                // State 및 StateTimer는 리셋하지 않고 보존하여 2초 기상 타이머 정상 진행
+                return;
+            }
 
-            if (CurrentHp <= 0 || wasAlreadyDownOrFlying || damage >= (IsBossType && IsRaging ? 32 : 22))
+            bool wasFlying = IsFlying;
+
+            if (CurrentHp <= 0 || wasFlying || damage >= (IsBossType && IsRaging ? 32 : 22))
             {
                 isKnockedDown = true;
                 State = "down";
                 StateTimer = 0f;
-                if (!wasAlreadyDownOrFlying)
+                HitStopTimer = 0f;
+                if (!wasFlying)
                 {
                     Vz = 135f;
                     Vx = knockbackDir * 110f;
@@ -560,6 +570,7 @@ namespace HanlangGame.Entities
                     isKnockedDown = true;
                     State = "down";
                     StateTimer = 0f;
+                    HitStopTimer = 0f;
                     Vz = 135f;
                     Vx = knockbackDir * 110f;
                 }

@@ -285,7 +285,7 @@ namespace HanlangGame.Systems
 
                 foreach (var enemy in enemies)
                 {
-                    if (enemy.IsDead || enemy.State == "down") continue;
+                    if (enemy.IsDead) continue;
 
                     // 2.5D 깊이 Y 판정 (같은 선상 +-15픽셀 내에 있어야 적중)
                     if (Math.Abs(player.Y - enemy.Y) > 15f) continue;
@@ -298,6 +298,7 @@ namespace HanlangGame.Systems
                         {
                             player.HasDealtDamage = true;
                         }
+                        bool wasEnemyAlreadyDown = (enemy.State == "down");
 
                         int damage = player.CurrentAttackType switch
                         {
@@ -397,58 +398,61 @@ namespace HanlangGame.Systems
                         // 콤보 및 스타일 랭크 등록
                         RegisterHit(player, enemy, damage);
 
-                        // 제2 비기 용비어천격: 적을 공중으로 솟구쳐 띄움 (Airborne Juggle)
-                        if (player.CurrentAttackType == "dragon")
+                        // 제2 비기 용비어천격: 적을 공중으로 솟구쳐 띄움 (Airborne Juggle) - 이미 쓰러진 적에게는 리셋 미적용
+                        if (!wasEnemyAlreadyDown)
                         {
-                            enemy.State = "down";
-                            enemy.StateTimer = 0f;
-                            enemy.Vz = 240f;
-                            enemy.Vx = knockDir * 60f;
-                        }
-                        else if (player.CurrentAttackType == "ex_dragon")
-                        {
-                            enemy.State = "down";
-                            enemy.StateTimer = 0f;
-                            enemy.Vz = 340f;
-                            enemy.Vx = knockDir * 120f;
-                            OnScreenShake?.Invoke(5.5f, 0.3f);
-                        }
-                        else if (player.CurrentAttackType == "ex_spin")
-                        {
-                            float pullDir = Math.Sign(player.X - enemy.X);
-                            enemy.Vx = pullDir * 160f;
-                            enemy.State = "hit";
-                            enemy.StateTimer = 0f;
-                        }
-                        else if (player.CurrentAttackType == "ex_wave")
-                        {
-                            enemy.State = "down";
-                            enemy.StateTimer = 0f;
-                            enemy.Vx = knockDir * 200f;
-                            enemy.Vz = 90f;
-                        }
-                        else if (player.CurrentAttackType == "cudgel_swing")
-                        {
-                            enemy.State = "down";
-                            enemy.StateTimer = 0f;
-                            enemy.Vx = knockDir * 140f;
-                            enemy.Vz = 60f;
-                        }
+                            if (player.CurrentAttackType == "dragon")
+                            {
+                                enemy.State = "down";
+                                enemy.StateTimer = 0f;
+                                enemy.Vz = 240f;
+                                enemy.Vx = knockDir * 60f;
+                            }
+                            else if (player.CurrentAttackType == "ex_dragon")
+                            {
+                                enemy.State = "down";
+                                enemy.StateTimer = 0f;
+                                enemy.Vz = 340f;
+                                enemy.Vx = knockDir * 120f;
+                                OnScreenShake?.Invoke(5.5f, 0.3f);
+                            }
+                            else if (player.CurrentAttackType == "ex_spin")
+                            {
+                                float pullDir = Math.Sign(player.X - enemy.X);
+                                enemy.Vx = pullDir * 160f;
+                                enemy.State = "hit";
+                                enemy.StateTimer = 0f;
+                            }
+                            else if (player.CurrentAttackType == "ex_wave")
+                            {
+                                enemy.State = "down";
+                                enemy.StateTimer = 0f;
+                                enemy.Vx = knockDir * 200f;
+                                enemy.Vz = 90f;
+                            }
+                            else if (player.CurrentAttackType == "cudgel_swing")
+                            {
+                                enemy.State = "down";
+                                enemy.StateTimer = 0f;
+                                enemy.Vx = knockDir * 140f;
+                                enemy.Vz = 60f;
+                            }
 
-                        // 공중 추격타 (Airborne Juggle Spike): 급강하 슬램!
-                        if (isAirJuggle)
-                        {
-                            enemy.State = "down";
-                            enemy.StateTimer = 0f;
-                            enemy.Vz = -280f; // 지면으로 급강하 슬램!
-                            enemy.Vx = knockDir * 110f;
-                            OnScreenShake?.Invoke(4.6f, 0.22f);
-                            OnHitStop?.Invoke(0.065f);
-                            player.TriggerHitStop(0.15f);
-                            enemy.TriggerHitStop(0.22f);
-                            AddHitSparks(enemy.X, enemy.Y - enemy.Z - 16f, count: 12);
-                            AddDust(enemy.X, enemy.Y, count: 6);
-                            Bubbles.Add(new SpeechBubble("공중 강타!", enemy.X, enemy.Y - enemy.Z - enemy.Height - 18f));
+                            // 공중 추격타 (Airborne Juggle Spike): 급강하 슬램!
+                            if (isAirJuggle)
+                            {
+                                enemy.State = "down";
+                                enemy.StateTimer = 0f;
+                                enemy.Vz = -280f; // 지면으로 급강하 슬램!
+                                enemy.Vx = knockDir * 110f;
+                                OnScreenShake?.Invoke(4.6f, 0.22f);
+                                OnHitStop?.Invoke(0.065f);
+                                player.TriggerHitStop(0.15f);
+                                enemy.TriggerHitStop(0.22f);
+                                AddHitSparks(enemy.X, enemy.Y - enemy.Z - 16f, count: 12);
+                                AddDust(enemy.X, enemy.Y, count: 6);
+                                Bubbles.Add(new SpeechBubble("공중 강타!", enemy.X, enemy.Y - enemy.Z - enemy.Height - 18f));
+                            }
                         }
 
                         // 타격감 극대화: 공격자와 맞은 캐릭터 일시 멈춤(Hit-Stop Freeze), 충격 스파크 방출!
@@ -464,9 +468,12 @@ namespace HanlangGame.Systems
                         float atkFreeze = isExOrSpecial ? 0.160f : (isHeavy ? 0.135f : 0.080f);
                         float defFreeze = isExOrSpecial ? 0.220f : (isHeavy ? 0.180f : 0.120f);
                         player.TriggerHitStop(atkFreeze);
-                        enemy.TriggerHitStop(defFreeze);
-                        OnScreenShake?.Invoke(isHeavy ? 3.8f : 1.8f, isHeavy ? 0.22f : 0.09f);
-                        OnHitStop?.Invoke(isHeavy ? 0.055f : 0.025f);
+                        if (!wasEnemyAlreadyDown)
+                        {
+                            enemy.TriggerHitStop(defFreeze);
+                            OnScreenShake?.Invoke(isHeavy ? 3.8f : 1.8f, isHeavy ? 0.22f : 0.09f);
+                            OnHitStop?.Invoke(isHeavy ? 0.055f : 0.025f);
+                        }
                         float hitSparkY = (player.CurrentAttackType == "jumpkick") ? (player.Y - player.Z - 12f) : (enemy.Y - enemy.Z - 16f);
                         AddHitSparks(enemy.X, hitSparkY, count: isHeavy ? 9 : 5);
 
@@ -603,7 +610,7 @@ namespace HanlangGame.Systems
                         // 플레이어가 던지거나 굴린 물체 -> 적 피격 판정
                         foreach (var enemy in enemies)
                         {
-                            if (enemy.IsDead || enemy.State == "down") continue;
+                            if (enemy.IsDead) continue;
                             if (Math.Abs(obj.Y - enemy.Y) > 18f) continue;
 
                             var enemyBody = enemy.GetBodyHitbox();
@@ -625,10 +632,11 @@ namespace HanlangGame.Systems
                                 float dir = Math.Sign(obj.Vx);
                                 if (dir == 0) dir = 1f;
 
-                                enemy.TriggerHitStop(0.18f);
+                                bool wasEnemyAlreadyDown = (enemy.State == "down");
+                                if (!wasEnemyAlreadyDown) enemy.TriggerHitStop(0.18f);
                                 obj.TriggerHitStop(0.12f);
                                 enemy.TakeDamage(throwDamage, dir, out _);
-                                if (obj.Type == ObjectType.Barrel || obj.Type == ObjectType.Cart || obj.Type == ObjectType.Bench)
+                                if (!wasEnemyAlreadyDown && (obj.Type == ObjectType.Barrel || obj.Type == ObjectType.Cart || obj.Type == ObjectType.Bench))
                                 {
                                     // 술통, 대형 수레, 평상에 부딪힌 적은 바닥으로 굴러넘어짐!
                                     enemy.State = "down";
@@ -780,7 +788,7 @@ namespace HanlangGame.Systems
 
                 foreach (var target in enemies)
                 {
-                    if (target == thrownEnemy || target.IsDead || target.State == "down") continue;
+                    if (target == thrownEnemy || target.IsDead) continue;
                     if (Math.Abs(thrownEnemy.Y - target.Y) > 16f) continue;
 
                     if (thrownEnemy.GetBodyHitbox().IntersectsWith(target.GetBodyHitbox()))
@@ -788,7 +796,8 @@ namespace HanlangGame.Systems
                         float dir = Math.Sign(thrownEnemy.Vx);
                         if (dir == 0) dir = 1f;
 
-                        target.TriggerHitStop(0.18f);
+                        bool wasTargetAlreadyDown = (target.State == "down");
+                        if (!wasTargetAlreadyDown) target.TriggerHitStop(0.18f);
                         thrownEnemy.TriggerHitStop(0.18f);
                         target.TakeDamage(25, dir, out _);
                         thrownEnemy.TakeDamage(18, -dir, out _);
@@ -858,6 +867,7 @@ namespace HanlangGame.Systems
                         {
                             enemy.HasDealtDamage = true;
                             float knockDir = enemy.FacingRight ? 1f : -1f;
+                            bool wasPlayerAlreadyDown = (player.State == "down");
                             player.TakeDamage(enemy.AttackPower, knockDir, out bool parried, out bool guarded, out bool counterHit);
 
                             if (parried)
@@ -914,12 +924,15 @@ namespace HanlangGame.Systems
                             }
                             else
                             {
-                                // 통상 피격 (다운 전이 시 강한 충격 연출)
+                                // 통상 피격 (다운 전이 시 강한 충격 연출, 이미 누워있는 경우 기상 타이머를 방해하는 히트스탑/흔들림 금지)
                                 bool isKnockedDown = player.State == "down";
                                 enemy.TriggerHitStop(0.10f);
-                                player.TriggerHitStop(isKnockedDown ? 0.20f : 0.14f);
-                                OnScreenShake?.Invoke(isKnockedDown ? 4.0f : 2.4f, isKnockedDown ? 0.22f : 0.14f);
-                                OnHitStop?.Invoke(isKnockedDown ? 0.065f : 0.045f);
+                                if (!wasPlayerAlreadyDown)
+                                {
+                                    player.TriggerHitStop(isKnockedDown ? 0.20f : 0.14f);
+                                    OnScreenShake?.Invoke(isKnockedDown ? 4.0f : 2.4f, isKnockedDown ? 0.22f : 0.14f);
+                                    OnHitStop?.Invoke(isKnockedDown ? 0.065f : 0.045f);
+                                }
                                 AddHitSparks(player.X, player.Y - player.Z - 16f, count: isKnockedDown ? 10 : 7);
 
                                 // 플레이어 머리 위에 선홍색 피격 데미지 숫자 생성!
