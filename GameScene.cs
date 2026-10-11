@@ -664,14 +664,16 @@ namespace HanlangGame
                     _buffer.DrawRoundedRect(cx, cy, cardW, cardH, 14f, Color.FromArgb(120, 110, 130), 2f);
                 }
 
+                float cardCenterX = cx + (cardW / 2f);
+
                 // 카드 상단 한자 뱃지
                 _buffer.FillRoundedRect(cx + 15, cy + 16, cardW - 30, 56, 8f, Color.FromArgb(220, 18, 16, 26));
                 _buffer.DrawRoundedRect(cx + 15, cy + 16, cardW - 30, 56, 8f, relic.Color, 1.5f);
-                _buffer.DrawOutlinedTextCentered(relic.Hanja, cy + 24, relic.Color, Color.Black, _buffer.FontTitle, 2f);
+                _buffer.DrawOutlinedTextCenteredAt(relic.Hanja, cardCenterX, cy + 24, relic.Color, Color.Black, _buffer.FontTitle, 2f);
 
                 // 유물 이름
                 Color nameCol = isSelected ? Color.FromArgb(255, 240, 100) : Color.FromArgb(240, 240, 240);
-                _buffer.DrawOutlinedTextCentered(relic.Name, cy + 90, nameCol, Color.Black, _buffer.FontSubtitle, 1.8f);
+                _buffer.DrawOutlinedTextCenteredAt(relic.Name, cardCenterX, cy + 90, nameCol, Color.Black, _buffer.FontSubtitle, 1.8f);
 
                 // 분할선
                 _buffer.DrawLine(cx + 25, cy + 130, cx + cardW - 25, cy + 130, Color.FromArgb(150, 130, 90), 1.5f);
@@ -681,7 +683,7 @@ namespace HanlangGame
                 int effY = cy + 148;
                 foreach (var line in words)
                 {
-                    _buffer.DrawOutlinedTextCentered(line, effY, Color.FromArgb(220, 225, 235), Color.Black, _buffer.FontBody, 1.2f);
+                    _buffer.DrawOutlinedTextCenteredAt(line, cardCenterX, effY, Color.FromArgb(220, 225, 235), Color.Black, _buffer.FontBody, 1.2f);
                     effY += 28;
                 }
 
@@ -689,7 +691,7 @@ namespace HanlangGame
                 if (isSelected)
                 {
                     _buffer.FillRoundedRect(cx + 30, cy + cardH - 52, cardW - 60, 36, 6f, Color.FromArgb(230, 200, 50));
-                    _buffer.DrawOutlinedTextCentered("★ 전 승 ★", cy + cardH - 46, Color.FromArgb(40, 20, 10), Color.Transparent, _buffer.FontHeader, 1.5f);
+                    _buffer.DrawOutlinedTextCenteredAt("★ 전 승 ★", cardCenterX, cy + cardH - 46, Color.FromArgb(40, 20, 10), Color.Transparent, _buffer.FontHeader, 1.5f);
                 }
             }
 

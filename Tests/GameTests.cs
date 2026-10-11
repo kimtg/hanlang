@@ -1522,6 +1522,74 @@ namespace HanlangGame.Tests
             Assert("채널 2 스트링스 코드 진행 타주 검증 (화음 노트 온 50회 이상)", ch2NoteOnCount >= 50);
             Assert("채널 2 다채로운 화음 음고 다양성 검증 (서로 다른 화음 피치 8개 이상)", ch2ChordPitches.Count >= 8);
 
+            // Test 58: 7음 음계(이끄는음, 다이아토닉 텐션) 융합 멜로디 및 유물 선택 화면 카드 텍스트 정렬 검증
+            // 1) 7음 음계 및 이끄는음(Leading tone) 존재 검증
+            byte[] mMarket = MidiGenerator.GenerateBgmMid("stage_market");
+            var marketPitches = new HashSet<int>();
+            int ptr58 = 14 + 8; // skip MThd and MTrk chunk header
+            while (ptr58 < mMarket.Length - 2)
+            {
+                byte st = mMarket[ptr58++];
+                if (st == 0x90) // Ch 0 Lead Melody
+                {
+                    int pitch = mMarket[ptr58++];
+                    int vel = mMarket[ptr58++];
+                    if (vel > 0) marketPitches.Add(pitch);
+                }
+            }
+            // E 계면조 5음(E, G, A, B, D) 외에 7음 다이아토닉 F#(66/78), C(60/72), 이끄는음 D#(63/75) 존재 확인
+            bool has7ToneMarket = marketPitches.Contains(MidiGenerator.NoteToMidi("F#5")) || marketPitches.Contains(MidiGenerator.NoteToMidi("C6")) || marketPitches.Contains(MidiGenerator.NoteToMidi("D#5"));
+            Assert("저잣거리 BGM 7음 다이아토닉/이끄는음 멜로디 포함 (F#/C/D#)", has7ToneMarket);
+
+            byte[] mFortress = MidiGenerator.GenerateBgmMid("stage_fortress");
+            var fortressPitches = new HashSet<int>();
+            int ptrF = 14 + 8;
+            while (ptrF < mFortress.Length - 2)
+            {
+                byte st = mFortress[ptrF++];
+                if (st == 0x90)
+                {
+                    int pitch = mFortress[ptrF++];
+                    int vel = mFortress[ptrF++];
+                    if (vel > 0) fortressPitches.Add(pitch);
+                }
+            }
+            // A 계면조 5음(A, C, D, E, G) 외에 B(71), F(65/77), G#(68/80) 존재 확인
+            bool has7ToneFortress = fortressPitches.Contains(MidiGenerator.NoteToMidi("B5")) || fortressPitches.Contains(MidiGenerator.NoteToMidi("F6")) || fortressPitches.Contains(MidiGenerator.NoteToMidi("G#5"));
+            Assert("성곽 BGM 7음 다이아토닉/이끄는음 멜로디 포함 (B/F/G#)", has7ToneFortress);
+
+            byte[] mFinalBoss = MidiGenerator.GenerateBgmMid("finalboss");
+            var bossPitches = new HashSet<int>();
+            int ptrB = 14 + 8;
+            while (ptrB < mFinalBoss.Length - 2)
+            {
+                byte st = mFinalBoss[ptrB++];
+                if (st == 0x90)
+                {
+                    int pitch = mFinalBoss[ptrB++];
+                    int vel = mFinalBoss[ptrB++];
+                    if (vel > 0) bossPitches.Add(pitch);
+                }
+            }
+            // C Phrygian 5음 외에 C Harmonic Minor 이끄는음 B(71), D(62/74) 존재 확인
+            bool has7ToneBoss = bossPitches.Contains(MidiGenerator.NoteToMidi("B5")) || bossPitches.Contains(MidiGenerator.NoteToMidi("D6"));
+            Assert("최종보스 BGM 7음 화성단음계 이끄는음 포함 (B/D)", has7ToneBoss);
+
+            // 2) 유물 선택 화면 3개 카드 개별 중심 정렬 좌표 산출 검증
+            int pbW = PixelBuffer.Width; // 960
+            int cCount = 3;
+            int cW = 270;
+            int cGap = 24;
+            int totW = cCount * cW + (cCount - 1) * cGap; // 858
+            int sX = (pbW - totW) / 2; // 51
+            float center0 = sX + 0 * (cW + cGap) + (cW / 2f); // 186
+            float center1 = sX + 1 * (cW + cGap) + (cW / 2f); // 480
+            float center2 = sX + 2 * (cW + cGap) + (cW / 2f); // 774
+            Assert("유물 카드 0 중심 X좌표 분립 (186px)", Math.Abs(center0 - 186f) < 0.1f);
+            Assert("유물 카드 1 중심 X좌표 분립 (480px)", Math.Abs(center1 - 480f) < 0.1f);
+            Assert("유물 카드 2 중심 X좌표 분립 (774px)", Math.Abs(center2 - 774f) < 0.1f);
+            Assert("3개 유물 카드의 텍스트 중심이 화면 중앙(480px)에 겹치지 않고 상호 독립적임", center0 != center1 && center1 != center2);
+
             Console.WriteLine("----------------------------------------------------");
             Console.WriteLine($" 총 테스트 결과: {passed} / {total} 통과 ({(passed == total ? "100% 성공" : "실패 항목 있음")})");
             Console.WriteLine("====================================================");

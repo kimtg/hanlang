@@ -143,6 +143,13 @@ namespace HanlangGame.Engine
             DrawOutlinedText(text, x, y, textColor, outlineColor, font, outlineWidth);
         }
 
+        public void DrawOutlinedTextCenteredAt(string text, float centerX, float y, Color textColor, Color outlineColor, Font font, float outlineWidth = 2.5f)
+        {
+            var size = Graphics.MeasureString(text, font);
+            float x = centerX - (size.Width / 2f);
+            DrawOutlinedText(text, x, y, textColor, outlineColor, font, outlineWidth);
+        }
+
         public void DrawText(string text, int x, int y, Color color, bool large = false, bool tiny = false)
         {
             Font font = large ? FontSubtitle : (tiny ? FontSmall : FontHeader);

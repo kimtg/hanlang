@@ -131,7 +131,7 @@ namespace HanlangGame.UI
 
             // 카드 타이틀 바
             buffer.FillRoundedRect(x, y, w, 36, 8f, themeCol);
-            buffer.DrawOutlinedTextCentered(title, y + 8, Color.FromArgb(255, 245, 210), Color.FromArgb(20, 15, 25), buffer.FontSubtitle, 1.8f);
+            buffer.DrawOutlinedTextCenteredAt(title, x + (w / 2f), y + 8, Color.FromArgb(255, 245, 210), Color.FromArgb(20, 15, 25), buffer.FontSubtitle, 1.8f);
 
             int itemY = y + 46;
             foreach (var (header, desc, headerCol) in items)

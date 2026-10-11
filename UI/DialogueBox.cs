@@ -152,7 +152,7 @@ namespace HanlangGame.UI
 
                 buffer.FillRoundedRect(tagX, tagY, tagW, tagH, 8f, Color.FromArgb(245, 30, 25, 35));
                 buffer.DrawRoundedRect(tagX, tagY, tagW, tagH, 8f, nameCol, 2.5f);
-                buffer.DrawOutlinedTextCentered(speaker, tagY + 8, nameCol, Color.Black, buffer.FontSubtitle, 2f);
+                buffer.DrawOutlinedTextCenteredAt(speaker, tagX + (tagW / 2f), tagY + 8, nameCol, Color.Black, buffer.FontSubtitle, 2f);
 
                 // 텍스트 출력 (글자 타이핑 효과)
                 int charCount = Math.Min(line.Length, (int)_charRevealTimer);
@@ -163,7 +163,7 @@ namespace HanlangGame.UI
                 // 다음 진행 안내 깜빡임
                 if (((int)(DateTime.UtcNow.Millisecond / 300) % 2 == 0))
                 {
-                    buffer.DrawOutlinedText("[ Z / ENTER : 계속 ]", boxX + boxW - 170, boxY + boxH - 28, Color.FromArgb(255, 225, 90), Color.Black, buffer.FontBody, 1.5f);
+                    buffer.DrawOutlinedText("[ ENTER : 계속 ]", boxX + boxW - 170, boxY + boxH - 28, Color.FromArgb(255, 225, 90), Color.Black, buffer.FontBody, 1.5f);
                 }
             }
 
