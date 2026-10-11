@@ -48,6 +48,13 @@ namespace HanlangGame.Entities
         public bool HasDealtDamage { get; set; } = false;
         public string CurrentAttackType { get; set; } = "";
 
+        // 피격 시 넉다운(쓰러짐) 확률 (기본 20%)
+        public float KnockdownChance { get; set; } = 0.20f;
+        public Random KnockdownRng { get; set; } = new Random();
+
+        // 잡은 적 투척 시 데미지 콜백
+        public Action<Enemy, int>? OnCarriedEnemyThrown { get; set; }
+
         public Player(StatusSystem status)
         {
             Status = status;
@@ -72,6 +79,48 @@ namespace HanlangGame.Entities
                 CarriedEnemy.State = "down";
                 CarriedEnemy.Z = 0f;
                 CarriedEnemy = null;
+                CarriedEnemyTimer = 0f;
+            }
+        }
+
+        public void SyncCarriedPositions()
+        {
+            if (CarriedObject != null)
+            {
+                CarriedObject.X = X;
+                CarriedObject.Y = Y;
+                CarriedObject.Z = Z + Height + 2f;
+                CarriedObject.FacingRight = FacingRight;
+                CarriedObject.IsCarried = true;
+                CarriedObject.IsFlying = false;
+                CarriedObject.IsRolling = false;
+                CarriedObject.Vx = 0f;
+                CarriedObject.Vy = 0f;
+                CarriedObject.Vz = 0f;
+            }
+            if (EquippedWeapon != null)
+            {
+                EquippedWeapon.X = X + (FacingRight ? 12f : -12f);
+                EquippedWeapon.Y = Y;
+                EquippedWeapon.Z = Z + 14f;
+                EquippedWeapon.FacingRight = FacingRight;
+                EquippedWeapon.IsCarried = true;
+                EquippedWeapon.IsFlying = false;
+                EquippedWeapon.Vx = 0f;
+                EquippedWeapon.Vy = 0f;
+                EquippedWeapon.Vz = 0f;
+            }
+            if (CarriedEnemy != null)
+            {
+                CarriedEnemy.X = X;
+                CarriedEnemy.Y = Y;
+                CarriedEnemy.Z = Z + Height + 2f;
+                CarriedEnemy.FacingRight = FacingRight;
+                CarriedEnemy.IsCarried = true;
+                CarriedEnemy.IsFlying = false;
+                CarriedEnemy.Vx = 0f;
+                CarriedEnemy.Vy = 0f;
+                CarriedEnemy.Vz = 0f;
                 CarriedEnemyTimer = 0f;
             }
         }
@@ -130,11 +179,19 @@ namespace HanlangGame.Entities
                 CarriedEnemyTimer = 0f;
                 enemy.IsCarried = false;
                 enemy.IsFlying = true;
+                enemy.State = "down";
+                enemy.StateTimer = 0f;
                 enemy.X = X + (FacingRight ? 16f : -16f);
                 enemy.Y = Y;
                 enemy.Z = Z + 20f;
                 enemy.Vx = (FacingRight ? 1f : -1f) * 260f;
                 enemy.Vz = 100f;
+
+                // 쓰러진 캐릭터 투척 시 던져진 캐릭터에게 즉시 투척 피해 적용
+                int throwDamage = Status.PunchDamage + 10;
+                enemy.TakeDamage(throwDamage, FacingRight ? 1f : -1f, out _);
+                OnCarriedEnemyThrown?.Invoke(enemy, throwDamage);
+
                 SoundSynth.PlaySpecial();
             }
         }
@@ -852,12 +909,19 @@ namespace HanlangGame.Entities
                     {
                         var e = CarriedEnemy;
                         CarriedEnemy = null;
+                        CarriedEnemyTimer = 0f;
                         e.IsCarried = false;
                         e.IsFlying = true;
                         e.State = "down";
                         e.StateTimer = 0f;
                         e.Vx = (FacingRight ? 1f : -1f) * 280f;
                         e.Vz = 70f;
+
+                        // 쓰러진 캐릭터 자이언트 스윙 투척 시 던져진 캐릭터에게 스윙 피해 적용
+                        int swingDamage = 25;
+                        e.TakeDamage(swingDamage, FacingRight ? 1f : -1f, out _);
+                        OnCarriedEnemyThrown?.Invoke(e, swingDamage);
+
                         SoundSynth.PlaySpecial();
                     }
                     State = "idle";
@@ -932,8 +996,8 @@ namespace HanlangGame.Entities
             else if (State == "down")
             {
                 Vx *= 0.8f;
-                // 체력이 남아있을 때만 0.75초 후 기상, HP가 0 이하로 사망한 상태면 누워있음
-                if (StateTimer > 0.75f && Status.CurrentHp > 0)
+                // 체력이 남아있을 때만 2초(2.0f) 후 기상, HP가 0 이하로 사망한 상태면 누워있음
+                if (StateTimer > 2.0f && Status.CurrentHp > 0)
                 {
                     State = "idle";
                     InvincibleTimer = 1.0f; // 기상 후 1초 무적
@@ -1160,10 +1224,22 @@ namespace HanlangGame.Entities
                     return;
                 }
 
-                State = "hit";
-                StateTimer = 0f;
-                InvincibleTimer = counterHit ? 0.45f : 0.6f;
-                Vx = knockbackDir * (counterHit ? 110f : 80f);
+                // 20% 확률로 피격 시 넘어짐(down), 80% 확률로 일반 피격 경직(hit)
+                bool isKnockedDown = KnockdownRng.NextDouble() < KnockdownChance;
+                if (isKnockedDown)
+                {
+                    State = "down";
+                    StateTimer = 0f;
+                    Vz = 120f;
+                    Vx = knockbackDir * (counterHit ? 120f : 100f);
+                }
+                else
+                {
+                    State = "hit";
+                    StateTimer = 0f;
+                    InvincibleTimer = counterHit ? 0.45f : 0.6f;
+                    Vx = knockbackDir * (counterHit ? 110f : 80f);
+                }
             }
         }
 

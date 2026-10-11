@@ -1637,6 +1637,233 @@ namespace HanlangGame.Tests
             }
             Assert("타격 스파크가 바닥(그림자)이 아닌 공중 캐릭터 타격점(Y - Z - 12f)에 폭발", hasAirSpark);
 
+            // Test 60: 쓰러진 캐릭터 2초 기상 타이머 및 주인공 피격 시 20% 넉다운 확률 검증
+            // 1) 적(Enemy) 다운 후 1초/1.9초 시점에는 기상 불가, 2초 초과 시 기상(idle) 검증
+            var downTimerEnemy = new Enemy(EnemyType.Thug, 100f, 170f, 1);
+            downTimerEnemy.State = "down";
+            downTimerEnemy.StateTimer = 0f;
+            downTimerEnemy.Update(1.0f);
+            Assert("적은 1초 경과 시 여전히 쓰러진(down) 상태 유지", downTimerEnemy.State == "down");
+            downTimerEnemy.Update(0.9f); // 누적 1.9초
+            Assert("적은 1.9초 경과 시에도 여전히 쓰러진(down) 상태 유지", downTimerEnemy.State == "down");
+            downTimerEnemy.Update(0.2f); // 누적 2.1초
+            Assert("적은 2초 초과 경과 후 일어나 idle 상태로 전환", downTimerEnemy.State == "idle");
+
+            // 2) 주인공(Player) 다운 후 1초/1.9초 시점에는 기상 불가, 2초 초과 시 기상(idle & 1초 무적) 검증
+            var downTimerPlayer = new Player(new StatusSystem());
+            downTimerPlayer.State = "down";
+            downTimerPlayer.StateTimer = 0f;
+            downTimerPlayer.Update(1.0f);
+            Assert("주인공은 1초 경과 시 여전히 쓰러진(down) 상태 유지", downTimerPlayer.State == "down");
+            downTimerPlayer.Update(0.9f); // 누적 1.9초
+            Assert("주인공은 1.9초 경과 시에도 여전히 쓰러진(down) 상태 유지", downTimerPlayer.State == "down");
+            downTimerPlayer.Update(0.2f); // 누적 2.1초
+            Assert("주인공은 2초 초과 경과 후 일어나 idle 상태로 전환", downTimerPlayer.State == "idle");
+            Assert("주인공 기상 후 1.0초 무적 시간 획득", downTimerPlayer.InvincibleTimer >= 1.0f);
+
+            // 3) 주인공 피격 시 넉다운(20% 확률) 결정성 검증
+            var kdTestPlayer1 = new Player(new StatusSystem());
+            kdTestPlayer1.KnockdownChance = 1.0f; // 100% 넉다운 모드
+            kdTestPlayer1.TakeDamage(10, 1f);
+            Assert("KnockdownChance 100%일 때 피격 시 넉다운(down) 전이", kdTestPlayer1.State == "down");
+            Assert("넉다운 시 Vz=120 체공 솟구침 부여", kdTestPlayer1.Vz == 120f);
+
+            var kdTestPlayer2 = new Player(new StatusSystem());
+            kdTestPlayer2.KnockdownChance = 0.0f; // 0% 넉다운 모드
+            kdTestPlayer2.TakeDamage(10, 1f);
+            Assert("KnockdownChance 0%일 때 피격 시 일반 경직(hit) 전이", kdTestPlayer2.State == "hit");
+
+            // 4) 기본 설정(20% 확률) 통계적 분포 검증 (1,000회 피격 샘플링)
+            int kdCount = 0;
+            int totalTrials = 1000;
+            var statPlayer = new Player(new StatusSystem());
+            statPlayer.KnockdownChance = 0.20f;
+            statPlayer.KnockdownRng = new Random(42);
+            for (int i = 0; i < totalTrials; i++)
+            {
+                statPlayer.InvincibleTimer = 0f;
+                statPlayer.State = "idle";
+                statPlayer.Status.CurrentHp = 100;
+                statPlayer.TakeDamage(1, 1f);
+                if (statPlayer.State == "down") kdCount++;
+            }
+            double kdRate = (double)kdCount / totalTrials;
+            Assert("주인공 피격 넉다운 확률은 약 20% (14%~26% 범위 내 분포)", kdRate >= 0.14 && kdRate <= 0.26);
+
+            // Test 61: 적(Enemy) 피격 시 20% 넉다운 및 쓰러진 캐릭터 투척 시 데미지 시스템 검증
+            // 1) 적 피격 시 넉다운 20% 확률 결정성 검증
+            var kdEnemy1 = new Enemy(EnemyType.Thug, 100f, 170f, 1);
+            kdEnemy1.KnockdownChance = 1.0f; // 100% 넉다운
+            kdEnemy1.TakeDamage(10, 1f);
+            Assert("적 KnockdownChance 100%일 때 약한 피격(10데미지)에도 넉다운(down) 전이", kdEnemy1.State == "down");
+            Assert("적 넉다운 시 Vz=135 솟구침 부여", kdEnemy1.Vz == 135f);
+
+            var kdEnemy2 = new Enemy(EnemyType.Thug, 100f, 170f, 1);
+            kdEnemy2.KnockdownChance = 0.0f; // 0% 넉다운
+            kdEnemy2.TakeDamage(10, 1f);
+            Assert("적 KnockdownChance 0%일 때 약한 피격(10데미지) 시 일반 경직(hit) 전이", kdEnemy2.State == "hit");
+
+            // 2) 적 기본 설정(20% 확률) 통계적 분포 검증 (1,000회 피격 샘플링)
+            int enemyKdCount = 0;
+            var statEnemy = new Enemy(EnemyType.Thug, 100f, 170f, 1);
+            statEnemy.KnockdownChance = 0.20f;
+            statEnemy.KnockdownRng = new Random(42);
+            for (int i = 0; i < totalTrials; i++)
+            {
+                statEnemy.InvincibleTimer = 0f;
+                statEnemy.State = "idle";
+                statEnemy.CurrentHp = 1000;
+                statEnemy.TakeDamage(5, 1f);
+                if (statEnemy.State == "down") enemyKdCount++;
+            }
+            double enemyKdRate = (double)enemyKdCount / totalTrials;
+            Assert("적 피격 넉다운 확률은 약 20% (14%~26% 범위 내 분포)", enemyKdRate >= 0.14 && enemyKdRate <= 0.26);
+
+            // 3) 쓰러진 적 들기 및 투척 시 던져진 캐릭터 즉각 피해 입음 검증 (ThrowCarried)
+            var throwPlayer = new Player(new StatusSystem());
+            var thrownTargetEnemy = new Enemy(EnemyType.Thug, 100f, 170f, 1);
+            thrownTargetEnemy.CurrentHp = 45;
+            thrownTargetEnemy.State = "down";
+            throwPlayer.CarriedEnemy = thrownTargetEnemy;
+            thrownTargetEnemy.IsCarried = true;
+
+            int expectedThrowDmg = throwPlayer.Status.PunchDamage + 10;
+            throwPlayer.ThrowCarried();
+
+            Assert("던져진 캐릭터는 투척 즉시 데미지를 입음 (HP 감소)", thrownTargetEnemy.CurrentHp == 45 - expectedThrowDmg);
+            Assert("던져진 캐릭터는 공중으로 날아감 (IsFlying = true)", thrownTargetEnemy.IsFlying);
+            Assert("던져진 캐릭터는 다운 상태 유지 (State == down)", thrownTargetEnemy.State == "down");
+            Assert("던져진 캐릭터는 전방으로 빠른 속도로 비행 (Vx = 260)", thrownTargetEnemy.Vx == 260f);
+
+            // 4) 자이언트 스윙(giantswing)으로 던져진 캐릭터 데미지(25) 입음 검증
+            var giantSwingPlayer = new Player(new StatusSystem());
+            var swingTargetEnemy = new Enemy(EnemyType.Thug, 100f, 170f, 1);
+            swingTargetEnemy.CurrentHp = 50;
+            swingTargetEnemy.State = "down";
+            giantSwingPlayer.CarriedEnemy = swingTargetEnemy;
+            swingTargetEnemy.IsCarried = true;
+            giantSwingPlayer.State = "giantswing";
+            giantSwingPlayer.StateTimer = 0.45f; // 스윙 완료 후 던지는 시점
+            giantSwingPlayer.Update(0.01f);
+
+            Assert("자이언트 스윙으로 던져진 캐릭터는 25의 스윙 피해를 입음", swingTargetEnemy.CurrentHp == 50 - 25);
+            Assert("자이언트 스윙으로 던져진 캐릭터는 체공 비행 (IsFlying = true)", swingTargetEnemy.IsFlying);
+
+            // 5) 던져진 캐릭터 지면 착지 시 착지 충격 데미지(18) 입음 검증
+            int hpBeforeLanding = thrownTargetEnemy.CurrentHp;
+            thrownTargetEnemy.Z = 15f;
+            thrownTargetEnemy.Vz = -30f;
+            thrownTargetEnemy.Update(0.6f); // 착지 유도 (Z <= 0)
+
+            Assert("던져진 캐릭터는 지면 착지 시 추가 충격 데미지(18)를 입음", thrownTargetEnemy.CurrentHp == hpBeforeLanding - 18);
+            Assert("착지 후 체공 비행 상태 해제 (IsFlying = false)", !thrownTargetEnemy.IsFlying);
+            Assert("착지 후 다운 상태 유지 (State == down)", thrownTargetEnemy.State == "down");
+
+            // 6) CombatSystem과 연동 시 투척 피해 및 착지 충격 피해 플로팅 숫자 생성 검증
+            var integratedCombat = new CombatSystem();
+            var integratedPlayer = new Player(new StatusSystem());
+            var integratedEnemy = new Enemy(EnemyType.Thug, 100f, 170f, 1);
+            integratedEnemy.CurrentHp = 45;
+            integratedEnemy.State = "down";
+            integratedCombat.CheckCollisions(integratedPlayer, new List<Enemy> { integratedEnemy }, new List<WorldObject>());
+
+            integratedPlayer.CarriedEnemy = integratedEnemy;
+            integratedEnemy.IsCarried = true;
+            integratedPlayer.ThrowCarried();
+
+            Assert("CombatSystem에 투척 피해 플로팅 데미지 숫자 등록됨", integratedCombat.DamageNumbers.Any(d => d.Value == expectedThrowDmg && !d.IsPlayerHit));
+
+            integratedEnemy.Z = 10f;
+            integratedEnemy.Vz = -40f;
+            integratedEnemy.Update(0.5f); // 착지 발생 -> OnThrownLanded 실행
+
+            Assert("CombatSystem에 착지 충격 피해(18) 플로팅 데미지 숫자 등록됨", integratedCombat.DamageNumbers.Any(d => d.Value == 18 && !d.IsPlayerHit));
+
+            // Test 62: 주인공이 물체(기물/무기)를 들고 다음 스테이지 및 서바이벌 웨이브로 이동 시 보존 및 위치 동기화 검증
+            // 1) 기물(수레 Cart)을 든 상태에서 LoadStage(2, player) 실행 시 기물 보존 검증
+            var carryPlayer = new Player(new StatusSystem());
+            carryPlayer.X = 840f; // 이전 스테이지 우측 출구 위치
+            carryPlayer.Y = 180f;
+            var carryCart = new WorldObject(ObjectType.Cart, 840f, 180f);
+            carryPlayer.CarriedObject = carryCart;
+            carryCart.IsCarried = true;
+            carryPlayer.SyncCarriedPositions();
+
+            var testStageMgr = new StageManager();
+            testStageMgr.LoadStage(2, carryPlayer);
+
+            Assert("다음 스테이지 로드 후에도 플레이어는 수레를 계속 들고 있음", carryPlayer.CarriedObject == carryCart);
+            Assert("다음 스테이지의 WorldObjects 목록에 들고 있는 수레가 포함됨", testStageMgr.WorldObjects.Contains(carryCart));
+            Assert("들고 있는 수레의 IsCarried 플래그 true 유지", carryCart.IsCarried);
+            Assert("들고 있는 수레의 IsFlying 플래그 false", !carryCart.IsFlying);
+
+            // 새 스테이지 시작 위치(X=35)로 플레이어 이동 및 위치 동기화 검증
+            carryPlayer.X = 35f;
+            carryPlayer.SyncCarriedPositions();
+            Assert("새 스테이지에서 수레의 X좌표가 플레이어 위치(X=35)로 즉시 동기화됨", carryCart.X == 35f);
+            Assert("새 스테이지에서 수레의 Z좌표가 머리 위로 정확히 동기화됨", carryCart.Z == carryPlayer.Z + carryPlayer.Height + 2f);
+
+            // 새 스테이지에서 수레 투척 검증
+            carryPlayer.ThrowCarried();
+            Assert("새 스테이지에서 수레 투척 후 플레이어 손에서 분리됨", carryPlayer.CarriedObject == null);
+            Assert("새 스테이지에서 투척된 수레는 공중 비행(IsFlying = true) 상태", carryCart.IsFlying);
+            Assert("투척된 수레는 전방 추진 속도 부여됨", carryCart.Vx > 0);
+            Assert("투척된 수레는 새 스테이지 WorldObjects에 유지되어 계속 시뮬레이션됨", testStageMgr.WorldObjects.Contains(carryCart));
+
+            // 2) 장착 무기(장창 Spear)를 손에 쥔 상태에서 다음 스테이지 이동 시 보존 검증
+            var weaponPlayer = new Player(new StatusSystem());
+            weaponPlayer.X = 850f;
+            weaponPlayer.Y = 175f;
+            var carrySpear = new WorldObject(ObjectType.Spear, 850f, 175f);
+            carrySpear.Durability = 4;
+            weaponPlayer.EquipWeapon(carrySpear);
+            weaponPlayer.SyncCarriedPositions();
+
+            testStageMgr.LoadStage(3, weaponPlayer);
+            Assert("다음 스테이지 로드 후에도 장착 무기(장창) 유지", weaponPlayer.EquippedWeapon == carrySpear);
+            Assert("다음 스테이지 WorldObjects에 장착 무기 포함됨", testStageMgr.WorldObjects.Contains(carrySpear));
+            Assert("장착 무기의 기존 내구도(4) 유지", carrySpear.Durability == 4);
+
+            weaponPlayer.X = 35f;
+            weaponPlayer.SyncCarriedPositions();
+            Assert("새 스테이지에서 장창의 X좌표가 플레이어 손 위치로 동기화됨", Math.Abs(carrySpear.X - (35f + 12f)) < 0.1f);
+
+            // 3) 서바이벌 모드에서 기물 들고 다음 웨이브 진입 시 보존 검증
+            var wavePlayer = new Player(new StatusSystem());
+            var waveBench = new WorldObject(ObjectType.Bench, 500f, 180f);
+            wavePlayer.CarriedObject = waveBench;
+            waveBench.IsCarried = true;
+            testStageMgr.LoadSurvivalWave(2, wavePlayer);
+            Assert("서바이벌 다음 웨이브 로드 후에도 들고 있던 평상 유지", wavePlayer.CarriedObject == waveBench);
+            Assert("서바이벌 다음 웨이브 WorldObjects에 평상 포함됨", testStageMgr.WorldObjects.Contains(waveBench));
+
+            // 4) GameScene 전체 진행 흐름 연동 검증 (1장 -> 2장 출구 이동 및 유물 선택 후 진입)
+            var sceneFlow = new GameScene();
+            sceneFlow.Initialize();
+            sceneFlow.StartNewGame();
+            var sceneCart = new WorldObject(ObjectType.Cart, 100f, 180f);
+            sceneFlow.StageManager.WorldObjects.Add(sceneCart);
+            sceneFlow.Player.CarriedObject = sceneCart;
+            sceneCart.IsCarried = true;
+            sceneFlow.Player.SyncCarriedPositions();
+
+            // 적 전멸 및 출구 도달
+            sceneFlow.StageManager.Enemies.Clear();
+            sceneFlow.Player.X = sceneFlow.StageManager.StageWidth - 10f;
+            sceneFlow.Update(0.016f); // RelicSelect 화면 진입
+            Assert("적 전멸 후 우측 끝 도달 시 유물 선택 화면 진입", sceneFlow.State == GameState.RelicSelect);
+            Assert("유물 선택 중에도 물체를 계속 들고 있음", sceneFlow.Player.IsCarrying && sceneFlow.Player.CarriedObject == sceneCart);
+
+            // 유물 선택 확인 (Enter 키)
+            sceneFlow.Input.OnKeyDown(System.Windows.Forms.Keys.Enter);
+            sceneFlow.Update(0.016f);
+            sceneFlow.Input.OnKeyUp(System.Windows.Forms.Keys.Enter);
+
+            Assert("다음 스테이지(2장)로 전환 완료", sceneFlow.StageManager.CurrentStage == 2);
+            Assert("2장 진입 후에도 1장에서 들고 온 수레를 계속 들고 있음", sceneFlow.Player.CarriedObject == sceneCart);
+            Assert("2장 월드 오브젝트 목록에 들고 온 수레가 정상 등록되어 있음", sceneFlow.StageManager.WorldObjects.Contains(sceneCart));
+            Assert("2장 시작 위치(X=35)에 맞춰 수레 좌표 동기화 완료", sceneCart.X == 35f);
+
             Console.WriteLine("----------------------------------------------------");
             Console.WriteLine($" 총 테스트 결과: {passed} / {total} 통과 ({(passed == total ? "100% 성공" : "실패 항목 있음")})");
             Console.WriteLine("====================================================");

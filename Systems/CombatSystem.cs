@@ -190,6 +190,20 @@ namespace HanlangGame.Systems
 
         public void CheckCollisions(Player player, List<Enemy> enemies, List<WorldObject>? worldObjects = null)
         {
+            if (player.OnCarriedEnemyThrown == null)
+            {
+                player.OnCarriedEnemyThrown = (thrownEnemy, dmg) =>
+                {
+                    DamageNumbers.Add(new DamageNumber(dmg, thrownEnemy.X, thrownEnemy.Y - thrownEnemy.Z - thrownEnemy.Height - 8f, isPlayerHit: false));
+                    AddHitSparks(thrownEnemy.X, thrownEnemy.Y - thrownEnemy.Z - 14f, count: 8);
+                    Bubbles.Add(new SpeechBubble(thrownEnemy.GetRandomHitQuote(), thrownEnemy.X, thrownEnemy.Y - thrownEnemy.Z - thrownEnemy.Height - 18f));
+                    if (thrownEnemy.CurrentHp <= 0)
+                    {
+                        OnEnemyDefeated(thrownEnemy, player);
+                    }
+                };
+            }
+
             // 0. 무릎치기 (Knee Strike): 포박한 적에게 직접 15 피해 타격
             if (player.CurrentAttackType == "knee" && player.CarriedEnemy != null && !player.HasDealtDamage)
             {
@@ -781,7 +795,27 @@ namespace HanlangGame.Systems
                         OnScreenShake?.Invoke(3.4f, 0.16f);
                         AddDust(bx, by, count: 6);
                         AddHitSparks(bx, by - 16f, count: 8);
+                        DamageNumbers.Add(new DamageNumber(12, bx, by - enemy.Height - 8f, isPlayerHit: false));
                         Bubbles.Add(new SpeechBubble("벽 쿵!", bx, by - 24f));
+                        if (enemy.CurrentHp <= 0)
+                        {
+                            OnEnemyDefeated(enemy, player);
+                        }
+                    };
+                }
+
+                if (enemy.OnThrownLanded == null)
+                {
+                    enemy.OnThrownLanded = (e, dmg) =>
+                    {
+                        DamageNumbers.Add(new DamageNumber(dmg, e.X, e.Y - e.Height - 8f, isPlayerHit: false));
+                        AddDust(e.X, e.Y, count: 6);
+                        AddHitSparks(e.X, e.Y - 14f, count: 6);
+                        SoundSynth.PlayHit();
+                        if (e.CurrentHp <= 0)
+                        {
+                            OnEnemyDefeated(e, player);
+                        }
                     };
                 }
 
@@ -847,16 +881,17 @@ namespace HanlangGame.Systems
                             }
                             else
                             {
-                                // 통상 피격
-                                OnScreenShake?.Invoke(2.4f, 0.14f);
-                                OnHitStop?.Invoke(0.045f);
-                                AddHitSparks(player.X, player.Y - player.Z - 16f, count: 7);
+                                // 통상 피격 (다운 전이 시 강한 충격 연출)
+                                bool isKnockedDown = player.State == "down";
+                                OnScreenShake?.Invoke(isKnockedDown ? 4.0f : 2.4f, isKnockedDown ? 0.22f : 0.14f);
+                                OnHitStop?.Invoke(isKnockedDown ? 0.065f : 0.045f);
+                                AddHitSparks(player.X, player.Y - player.Z - 16f, count: isKnockedDown ? 10 : 7);
 
                                 // 플레이어 머리 위에 선홍색 피격 데미지 숫자 생성!
                                 DamageNumbers.Add(new DamageNumber(enemy.AttackPower, player.X, player.Y - player.Z - player.Height - 8f, isPlayerHit: true));
 
                                 // 플레이어 피격 말풍선
-                                Bubbles.Add(new SpeechBubble("따끔!", player.X, player.Y - player.Z - player.Height - 18f));
+                                Bubbles.Add(new SpeechBubble(isKnockedDown ? "으악!" : "따끔!", player.X, player.Y - player.Z - player.Height - 18f));
                             }
                         }
                     }

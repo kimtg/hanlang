@@ -30,6 +30,7 @@ namespace HanlangGame.Entities
         public int ShieldHp { get; set; } = 0; // 철갑 방패 내구도
 
         public Action<float, float>? OnWallBounce;
+        public Action<Enemy, int>? OnThrownLanded;
 
         public bool IsBossType => Type == EnemyType.Boss || Type == EnemyType.MidBoss1 || Type == EnemyType.MidBoss2;
         public bool IsRaging { get; set; } = false;
@@ -48,6 +49,10 @@ namespace HanlangGame.Entities
         private float _attackCooldown = 0.2f;
 
         public bool HasDealtDamage { get; set; } = false;
+
+        // 피격 시 넉다운(쓰러짐) 확률 (기본 20%)
+        public float KnockdownChance { get; set; } = 0.20f;
+        public Random KnockdownRng { get; set; } = new Random();
 
         private static readonly string[] HitQuotes = 
         { 
@@ -406,7 +411,9 @@ namespace HanlangGame.Entities
                     Vy = 0f;
                     State = "down";
                     StateTimer = 0f;
-                    TakeDamage(18, 0f, out _); // 투척 착지 충격 데미지
+                    int landDamage = 18;
+                    TakeDamage(landDamage, 0f, out _); // 투척 착지 충격 데미지
+                    OnThrownLanded?.Invoke(this, landDamage);
                 }
             }
 
@@ -445,7 +452,8 @@ namespace HanlangGame.Entities
             if (State == "down")
             {
                 Vx *= 0.8f;
-                if (StateTimer > 0.95f)
+                // 2초(2.0f) 후 기상 (사망 시 소멸)
+                if (StateTimer > 2.0f)
                 {
                     if (CurrentHp <= 0)
                     {
@@ -517,13 +525,18 @@ namespace HanlangGame.Entities
                 IsRaging = true;
             }
 
-            if (CurrentHp <= 0 || damage >= (IsBossType && IsRaging ? 32 : 22))
+            bool wasAlreadyDownOrFlying = State == "down" || IsFlying;
+
+            if (CurrentHp <= 0 || wasAlreadyDownOrFlying || damage >= (IsBossType && IsRaging ? 32 : 22))
             {
                 isKnockedDown = true;
                 State = "down";
                 StateTimer = 0f;
-                Vz = 135f;
-                Vx = knockbackDir * 110f;
+                if (!wasAlreadyDownOrFlying)
+                {
+                    Vz = 135f;
+                    Vx = knockbackDir * 110f;
+                }
             }
             else
             {
@@ -534,10 +547,23 @@ namespace HanlangGame.Entities
                     return;
                 }
 
-                isKnockedDown = false;
-                State = "hit";
-                StateTimer = 0f;
-                Vx = knockbackDir * 70f;
+                // 피격 시 20% 확률로 쓰러짐(down), 80% 확률로 일반 피격 경직(hit)
+                bool randomKnockdown = KnockdownRng.NextDouble() < KnockdownChance;
+                if (randomKnockdown)
+                {
+                    isKnockedDown = true;
+                    State = "down";
+                    StateTimer = 0f;
+                    Vz = 135f;
+                    Vx = knockbackDir * 110f;
+                }
+                else
+                {
+                    isKnockedDown = false;
+                    State = "hit";
+                    StateTimer = 0f;
+                    Vx = knockbackDir * 70f;
+                }
             }
         }
 

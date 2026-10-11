@@ -240,9 +240,22 @@ namespace HanlangGame
             if (_stageManager.IsSurvivalMode)
             {
                 int nextWave = _stageManager.SurvivalWave + 1;
-                _stageManager.LoadSurvivalWave(nextWave);
+                _stageManager.LoadSurvivalWave(nextWave, _player);
                 _player.X = 35f;
                 _cameraX = 0f;
+                _player.Vx = 0f;
+                _player.Vy = 0f;
+                _player.State = "idle";
+                _player.SyncCarriedPositions();
+
+                // 들고 온 기물 및 장착 무기가 필드 오브젝트 리스트에 누락되지 않도록 보장
+                if (_player.CarriedObject != null && !_stageManager.WorldObjects.Contains(_player.CarriedObject))
+                    _stageManager.WorldObjects.Add(_player.CarriedObject);
+                if (_player.EquippedWeapon != null && !_stageManager.WorldObjects.Contains(_player.EquippedWeapon))
+                    _stageManager.WorldObjects.Add(_player.EquippedWeapon);
+                if (_player.CarriedEnemy != null && !_stageManager.Enemies.Contains(_player.CarriedEnemy))
+                    _stageManager.Enemies.Add(_player.CarriedEnemy);
+
                 _status.CurrentHp = Math.Min(_status.MaxHp, _status.CurrentHp + 45);
                 _status.CurrentMp = _status.MaxMp;
                 SoundSynth.PlayLevelUp();
@@ -252,9 +265,22 @@ namespace HanlangGame
             else
             {
                 int nextStage = _stageManager.CurrentStage + 1;
-                _stageManager.LoadStage(nextStage);
+                _stageManager.LoadStage(nextStage, _player);
                 _player.X = 35f;
                 _cameraX = 0f;
+                _player.Vx = 0f;
+                _player.Vy = 0f;
+                _player.State = "idle";
+                _player.SyncCarriedPositions();
+
+                // 들고 온 기물 및 장착 무기가 필드 오브젝트 리스트에 누락되지 않도록 보장
+                if (_player.CarriedObject != null && !_stageManager.WorldObjects.Contains(_player.CarriedObject))
+                    _stageManager.WorldObjects.Add(_player.CarriedObject);
+                if (_player.EquippedWeapon != null && !_stageManager.WorldObjects.Contains(_player.EquippedWeapon))
+                    _stageManager.WorldObjects.Add(_player.EquippedWeapon);
+                if (_player.CarriedEnemy != null && !_stageManager.Enemies.Contains(_player.CarriedEnemy))
+                    _stageManager.Enemies.Add(_player.CarriedEnemy);
+
                 SoundSynth.PlayLevelUp();
                 ShowNotification(_stageManager.GetStageName(nextStage) + "에 진입했습니다!");
                 State = GameState.Playing;

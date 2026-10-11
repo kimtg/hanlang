@@ -39,11 +39,17 @@ namespace HanlangGame.Systems
             };
         }
 
-        public void LoadStage(int stage)
+        public void LoadStage(int stage, Player? player = null)
         {
             IsSurvivalMode = false;
             CurrentStage = stage;
             GameWon = false; // 재시작 시 엔딩이 다시 뜨지 않도록 완벽 리셋!
+
+            // 플레이어가 들고 있는 기물, 장착 무기, 포박한 적 보존
+            WorldObject? carriedObj = (player != null && player.CarriedObject != null && !player.CarriedObject.IsDead) ? player.CarriedObject : null;
+            WorldObject? equippedWp = (player != null && player.EquippedWeapon != null && !player.EquippedWeapon.IsDead) ? player.EquippedWeapon : null;
+            Enemy? carriedEnemy = (player != null && player.CarriedEnemy != null && !player.CarriedEnemy.IsDead) ? player.CarriedEnemy : null;
+
             Enemies.Clear();
             WorldObjects.Clear();
 
@@ -206,15 +212,51 @@ namespace HanlangGame.Systems
                     break;
             }
 
+            // 플레이어가 들고 온 기물/무기/적 복원
+            if (carriedObj != null && !WorldObjects.Contains(carriedObj))
+            {
+                carriedObj.IsCarried = true;
+                carriedObj.IsFlying = false;
+                carriedObj.IsRolling = false;
+                carriedObj.Vx = 0f;
+                carriedObj.Vy = 0f;
+                carriedObj.Vz = 0f;
+                WorldObjects.Add(carriedObj);
+            }
+            if (equippedWp != null && !WorldObjects.Contains(equippedWp))
+            {
+                equippedWp.IsCarried = true;
+                equippedWp.IsFlying = false;
+                equippedWp.Vx = 0f;
+                equippedWp.Vy = 0f;
+                equippedWp.Vz = 0f;
+                WorldObjects.Add(equippedWp);
+            }
+            if (carriedEnemy != null && !Enemies.Contains(carriedEnemy))
+            {
+                carriedEnemy.IsCarried = true;
+                carriedEnemy.IsFlying = false;
+                carriedEnemy.Vx = 0f;
+                carriedEnemy.Vy = 0f;
+                carriedEnemy.Vz = 0f;
+                Enemies.Add(carriedEnemy);
+            }
+
             InitWeather(stage);
         }
 
-        public void LoadSurvivalWave(int wave)
+        public void LoadSurvivalWave(int wave, Player? player = null)
         {
             IsSurvivalMode = true;
             SurvivalWave = wave;
             CurrentStage = ((wave - 1) % MaxStage) + 1;
             GameWon = false;
+
+            // 플레이어가 들고 있는 기물, 장착 무기, 포박한 적 보존
+            WorldObject? carriedObj = (player != null && player.CarriedObject != null && !player.CarriedObject.IsDead) ? player.CarriedObject : null;
+            WorldObject? equippedWp = (player != null && player.EquippedWeapon != null && !player.EquippedWeapon.IsDead) ? player.EquippedWeapon : null;
+            Enemy? carriedEnemy = (player != null && player.CarriedEnemy != null && !player.CarriedEnemy.IsDead) ? player.CarriedEnemy : null;
+
             Enemies.Clear();
             WorldObjects.Clear();
 
@@ -257,6 +299,36 @@ namespace HanlangGame.Systems
             if (wave >= 3)
             {
                 WorldObjects.Add(new WorldObject(ObjectType.Hwacha, 600f, 185f));
+            }
+
+            // 복원
+            if (carriedObj != null && !WorldObjects.Contains(carriedObj))
+            {
+                carriedObj.IsCarried = true;
+                carriedObj.IsFlying = false;
+                carriedObj.IsRolling = false;
+                carriedObj.Vx = 0f;
+                carriedObj.Vy = 0f;
+                carriedObj.Vz = 0f;
+                WorldObjects.Add(carriedObj);
+            }
+            if (equippedWp != null && !WorldObjects.Contains(equippedWp))
+            {
+                equippedWp.IsCarried = true;
+                equippedWp.IsFlying = false;
+                equippedWp.Vx = 0f;
+                equippedWp.Vy = 0f;
+                equippedWp.Vz = 0f;
+                WorldObjects.Add(equippedWp);
+            }
+            if (carriedEnemy != null && !Enemies.Contains(carriedEnemy))
+            {
+                carriedEnemy.IsCarried = true;
+                carriedEnemy.IsFlying = false;
+                carriedEnemy.Vx = 0f;
+                carriedEnemy.Vy = 0f;
+                carriedEnemy.Vz = 0f;
+                Enemies.Add(carriedEnemy);
             }
 
             InitWeather(CurrentStage);
