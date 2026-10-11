@@ -318,7 +318,8 @@ namespace HanlangGame.Systems
                         {
                             damage = (int)(damage * 1.5f);
                             Items.Add(new Item(enemy.X, enemy.Y, ItemType.Coin));
-                            AddHitSparks(enemy.X, enemy.Y - 16f, count: 8);
+                            float sparkY = (player.CurrentAttackType == "jumpkick") ? (player.Y - player.Z - 12f) : (enemy.Y - enemy.Z - 16f);
+                            AddHitSparks(enemy.X, sparkY, count: 8);
                             Bubbles.Add(new SpeechBubble("백호 일격!", enemy.X, enemy.Y - enemy.Height - 16f));
                         }
 
@@ -437,7 +438,8 @@ namespace HanlangGame.Systems
                                        player.CurrentAttackType == "swing" || isKnockedDown;
                         OnScreenShake?.Invoke(isHeavy ? 3.8f : 1.8f, isHeavy ? 0.22f : 0.09f);
                         OnHitStop?.Invoke(isHeavy ? 0.055f : 0.025f);
-                        AddHitSparks(enemy.X, enemy.Y - enemy.Z - 16f, count: isHeavy ? 9 : 5);
+                        float hitSparkY = (player.CurrentAttackType == "jumpkick") ? (player.Y - player.Z - 12f) : (enemy.Y - enemy.Z - 16f);
+                        AddHitSparks(enemy.X, hitSparkY, count: isHeavy ? 9 : 5);
 
                         // 머리 위에 떠오르는 데미지 숫자 생성!
                         DamageNumbers.Add(new DamageNumber(damage, enemy.X, enemy.Y - enemy.Z - enemy.Height - 8f, isPlayerHit: false));
@@ -490,7 +492,8 @@ namespace HanlangGame.Systems
                                 // 신기전 화차 타격 시 전방 다연장 로켓 화살 8발 일제 발사!
                                 SoundSynth.PlaySpecial();
                                 OnScreenShake?.Invoke(4.5f, 0.3f);
-                                AddHitSparks(obj.X, obj.Y - 14f, count: 12);
+                                float objSparkY = (player.CurrentAttackType == "jumpkick") ? (player.Y - player.Z - 12f) : (obj.Y - 14f);
+                                AddHitSparks(obj.X, objSparkY, count: 12);
                                 Bubbles.Add(new SpeechBubble("신기전 일제 발사!", obj.X, obj.Y - 32f));
                                 float fireDir = player.FacingRight ? 1f : -1f;
                                 for (int k = 0; k < 8; k++)
@@ -510,7 +513,8 @@ namespace HanlangGame.Systems
                                 obj.Durability = 0;
                                 obj.IsDead = true;
                                 SoundSynth.PlayShatter();
-                                AddHitSparks(obj.X, obj.Y - 10f, count: 8);
+                                float objSparkY = (player.CurrentAttackType == "jumpkick") ? (player.Y - player.Z - 12f) : (obj.Y - 10f);
+                                AddHitSparks(obj.X, objSparkY, count: 8);
                                 AddDust(obj.X, obj.Y, count: 6);
 
                                 // 옹기 항아리나 쌀가마니가 깨지며 아이템 드롭
@@ -532,7 +536,8 @@ namespace HanlangGame.Systems
                             else
                             {
                                 obj.Durability--;
-                                AddHitSparks(obj.X, obj.Y - 10f, count: 5);
+                                float objSparkY = (player.CurrentAttackType == "jumpkick") ? (player.Y - player.Z - 12f) : (obj.Y - 10f);
+                                AddHitSparks(obj.X, objSparkY, count: 5);
                                 if (obj.Durability <= 0)
                                 {
                                     obj.IsDead = true;

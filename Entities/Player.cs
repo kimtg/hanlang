@@ -1044,9 +1044,10 @@ namespace HanlangGame.Entities
 
             if (State == "jumpkick")
             {
-                // 공중 날라차기: 발끝부터 지상 적의 몸통/머리까지 닿도록 하단으로 판정 확장
-                float attackY = Y - Z - 12f;
-                float attackHeight = 24f + Z; // 높이 뜰수록 지면까지 판정 연결
+                // 공중 날라차기: 체공 중인 캐릭터 위치(Y - Z)에 공격 판정(히트박스) 집중 배치
+                // 바닥/그림자 위치(Y)로 불필요하게 늘어나지 않고 캐릭터의 타격점(상체~발끝)에 정확히 밀착
+                float attackY = Y - Z - 24f;
+                float attackHeight = 24f;
                 return new RectangleF(attackXStd, attackY, reachStd + 8f, attackHeight);
             }
             else

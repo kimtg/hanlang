@@ -1588,7 +1588,54 @@ namespace HanlangGame.Tests
             Assert("유물 카드 0 중심 X좌표 분립 (186px)", Math.Abs(center0 - 186f) < 0.1f);
             Assert("유물 카드 1 중심 X좌표 분립 (480px)", Math.Abs(center1 - 480f) < 0.1f);
             Assert("유물 카드 2 중심 X좌표 분립 (774px)", Math.Abs(center2 - 774f) < 0.1f);
-            Assert("3개 유물 카드의 텍스트 중심이 화면 중앙(480px)에 겹치지 않고 상호 독립적임", center0 != center1 && center1 != center2);
+            // Test 59: 점프 공격(jumpkick) 공격 포인트의 공중 캐릭터 위치 동기화 및 바닥 그림자 분리 검증
+            var airPlayer = new Player(new StatusSystem());
+            airPlayer.X = 100f;
+            airPlayer.Y = 170f;
+            airPlayer.Z = 75f; // 고공 점프 체공 상태
+            airPlayer.State = "jumpkick";
+            airPlayer.CurrentAttackType = "jumpkick";
+            airPlayer.FacingRight = true;
+
+            var airHitbox = airPlayer.GetAttackHitbox();
+            Assert("점프 공격 히트박스 존재", airHitbox.HasValue);
+            var aBox = airHitbox.Value;
+
+            // 1) 히트박스 Y 좌표가 바닥(170f)이 아닌 캐릭터 위치(Y - Z = 95f 근처)에 생성되는지 검증
+            float expectedTop = airPlayer.Y - airPlayer.Z - 24f; // 170 - 75 - 24 = 71f
+            float expectedBottom = expectedTop + 24f; // 95f
+            Assert("점프 공격 히트박스 상단은 캐릭터 공중 위치(Y - Z - 24f)", Math.Abs(aBox.Y - expectedTop) < 0.1f);
+            Assert("점프 공격 히트박스 하단은 지면(170f)으로 확장되지 않고 캐릭터 발끝(Y - Z)", Math.Abs(aBox.Bottom - expectedBottom) < 0.1f);
+            Assert("히트박스 하단이 바닥 그림자(170f)보다 70px 이상 높은 공중에 위치", aBox.Bottom < airPlayer.Y - 50f);
+
+            // 2) 고공 점프 중 지상 적을 공격했을 때 바닥 그림자 판정으로 억지 적중하지 않음 검증
+            var groundEnemyFar = new Enemy(EnemyType.Thug, 120f, 170f, 1);
+            groundEnemyFar.Z = 0f; // 지상에 서 있는 적
+            var airCombat = new CombatSystem();
+            airCombat.CheckCollisions(airPlayer, new List<Enemy> { groundEnemyFar }, new List<WorldObject>());
+            Assert("고공 점프 공격 시 지상의 적(그림자 위치)은 피격되지 않음", !airPlayer.HasDealtDamage);
+
+            // 3) 같은 공중 고도에 있는 적(Air Juggle)은 정확히 타격됨 검증
+            airPlayer.HasDealtDamage = false;
+            var targetAirEnemy = new Enemy(EnemyType.Thug, 120f, 170f, 1);
+            targetAirEnemy.Z = 70f; // 공중 체공 적
+            airCombat.CheckCollisions(airPlayer, new List<Enemy> { targetAirEnemy }, new List<WorldObject>());
+            Assert("동일 공중 고도의 적은 점프 공격에 정확히 타격됨", airPlayer.HasDealtDamage);
+
+            // 4) 타격 스파크 생성 위치가 바닥(170f)이 아닌 공중 캐릭터 위치(player.Y - player.Z - 12f)인지 검증
+            bool hasAirSpark = false;
+            foreach (var p in airCombat.Particles)
+            {
+                if (p.Type == "ring" || p.Type == "spark")
+                {
+                    if (Math.Abs(p.Y - (airPlayer.Y - airPlayer.Z - 12f)) < 1.0f)
+                    {
+                        hasAirSpark = true;
+                        break;
+                    }
+                }
+            }
+            Assert("타격 스파크가 바닥(그림자)이 아닌 공중 캐릭터 타격점(Y - Z - 12f)에 폭발", hasAirSpark);
 
             Console.WriteLine("----------------------------------------------------");
             Console.WriteLine($" 총 테스트 결과: {passed} / {total} 통과 ({(passed == total ? "100% 성공" : "실패 항목 있음")})");
