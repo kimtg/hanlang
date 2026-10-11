@@ -1347,6 +1347,181 @@ namespace HanlangGame.Tests
             Assert("5웨이브 보스 출현 확인", survScene.StageManager.CurrentBoss != null);
             Assert("연무장에 신기전 화차 배치 확인", survScene.StageManager.WorldObjects.Exists(o => o.Type == ObjectType.Hwacha));
 
+            // Test 56: 멜로디 음표 길이의 다양성 (16분, 8분, 점8분, 4분 등 서로 다른 음표 길이 공존) 검증
+            byte[] testMid = MidiGenerator.GenerateBgmMid("stage_market");
+            int trackHeaderIdx = -1;
+            for (int i = 0; i < testMid.Length - 4; i++)
+            {
+                if (testMid[i] == 'M' && testMid[i + 1] == 'T' && testMid[i + 2] == 'r' && testMid[i + 3] == 'k')
+                {
+                    trackHeaderIdx = i + 8; // skip "MTrk" + 4-byte length
+                    break;
+                }
+            }
+            Assert("MIDI 트랙 청크 검출", trackHeaderIdx > 0);
+
+            var activeNoteOnTick = new Dictionary<int, int>();
+            var noteDurations = new HashSet<int>();
+            int ptr = trackHeaderIdx;
+            int absTick = 0;
+
+            while (ptr < testMid.Length - 3)
+            {
+                int delta = 0;
+                while (ptr < testMid.Length)
+                {
+                    byte b = testMid[ptr++];
+                    delta = (delta << 7) | (b & 0x7F);
+                    if ((b & 0x80) == 0) break;
+                }
+                absTick += delta;
+
+                if (ptr >= testMid.Length) break;
+                byte midiStatus = testMid[ptr++];
+
+                if (midiStatus == 0xFF) // Meta event
+                {
+                    if (ptr >= testMid.Length) break;
+                    byte metaType = testMid[ptr++];
+                    int metaLen = 0;
+                    while (ptr < testMid.Length)
+                    {
+                        byte b = testMid[ptr++];
+                        metaLen = (metaLen << 7) | (b & 0x7F);
+                        if ((b & 0x80) == 0) break;
+                    }
+                    ptr += metaLen;
+                }
+                else if (midiStatus == 0x90) // Ch 0 Note On
+                {
+                    int pitch = testMid[ptr++];
+                    int vel = testMid[ptr++];
+                    if (vel > 0) activeNoteOnTick[pitch] = absTick;
+                    else if (activeNoteOnTick.TryGetValue(pitch, out int onTick))
+                    {
+                        noteDurations.Add(absTick - onTick);
+                        activeNoteOnTick.Remove(pitch);
+                    }
+                }
+                else if (midiStatus == 0x80) // Ch 0 Note Off
+                {
+                    int pitch = testMid[ptr++];
+                    ptr++; // skip velocity
+                    if (activeNoteOnTick.TryGetValue(pitch, out int onTick))
+                    {
+                        noteDurations.Add(absTick - onTick);
+                        activeNoteOnTick.Remove(pitch);
+                    }
+                }
+                else if (midiStatus >= 0x80 && midiStatus <= 0xEF) // Other channel voice messages
+                {
+                    int msgLen = (midiStatus & 0xF0) switch
+                    {
+                        0xC0 or 0xD0 => 1,
+                        _ => 2
+                    };
+                    ptr += msgLen;
+                }
+            }
+
+            Assert("멜로디에 서로 다른 길이의 음표가 4종류 이상 존재 (16분/8분/점8분/4분 등)", noteDurations.Count >= 4);
+            Assert("1스텝(24틱 이하) 단음표 존재", noteDurations.Any(d => d <= 24));
+            Assert("2스텝(40~50틱) 8분음표 존재", noteDurations.Any(d => d >= 40 && d <= 50));
+            Assert("3스텝 이상(60틱 초과) 장음표 존재", noteDurations.Any(d => d > 60));
+
+            // Test 57: 다채로운 화성 진행(Triad/7th Chord Progression) 및 3배 확장된 음악 길이(384/192스텝) 검증
+            // 1) ParseChord 단위 검증 (3화음, 7화음, 텐션 보이싱)
+            int[] emChord = MidiGenerator.ParseChord("Em");
+            Assert("Em 3화음 파싱 (E3-G3-B3: 52, 55, 59)", emChord.Length == 3 && emChord[0] == 52 && emChord[1] == 55 && emChord[2] == 59);
+
+            int[] a7Chord = MidiGenerator.ParseChord("A7");
+            Assert("A7 도미넌트 7화음 파싱 (A3-C#4-E4-G4: 57, 61, 64, 67)", a7Chord.Length == 4 && a7Chord[0] == 57 && a7Chord[1] == 61 && a7Chord[2] == 64 && a7Chord[3] == 67);
+
+            int[] bm7Chord = MidiGenerator.ParseChord("Bm7");
+            Assert("Bm7 마이너 7화음 파싱 (B3-D4-F#4-A4: 59, 62, 66, 69)", bm7Chord.Length == 4 && bm7Chord[0] == 59 && bm7Chord[1] == 62 && bm7Chord[2] == 66 && bm7Chord[3] == 69);
+
+            // 2) 9개 전 트랙의 코드 진행 길이 및 화음 다양성(5종류 이상) 검증
+            string[] allTracks = new[] { "stage_market", "stage_fortress", "stage_night", "stage_palace", "midboss", "finalboss", "title", "shop", "victory" };
+            foreach (var tName in allTracks)
+            {
+                string[] trkChords = MidiGenerator.GetTrackChords(tName);
+                int expectedLength = (tName == "title" || tName == "shop" || tName == "victory") ? 12 : 24;
+                Assert($"{tName} 트랙 코드 진행 길이 ({expectedLength}마디)", trkChords.Length == expectedLength);
+                Assert($"{tName} 트랙 화음 다양성 (5종류 이상 코드 사용)", trkChords.Distinct().Count() >= 5);
+            }
+
+            // 3) MIDI 바이너리 계측: 재생 시간 3배 확장 검증 (스테이지/보스: 384스텝 = 9,216틱, 약 48~52초)
+            byte[] longStageMid = MidiGenerator.GenerateBgmMid("stage_market");
+            int stageTrackIdx = -1;
+            for (int i = 0; i < longStageMid.Length - 4; i++)
+            {
+                if (longStageMid[i] == 'M' && longStageMid[i + 1] == 'T' && longStageMid[i + 2] == 'r' && longStageMid[i + 3] == 'k')
+                {
+                    stageTrackIdx = i + 8;
+                    break;
+                }
+            }
+
+            int lastTick = 0;
+            int curTick = 0;
+            int ptr57 = stageTrackIdx;
+            var ch2ChordPitches = new HashSet<int>();
+            int ch2NoteOnCount = 0;
+
+            while (ptr57 < longStageMid.Length - 3)
+            {
+                int delta = 0;
+                while (ptr57 < longStageMid.Length)
+                {
+                    byte b = longStageMid[ptr57++];
+                    delta = (delta << 7) | (b & 0x7F);
+                    if ((b & 0x80) == 0) break;
+                }
+                curTick += delta;
+                if (curTick > lastTick) lastTick = curTick;
+
+                if (ptr57 >= longStageMid.Length) break;
+                byte st = longStageMid[ptr57++];
+
+                if (st == 0xFF) // Meta
+                {
+                    if (ptr57 >= longStageMid.Length) break;
+                    byte mType = longStageMid[ptr57++];
+                    int mLen = 0;
+                    while (ptr57 < longStageMid.Length)
+                    {
+                        byte b = longStageMid[ptr57++];
+                        mLen = (mLen << 7) | (b & 0x7F);
+                        if ((b & 0x80) == 0) break;
+                    }
+                    ptr57 += mLen;
+                }
+                else if (st == 0x92) // Ch 2 (Strings Chord) Note On
+                {
+                    int note = longStageMid[ptr57++];
+                    int vel = longStageMid[ptr57++];
+                    if (vel > 0)
+                    {
+                        ch2ChordPitches.Add(note);
+                        ch2NoteOnCount++;
+                    }
+                }
+                else if (st >= 0x80 && st <= 0xEF)
+                {
+                    int mLen = (st & 0xF0) switch
+                    {
+                        0xC0 or 0xD0 => 1,
+                        _ => 2
+                    };
+                    ptr57 += mLen;
+                }
+            }
+
+            // 384스텝 = 24마디 * 16스텝 * 24틱 = 9,216틱. 마지막 이벤트 틱이 9,000틱 이상인지 검증 (기존 3,072틱 대비 3배)
+            Assert("스테이지 BGM 총 연주 길이 3배 확장 검증 (384스텝, 9,000틱 초과)", lastTick >= 9000);
+            Assert("채널 2 스트링스 코드 진행 타주 검증 (화음 노트 온 50회 이상)", ch2NoteOnCount >= 50);
+            Assert("채널 2 다채로운 화음 음고 다양성 검증 (서로 다른 화음 피치 8개 이상)", ch2ChordPitches.Count >= 8);
+
             Console.WriteLine("----------------------------------------------------");
             Console.WriteLine($" 총 테스트 결과: {passed} / {total} 통과 ({(passed == total ? "100% 성공" : "실패 항목 있음")})");
             Console.WriteLine("====================================================");

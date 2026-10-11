@@ -752,9 +752,6 @@ namespace HanlangGame.Engine
                     break;
             }
 
-            // BGM 연주 속도를 기존의 80% 수준으로 조절 (BPM * 0.8)
-            bpm *= 0.8f;
-
             double stepDuration = 60.0 / bpm / 4.0; // 16th note step duration
             int totalSamples = (int)(sampleRate * stepDuration * totalSteps);
             short[] samples = new short[totalSamples];
