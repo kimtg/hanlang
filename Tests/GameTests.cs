@@ -1864,6 +1864,93 @@ namespace HanlangGame.Tests
             Assert("2장 월드 오브젝트 목록에 들고 온 수레가 정상 등록되어 있음", sceneFlow.StageManager.WorldObjects.Contains(sceneCart));
             Assert("2장 시작 위치(X=35)에 맞춰 수레 좌표 동기화 완료", sceneCart.X == 35f);
 
+            // Test 63: BGM 블루스 스케일 블루 노트(b5 Blue Note) 및 서양 일반 조성 음악(Diatonic/Harmonic Minor) 음정 다양성 검증
+            // 채널 0 리드 멜로디 피치 추출 헬퍼 람다
+            Func<byte[], HashSet<int>> extractCh0Pitches = (byte[] midBytes) =>
+            {
+                var pitches = new HashSet<int>();
+                int p = 14 + 8; // skip MThd(14) + MTrk(8) chunk header
+                while (p < midBytes.Length - 2)
+                {
+                    byte st = midBytes[p++];
+                    if (st == 0x90) // Ch 0 Note On
+                    {
+                        int pitch = midBytes[p++];
+                        int vel = midBytes[p++];
+                        if (vel > 0) pitches.Add(pitch);
+                    }
+                    else if (st == 0xFF) // Meta event
+                    {
+                        if (p >= midBytes.Length) break;
+                        p++; // meta type
+                        int metaLen = 0;
+                        while (p < midBytes.Length)
+                        {
+                            byte b = midBytes[p++];
+                            metaLen = (metaLen << 7) | (b & 0x7F);
+                            if ((b & 0x80) == 0) break;
+                        }
+                        p += metaLen;
+                    }
+                    else if (st >= 0x80 && st <= 0xEF)
+                    {
+                        int mLen = (st & 0xF0) switch
+                        {
+                            0xC0 or 0xD0 => 1,
+                            _ => 2
+                        };
+                        p += mLen;
+                    }
+                }
+                return pitches;
+            };
+
+            // 1) 9개 전 트랙의 리드 멜로디 피치 추출 및 블루 노트(b5) 타주 검출
+            var marketLead = extractCh0Pitches(MidiGenerator.GenerateBgmMid("stage_market"));
+            int bb4 = MidiGenerator.NoteToMidi("Bb4");
+            int bb5 = MidiGenerator.NoteToMidi("Bb5");
+            Assert("저잣거리 BGM(E minor): E 블루스 스케일 b5 블루 노트(Bb4/Bb5) 타주 검증", marketLead.Contains(bb4) || marketLead.Contains(bb5));
+
+            var midbossLead = extractCh0Pitches(MidiGenerator.GenerateBgmMid("midboss"));
+            int ab4 = MidiGenerator.NoteToMidi("Ab4");
+            int ab5 = MidiGenerator.NoteToMidi("Ab5");
+            Assert("중간보스 BGM(D minor): D 블루스 스케일 b5 블루 노트(Ab4/Ab5) 타주 검증", midbossLead.Contains(ab4) || midbossLead.Contains(ab5));
+
+            var finalbossLead = extractCh0Pitches(MidiGenerator.GenerateBgmMid("finalboss"));
+            int gb4 = MidiGenerator.NoteToMidi("Gb4");
+            int gb5 = MidiGenerator.NoteToMidi("Gb5");
+            Assert("최종보스 BGM(C minor): C 블루스 스케일 b5 블루 노트(Gb4/Gb5) 타주 검증", finalbossLead.Contains(gb4) || finalbossLead.Contains(gb5));
+
+            var fortressLead = extractCh0Pitches(MidiGenerator.GenerateBgmMid("stage_fortress"));
+            int eb4 = MidiGenerator.NoteToMidi("Eb4");
+            int eb5 = MidiGenerator.NoteToMidi("Eb5");
+            Assert("성곽 BGM(A minor): A 블루스 스케일 b5 블루 노트(Eb4/Eb5) 타주 검증", fortressLead.Contains(eb4) || fortressLead.Contains(eb5));
+
+            var nightLead = extractCh0Pitches(MidiGenerator.GenerateBgmMid("stage_night"));
+            Assert("육조거리 BGM(D minor): D 블루스 스케일 b5 블루 노트(Ab4/Ab5) 타주 검증", nightLead.Contains(ab4) || nightLead.Contains(ab5));
+
+            var shopLead = extractCh0Pitches(MidiGenerator.GenerateBgmMid("shop"));
+            Assert("주막 BGM(A minor Swing): A 블루스 스케일 b5 블루 노트(Eb5) 타주 검증", shopLead.Contains(eb5));
+
+            // 2) 5음 음계 비중 축소 및 서양 일반 조성 음악(Diatonic Tonal Music) 음정 다양성(7~8개 이상 고유 피치 클래스) 검증
+            var palaceLead = extractCh0Pitches(MidiGenerator.GenerateBgmMid("stage_palace"));
+            int palacePitchClasses = palaceLead.Select(p => p % 12).Distinct().Count();
+            Assert("궁궐 BGM(G major): 5음 음계 탈피 및 서양 조성 다이아토닉 음정 다양성 (7음 이상 사용)", palacePitchClasses >= 7);
+
+            var titleLead = extractCh0Pitches(MidiGenerator.GenerateBgmMid("title"));
+            int titlePitchClasses = titleLead.Select(p => p % 12).Distinct().Count();
+            Assert("타이틀 BGM(C major): 서양 조성 다이아토닉 + 블루스 텐션 다양성 (7음 이상 사용)", titlePitchClasses >= 7);
+
+            var victoryLead = extractCh0Pitches(MidiGenerator.GenerateBgmMid("victory"));
+            int victoryPitchClasses = victoryLead.Select(p => p % 12).Distinct().Count();
+            Assert("승리 BGM(D major): 서양 클래식 승리 찬가 다이아토닉 다양성 (7음 이상 사용)", victoryPitchClasses >= 7);
+
+            int marketPitchClasses = marketLead.Select(p => p % 12).Distinct().Count();
+            Assert("저잣거리 BGM(E minor): E minor 다이아토닉 + 블루 노트 융합 다양성 (8음 이상 사용)", marketPitchClasses >= 8);
+
+            int bossPitchClasses = finalbossLead.Select(p => p % 12).Distinct().Count();
+            Assert("최종보스 BGM(C minor): C 화성단음계 + 블루 노트 융합 다양성 (8음 이상 사용)", bossPitchClasses >= 8);
+
             Console.WriteLine("----------------------------------------------------");
             Console.WriteLine($" 총 테스트 결과: {passed} / {total} 통과 ({(passed == total ? "100% 성공" : "실패 항목 있음")})");
             Console.WriteLine("====================================================");
