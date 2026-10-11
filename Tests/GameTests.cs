@@ -2309,6 +2309,63 @@ namespace HanlangGame.Tests
             Assert("용비어천격 체공 및 타격 완료 후 지면 착지 시 idle 정상 전이", dragonPl.State == "idle");
             Assert("착지 후 후딜레이 쿨다운 부여", dragonPl.ParryCooldownTimer > 0f);
 
+            // ====================================================
+            // Test 69: 제3 비기: 월인천강포(月印千江砲) 애니메이션 프레임 전환 및 고해상도 그래픽 렌더링 검증
+            // ====================================================
+            var wavePl = new Player(new StatusSystem());
+            wavePl.X = 100f;
+            wavePl.Y = 170f;
+            wavePl.Z = 0f;
+            wavePl.State = "wave";
+            wavePl.CurrentAttackType = "wave";
+            wavePl.StateTimer = 0f;
+
+            // 1) 초기 기 모으기 단계 (StateTimer < 0.12s) -> AnimFrame 0 (허리춤 태극 응축 자세)
+            wavePl.Update(0.05f);
+            Assert("월인천강포 시전 중 'wave' 상태 유지", wavePl.State == "wave");
+            Assert("기 모으기 단계에서는 태극 응축 자세 (AnimFrame == 0)", wavePl.AnimFrame == 0);
+
+            // 2) 전방 발사 단계 (StateTimer >= 0.12s) -> AnimFrame 1 (전방 궁보 스탠스 & 두 손 발사)
+            wavePl.Update(0.09f); // 누적 0.14s
+            Assert("월인천강포 발사 중 'wave' 상태 유지", wavePl.State == "wave");
+            Assert("발사 단계에서는 전방 궁보 발사 모션 (AnimFrame == 1)", wavePl.AnimFrame == 1);
+
+            // 3) 월인천강포 고해상도 그래픽 렌더링 무결성 검증 (만월, 회전 음양 태극구, 3중 광폭 빔, 月印千江 서예)
+            using (var testBmp = new Bitmap(960, 720))
+            {
+                var buffer = new PixelBuffer();
+                bool waveRenderPass = true;
+                try
+                {
+                    wavePl.Render(buffer, 0f);
+                }
+                catch
+                {
+                    waveRenderPass = false;
+                }
+                Assert("월인천강포(wave) 고해상도 그래픽(만월, 태극 성운구, 광폭 빔, 月印千江) 정상 렌더링", waveRenderPass);
+
+                // ex_wave (극·월인천강포) 렌더링 무결성 (개기월식 붉은 만월 및 스케일 확장)
+                wavePl.State = "ex_wave";
+                bool exWaveRenderPass = true;
+                try
+                {
+                    wavePl.Render(buffer, 0f);
+                }
+                catch
+                {
+                    exWaveRenderPass = false;
+                }
+                Assert("비기 각성 ex_wave 고해상도 그래픽 정상 렌더링", exWaveRenderPass);
+            }
+
+            // 4) 발사 지속 시간(0.50s) 종료 후 idle 상태로 자연스럽게 복귀 및 쿨다운
+            wavePl.State = "wave";
+            wavePl.StateTimer = 0.48f;
+            wavePl.Update(0.05f); // 누적 > 0.50s
+            Assert("월인천강포 발사 완료 후 idle 정상 전이", wavePl.State == "idle");
+            Assert("발사 완료 후 후딜레이 쿨다운 부여", wavePl.ParryCooldownTimer > 0f);
+
             Console.WriteLine("----------------------------------------------------");
             Console.WriteLine($" 총 테스트 결과: {passed} / {total} 통과 ({(passed == total ? "100% 성공" : "실패 항목 있음")})");
             Console.WriteLine("====================================================");

@@ -420,7 +420,7 @@ namespace HanlangGame.Visuals
                     g.FillRectangle(brWhite, bx + legW - 1, legY + 5, legW - 2, 2);
                 }
             }
-            else if (action == "wave" || action == "guard")
+            else if (action == "guard")
             {
                 int backX = bx - 1;
                 int frontX = bx + legW - 2;
@@ -430,6 +430,33 @@ namespace HanlangGame.Visuals
                 g.FillRectangle(brOut, frontX, legY, legW, legH);
                 g.FillRectangle(brRobe, frontX + 1, legY, legW - 2, 3);
                 g.FillRectangle(brWhite, frontX + 1, legY + 3, legW - 2, 3);
+            }
+            else if (action == "wave")
+            {
+                if (frame == 0)
+                {
+                    // 프레임 0: 음양 기 모으기 - 양발 단단히 디디고 무게중심 뒤로
+                    int backX = bx - 2;
+                    int frontX = bx + legW - 3;
+                    g.FillRectangle(brOut, backX, legY, legW, legH);
+                    g.FillRectangle(brRobeDk, backX + 1, legY, legW - 2, 3);
+                    g.FillRectangle(brWhite, backX + 1, legY + 3, legW - 2, 3);
+                    g.FillRectangle(brOut, frontX, legY, legW, legH);
+                    g.FillRectangle(brRobe, frontX + 1, legY, legW - 2, 3);
+                    g.FillRectangle(brWhite, frontX + 1, legY + 3, legW - 2, 3);
+                }
+                else
+                {
+                    // 프레임 1: 파동포 일제 발사 - 전방으로 깊게 내딛은 궁보(弓步) 스탠스
+                    int backX = bx - 3;
+                    int frontX = bx + legW;
+                    g.FillRectangle(brOut, backX, legY, legW, legH);
+                    g.FillRectangle(brRobeDk, backX + 1, legY, legW - 2, 3);
+                    g.FillRectangle(brWhite, backX + 1, legY + 3, legW - 2, 3);
+                    g.FillRectangle(brOut, frontX, legY, legW + 1, legH);
+                    g.FillRectangle(brRobe, frontX + 1, legY, legW - 1, 3);
+                    g.FillRectangle(brWhite, frontX + 1, legY + 3, legW - 1, 3);
+                }
             }
             else if (action == "walk" || action == "carry_walk")
             {
@@ -519,9 +546,20 @@ namespace HanlangGame.Visuals
             }
             else if (action == "wave")
             {
-                g.FillRectangle(brOut, bx + bodyW - 6, bodyY + 2, 7, 7);
-                g.FillRectangle(brRobe, bx + bodyW - 5, bodyY + 3, 4, 5);
-                g.FillRectangle(brSkin, bx + bodyW - 3, bodyY + 3, 4, 5);
+                if (frame == 0)
+                {
+                    // 프레임 0: 양손 모으기 (허리춤 뒤로 장전)
+                    g.FillRectangle(brOut, bx - 3, bodyY + 3, 7, 7);
+                    g.FillRectangle(brRobe, bx - 2, bodyY + 4, 4, 5);
+                    g.FillRectangle(brSkin, bx + 1, bodyY + 4, 3, 4);
+                }
+                else
+                {
+                    // 프레임 1: 전방으로 장풍 발사! 양손 앞으로 뻗기
+                    g.FillRectangle(brOut, bx + bodyW - 6, bodyY + 1, 8, 8);
+                    g.FillRectangle(brRobe, bx + bodyW - 5, bodyY + 2, 5, 6);
+                    g.FillRectangle(brSkin, bx + bodyW - 1, bodyY + 2, 4, 6);
+                }
             }
             else if (action == "spin")
             {
@@ -1039,13 +1077,30 @@ namespace HanlangGame.Visuals
             }
             else if (action == "wave")
             {
-                int wArmX = bx + bodyW - 2;
-                int wArmY = bodyY;
-                g.FillRectangle(brOut, wArmX, wArmY, 9, 8);
-                g.FillRectangle(brRobe, wArmX + 1, wArmY + 1, 4, 6);
-                g.FillRectangle(brSkin, wArmX + 4, wArmY, 5, 8);
-                using var brCyanOrb = new SolidBrush(Color.FromArgb(140, 230, 255));
-                g.FillEllipse(brCyanOrb, wArmX + 7, wArmY + 1, 5, 6);
+                if (frame == 0)
+                {
+                    // 프레임 0: 음양 태극기 응축 (허리춤에서 구체 생성)
+                    int wArmX = bx + 2;
+                    int wArmY = bodyY + 2;
+                    g.FillRectangle(brOut, wArmX, wArmY, 8, 8);
+                    g.FillRectangle(brRobe, wArmX + 1, wArmY + 1, 5, 6);
+                    g.FillRectangle(brSkin, wArmX + 3, wArmY + 3, 4, 5);
+                    using var brTaegeukCharge = new SolidBrush(Color.FromArgb(100, 220, 255));
+                    g.FillEllipse(brTaegeukCharge, wArmX + 5, wArmY + 2, 6, 6);
+                }
+                else
+                {
+                    // 프레임 1: 전방으로 손바닥을 활짝 펴서 발사!
+                    int wArmX = bx + bodyW - 2;
+                    int wArmY = bodyY - 1;
+                    g.FillRectangle(brOut, wArmX, wArmY, 11, 9);
+                    g.FillRectangle(brRobe, wArmX + 1, wArmY + 1, 5, 7);
+                    g.FillRectangle(brSkin, wArmX + 5, wArmY, 6, 9);
+                    using var brCyanOrb = new SolidBrush(Color.FromArgb(170, 240, 255));
+                    using var brWhiteCore = new SolidBrush(Color.White);
+                    g.FillEllipse(brCyanOrb, wArmX + 7, wArmY, 8, 9);
+                    g.FillEllipse(brWhiteCore, wArmX + 9, wArmY + 2, 4, 5);
+                }
             }
             else
             {

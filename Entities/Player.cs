@@ -1620,55 +1620,192 @@ namespace HanlangGame.Entities
             var g = buffer.Graphics;
             buffer.SetHighQualityModes();
 
+            bool isEx = State == "ex_wave";
+            float dir = FacingRight ? 1f : -1f;
+
+            // 70% 스케일 적용 (사용자 요청: 애니메이션 크기 70%로 축소)
+            const float animScale = 0.70f;
+
+            // 960x720 고해상도 스크린 좌표계
             float scx = Perspective.ProjectScreenX(X, cameraX, Y);
             float scy = Perspective.ProjectScreenY(Y - 15f, Z);
+            float sGroundY = Perspective.ProjectScreenY(Y, 0f);
 
-            // 1. 은빛 보름달 광륜 (Silver Celestial Moon Halo)
-            float moonRadius = 45f * PixelBuffer.Scale;
-            using (var moonPen = new Pen(Color.FromArgb(170, 210, 240, 255), 3.5f))
-            using (var moonGlow = new SolidBrush(Color.FromArgb(45, 180, 220, 255)))
+            // 손 위치 (파동포 발사 지점)
+            float handX = scx + dir * (16f * PixelBuffer.Scale);
+            float handY = scy - 3f * PixelBuffer.Scale;
+
+            // ----------------------------------------------------
+            // 1. 만월(滿月) & 은빛 천체 광륜 (Celestial Full Moon Halo)
+            // 플레이어 등 뒤로 떠오르는 장엄한 보름달 (70% 축소)
+            // ----------------------------------------------------
+            float moonRadius = (isEx ? 68f : 55f) * animScale * PixelBuffer.Scale;
+            float moonCenterX = scx - dir * 13f * PixelBuffer.Scale;
+            float moonCenterY = scy - 8f * PixelBuffer.Scale;
+
+            // 다층 달빛 코로나 & 후광 링
+            float pulse = (float)Math.Sin(StateTimer * 18f) * 4f * animScale * PixelBuffer.Scale;
+            float coronaPad = 15f * animScale * PixelBuffer.Scale;
+            using (var moonCorona = new SolidBrush(isEx ? Color.FromArgb(55, 255, 80, 40) : Color.FromArgb(45, 140, 210, 255)))
             {
-                g.FillEllipse(moonGlow, scx - moonRadius, scy - moonRadius, moonRadius * 2f, moonRadius * 2f);
-                g.DrawEllipse(moonPen, scx - moonRadius, scy - moonRadius, moonRadius * 2f, moonRadius * 2f);
+                g.FillEllipse(moonCorona, moonCenterX - moonRadius - coronaPad - pulse, moonCenterY - moonRadius - coronaPad - pulse,
+                    (moonRadius + coronaPad + pulse) * 2f, (moonRadius + coronaPad + pulse) * 2f);
             }
 
-            // 2. 청홍 태극 파동구 (Taegeuk Energy Sphere at Hands)
-            float handX = scx + (FacingRight ? 22f : -22f);
-            float handY = scy - 5f;
-            using (var blueTaegeuk = new SolidBrush(Color.FromArgb(220, 30, 90, 220)))
-            using (var redTaegeuk = new SolidBrush(Color.FromArgb(220, 220, 40, 40)))
+            // 보름달 본체 (은빛 그라데이션)
+            using (var moonBrush = new LinearGradientBrush(
+                new PointF(moonCenterX - moonRadius, moonCenterY - moonRadius),
+                new PointF(moonCenterX + moonRadius, moonCenterY + moonRadius),
+                isEx ? Color.FromArgb(230, 255, 180, 100) : Color.FromArgb(220, 235, 245, 255),
+                isEx ? Color.FromArgb(170, 220, 50, 20) : Color.FromArgb(160, 150, 205, 250)))
             {
-                g.FillPie(blueTaegeuk, handX - 16f, handY - 16f, 32f, 32f, 0, 180);
-                g.FillPie(redTaegeuk, handX - 16f, handY - 16f, 32f, 32f, 180, 180);
+                g.FillEllipse(moonBrush, moonCenterX - moonRadius, moonCenterY - moonRadius, moonRadius * 2f, moonRadius * 2f);
             }
 
-            // 3. 150px 일직선 관통 광선 파동포 빔 (Piercing Wave Beam)
-            float beamLength = 150f * PixelBuffer.Scale;
-            float dir = FacingRight ? 1f : -1f;
+            // 달의 바다 / 크레이터 질감 음영
+            using (var moonShadow = new SolidBrush(isEx ? Color.FromArgb(60, 120, 20, 10) : Color.FromArgb(40, 70, 120, 190)))
+            {
+                g.FillEllipse(moonShadow, moonCenterX - moonRadius * 0.45f, moonCenterY - moonRadius * 0.35f, moonRadius * 0.65f, moonRadius * 0.55f);
+                g.FillEllipse(moonShadow, moonCenterX + moonRadius * 0.15f, moonCenterY + moonRadius * 0.1f, moonRadius * 0.45f, moonRadius * 0.4f);
+                g.FillEllipse(moonShadow, moonCenterX - moonRadius * 0.2f, moonCenterY + moonRadius * 0.25f, moonRadius * 0.5f, moonRadius * 0.35f);
+            }
+
+            // 보름달 외곽선 테두리
+            using (var moonPen = new Pen(isEx ? Color.FromArgb(240, 255, 220, 140) : Color.FromArgb(240, 210, 240, 255), 2.5f))
+            {
+                g.DrawEllipse(moonPen, moonCenterX - moonRadius, moonCenterY - moonRadius, moonRadius * 2f, moonRadius * 2f);
+            }
+
+            // ----------------------------------------------------
+            // 2. 지면 반사광 & 파동포 반동풍 (Ground Reflection & Backdraft)
+            // ----------------------------------------------------
+            float gReflectW = 180f * animScale * PixelBuffer.Scale;
+            using (var brGReflect = new SolidBrush(isEx ? Color.FromArgb(45, 255, 120, 40) : Color.FromArgb(40, 100, 200, 255)))
+            {
+                g.FillEllipse(brGReflect, handX - (dir > 0 ? 20f : gReflectW - 20f), sGroundY - 6f, gReflectW, 12f);
+            }
+
+            // ----------------------------------------------------
+            // 3. 실시간 고속 회전 음양 태극 성운구 (Rotating Swirling Taegeuk Core) (70% 축소)
+            // ----------------------------------------------------
+            float taegeukR = (16f + (float)Math.Sin(StateTimer * 30f) * 3f) * animScale * PixelBuffer.Scale;
+            float rotAngle = StateTimer * 1200f; // 초당 약 3.3바퀴 고속 회전
+
+            var stateSaved = g.Save();
+            g.TranslateTransform(handX, handY);
+            g.RotateTransform(rotAngle);
+
+            // 외곽 빛의 소용돌이 링
+            using (var pTaeRing = new Pen(Color.FromArgb(220, 255, 255, 255), 1.8f))
+            {
+                g.DrawEllipse(pTaeRing, -taegeukR * 1.2f, -taegeukR * 1.2f, taegeukR * 2.4f, taegeukR * 2.4f);
+            }
+
+            // 청색 음(陰) & 붉은색 양(陽)
+            using (var blueTaegeuk = new SolidBrush(Color.FromArgb(235, 25, 95, 235)))
+            using (var redTaegeuk = new SolidBrush(Color.FromArgb(235, 235, 35, 35)))
+            {
+                g.FillPie(blueTaegeuk, -taegeukR, -taegeukR, taegeukR * 2f, taegeukR * 2f, 0, 180);
+                g.FillPie(redTaegeuk, -taegeukR, -taegeukR, taegeukR * 2f, taegeukR * 2f, 180, 180);
+                // 태극 곡선 입체 원
+                g.FillEllipse(blueTaegeuk, -taegeukR / 2f, -taegeukR / 2f, taegeukR, taegeukR);
+                g.FillEllipse(redTaegeuk, taegeukR / 2f - taegeukR / 2f, -taegeukR / 2f, taegeukR, taegeukR);
+                g.FillEllipse(redTaegeuk, -taegeukR / 4f, -taegeukR / 4f, taegeukR / 2f, taegeukR / 2f);
+                g.FillEllipse(blueTaegeuk, taegeukR / 2f - taegeukR / 4f, -taegeukR / 4f, taegeukR / 2f, taegeukR / 2f);
+            }
+
+            // 중심 순백 광자 핵
+            using (var brCoreGlow = new SolidBrush(Color.FromArgb(255, 255, 255, 240)))
+            {
+                g.FillEllipse(brCoreGlow, -taegeukR * 0.35f, -taegeukR * 0.35f, taegeukR * 0.7f, taegeukR * 0.7f);
+            }
+            g.Restore(stateSaved);
+
+            // ----------------------------------------------------
+            // 4. 초광폭 관통 달빛 파동포 빔 & 은하수 하전 입자 (Mega Piercing Moonlight Wave Beam) (70% 축소)
+            // ----------------------------------------------------
+            float beamLength = (isEx ? 280f : 200f) * animScale * PixelBuffer.Scale;
             float endX = handX + dir * beamLength;
 
-            // 외곽 푸른 파동 글로우
-            using (var outerBeam = new Pen(Color.FromArgb(160, 70, 175, 255), 26f))
+            // 1단계: 외곽 광대한 오라 플라즈마 필드 (폭 70% 축소)
+            float outerBeamW = (isEx ? 48f : 36f) * animScale * PixelBuffer.Scale;
+            using (var outerBeam = new Pen(isEx ? Color.FromArgb(140, 255, 110, 50) : Color.FromArgb(140, 60, 180, 255), outerBeamW))
             {
-                outerBeam.StartCap = System.Drawing.Drawing2D.LineCap.Round;
-                outerBeam.EndCap = System.Drawing.Drawing2D.LineCap.Round;
+                outerBeam.StartCap = LineCap.Round;
+                outerBeam.EndCap = LineCap.Round;
                 g.DrawLine(outerBeam, handX, handY, endX, handY);
             }
 
-            // 내부 순백 코어 빔
-            using (var coreBeam = new Pen(Color.FromArgb(255, 255, 255, 230), 12f))
+            // 2단계: 중간 은빛 성운 빔 (폭 70% 축소)
+            float midBeamW = (isEx ? 30f : 22f) * animScale * PixelBuffer.Scale;
+            using (var midBeam = new Pen(isEx ? Color.FromArgb(200, 255, 210, 90) : Color.FromArgb(200, 140, 230, 255), midBeamW))
             {
-                coreBeam.StartCap = System.Drawing.Drawing2D.LineCap.Round;
-                coreBeam.EndCap = System.Drawing.Drawing2D.LineCap.Round;
+                midBeam.StartCap = LineCap.Round;
+                midBeam.EndCap = LineCap.Round;
+                g.DrawLine(midBeam, handX, handY, endX, handY);
+            }
+
+            // 3단계: 초고열 순백 코어 레이저 (폭 70% 축소)
+            float coreBeamW = (isEx ? 14f : 10f) * animScale * PixelBuffer.Scale;
+            using (var coreBeam = new Pen(Color.FromArgb(255, 255, 255, 245), coreBeamW))
+            {
+                coreBeam.StartCap = LineCap.Round;
+                coreBeam.EndCap = LineCap.Round;
                 g.DrawLine(coreBeam, handX, handY, endX, handY);
             }
 
-            // 4. 파동포 궤적을 타고 나아가는 광채 한자 "月 印 千 江"
-            string[] waveChars = { "月", "印", "千", "江" };
-            for (int w = 0; w < waveChars.Length; w++)
+            // 4단계: 빔을 나선형으로 휘감는 이중 광자 리본 (Helical Moonlight Spirals)
+            int waveNodes = 12;
+            for (int k = 0; k < waveNodes; k++)
             {
-                float charX = handX + dir * (35f + w * 32f) * PixelBuffer.Scale;
-                buffer.DrawOutlinedText(waveChars[w], charX - 10f, handY - 14f, Color.FromArgb(255, 250, 150), Color.FromArgb(20, 30, 70), buffer.FontHeader, 2f);
+                float tStep = k / (float)waveNodes;
+                float segX = handX + dir * (tStep * beamLength);
+                float sinPhase = StateTimer * 28f - k * 0.7f;
+                float sinAmp = (18f + (float)Math.Sin(k * 0.6f) * 6f) * animScale * PixelBuffer.Scale;
+                float segY1 = handY + (float)Math.Sin(sinPhase) * sinAmp;
+                float segY2 = handY - (float)Math.Sin(sinPhase) * sinAmp;
+
+                // 마름모 충격파 링 노드
+                float nodeSize = (10f + (float)Math.Cos(sinPhase) * 3f) * animScale * PixelBuffer.Scale;
+                using var brNode = new SolidBrush(Color.FromArgb(210, 255, 255, 220));
+                g.FillEllipse(brNode, segX - nodeSize / 2f, segY1 - nodeSize / 4f, nodeSize, nodeSize * 0.5f);
+                g.FillEllipse(brNode, segX - nodeSize / 2f, segY2 - nodeSize / 4f, nodeSize, nodeSize * 0.5f);
+
+                // 아래로 흩날리는 천강(千江) 은하수 별빛 물방울
+                float starX = segX + (float)Math.Cos(StateTimer * 20f + k) * 6f * PixelBuffer.Scale;
+                float starY = handY + (k * 3f + (float)Math.Sin(StateTimer * 25f + k) * 6f) * PixelBuffer.Scale;
+                using var brStardust = new SolidBrush(Color.FromArgb(180, 160, 240, 255));
+                g.FillEllipse(brStardust, starX - 2f, starY - 2f, 4f, 4f);
+            }
+
+            // ----------------------------------------------------
+            // 5. 파동포 궤적을 타고 나아가는 광채 한자 "月 印 千 江" (월인천강) 4자 신비 투사 (70% 축소)
+            // ----------------------------------------------------
+            string[] waveChars = { "月", "印", "千", "江" };
+            float charBaseDist = (isEx ? 50f : 40f) * animScale * PixelBuffer.Scale;
+            float charStepDist = (isEx ? 52f : 38f) * animScale * PixelBuffer.Scale;
+
+            for (int w = 0; w < 4; w++)
+            {
+                float charX = handX + dir * (charBaseDist + w * charStepDist);
+                float charY = handY - 10f * PixelBuffer.Scale;
+
+                // 은빛 보름달 형태의 원형 광배(Lunar Disc Halo) (70% 축소)
+                float discR = 17f * PixelBuffer.Scale;
+                using (var brDiscHalo = new SolidBrush(Color.FromArgb(190, 15, 30, 65)))
+                {
+                    g.FillEllipse(brDiscHalo, charX - discR, charY - discR / 2f, discR * 2f, discR * 2f);
+                }
+                using (var penDiscRing = new Pen(isEx ? Color.FromArgb(240, 255, 210, 80) : Color.FromArgb(240, 180, 240, 255), 1.8f))
+                {
+                    g.DrawEllipse(penDiscRing, charX - discR, charY - discR / 2f, discR * 2f, discR * 2f);
+                }
+
+                // 백금/황금빛 본문 + 검푸른 붓글씨 외곽선 (FontHeader 15pt 적용)
+                buffer.DrawOutlinedText(waveChars[w], charX - 8.5f * PixelBuffer.Scale, charY - 1f * PixelBuffer.Scale,
+                    isEx ? Color.FromArgb(255, 255, 160) : Color.FromArgb(255, 250, 180),
+                    Color.FromArgb(10, 20, 50),
+                    buffer.FontHeader, 2.2f);
             }
         }
 

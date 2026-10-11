@@ -115,6 +115,11 @@ namespace HanlangGame.Entities
                 // 제2 비기 용비어천격: 0: 끌어올리는 하단 장전 자세, 1: 솟구치는 상단 승룡 어퍼컷 자세
                 AnimFrame = (StateTimer < 0.10f) ? 0 : 1;
             }
+            else if (State == "wave" || State == "ex_wave")
+            {
+                // 제3 비기 월인천강포: 0: 기 모으기 장전 자세, 1: 전방 파동포 일제 발사 자세
+                AnimFrame = (StateTimer < 0.12f) ? 0 : 1;
+            }
             else
             {
                 AnimFrame = 0;
