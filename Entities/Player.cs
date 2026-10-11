@@ -1,5 +1,6 @@
 using System;
 using System.Drawing;
+using System.Drawing.Drawing2D;
 using System.Windows.Forms;
 using HanlangGame.Engine;
 using HanlangGame.Visuals;
@@ -741,11 +742,28 @@ namespace HanlangGame.Entities
                     StateTimer = 0f;
                     HasDealtDamage = false;
                 }
+                else if (State == "dragon" && StateTimer > 0.40f)
+                {
+                    State = "idle";
+                    StateTimer = 0f;
+                    HasDealtDamage = false;
+                    ParryCooldownTimer = 0.28f;
+                }
+                else if (State == "ex_dragon" && StateTimer > 0.48f)
+                {
+                    State = "idle";
+                    StateTimer = 0f;
+                    HasDealtDamage = false;
+                    ParryCooldownTimer = 0.28f;
+                }
             }
             else
             {
-                // 공중 체공 중일 때는 날라차기나 피격이 아닌 경우 점프 상태 보장
-                if (State != "jumpkick" && State != "hit" && State != "down")
+                // 공중 체공 중일 때는 날라차기, 비기(dragon, spin, wave) 또는 피격이 아닌 경우 점프 상태 보장
+                if (State != "jumpkick" && State != "hit" && State != "down" &&
+                    State != "dragon" && State != "ex_dragon" &&
+                    State != "spin" && State != "ex_spin" &&
+                    State != "wave" && State != "ex_wave")
                 {
                     State = "jump";
                 }
@@ -1279,7 +1297,9 @@ namespace HanlangGame.Entities
             {
                 "guard" => ParryWindowTimer > 0 ? "player_parry" : "player_guard",
                 "dragon" => AnimFrame > 0 ? "player_dragon_1" : "player_dragon_0",
+                "ex_dragon" => AnimFrame > 0 ? "player_dragon_1" : "player_dragon_0",
                 "wave" => AnimFrame > 0 ? "player_wave_1" : "player_wave_0",
+                "ex_wave" => AnimFrame > 0 ? "player_wave_1" : "player_wave_0",
                 "swing" => "player_swing",
                 "knee" => "player_kick_0",
                 "giantswing" => $"player_spin_{AnimFrame}",
@@ -1289,6 +1309,7 @@ namespace HanlangGame.Entities
                 "kick" => $"player_kick_{AnimFrame}",
                 "jumpkick" => "player_jumpkick",
                 "spin" => $"player_spin_{AnimFrame}",
+                "ex_spin" => $"player_spin_{AnimFrame}",
                 "jump" => IsCarrying ? "player_carry_jump" : "player_jump",
                 "walk" or "run" => IsCarrying ? $"player_carry_walk_{AnimFrame}" : $"player_walk_{AnimFrame}",
                 "hit" => "player_hit",
@@ -1311,15 +1332,15 @@ namespace HanlangGame.Entities
             // ==========================================
             // 삼대 삼한 비기 고해상도 이펙트 렌더링
             // ==========================================
-            if (State == "spin")
+            if (State == "spin" || State == "ex_spin")
             {
                 RenderHunminSpinGlow(buffer, cameraX);
             }
-            else if (State == "dragon")
+            else if (State == "dragon" || State == "ex_dragon")
             {
                 RenderDragonStrikeGlow(buffer, cameraX);
             }
-            else if (State == "wave")
+            else if (State == "wave" || State == "ex_wave")
             {
                 RenderMoonWaveGlow(buffer, cameraX);
             }
@@ -1399,43 +1420,198 @@ namespace HanlangGame.Entities
             var g = buffer.Graphics;
             buffer.SetHighQualityModes();
 
+            bool isEx = State == "ex_dragon";
+            float dir = FacingRight ? 1f : -1f;
+
+            // 960x720 고해상도 스크린 좌표계
             float scx = Perspective.ProjectScreenX(X, cameraX, Y);
             float scy = Perspective.ProjectScreenY(Y - 15f, Z);
+            float sGroundY = Perspective.ProjectScreenY(Y, 0f);
 
-            // 1. 청룡의 비룡 승천 나선형 기운 (Ascending Azure Dragon Spiral Aura)
-            float t = StateTimer * 20f;
-            for (int i = 0; i < 8; i++)
+            // 주먹 위치: 캐릭터 상체 앞쪽 및 높은 상승 타격점
+            float fistX = scx + dir * 14f * PixelBuffer.Scale;
+            float fistY = scy - 20f * PixelBuffer.Scale;
+
+            // ----------------------------------------------------
+            // 1. 지면 용오름 충격파 (Ground Dragon Ascent Blast)
+            // ----------------------------------------------------
+            float groundRatio = Math.Clamp(StateTimer / 0.40f, 0f, 1f);
+            float groundRingW = (35f + groundRatio * 65f) * PixelBuffer.Scale;
+            float groundRingH = (12f + groundRatio * 18f) * PixelBuffer.Scale;
+            int groundAlpha = (int)(Math.Max(0f, 1f - groundRatio) * 220);
+
+            if (groundAlpha > 0)
             {
-                float arcY = scy + (i * 12f) - (StateTimer * 140f);
-                float arcX = scx + (float)Math.Sin(t + i * 0.8f) * 28f * (FacingRight ? 1f : -1f);
-                float size = (32f - i * 3f) * PixelBuffer.Scale;
+                using var pGroundRing = new Pen(isEx ? Color.FromArgb(groundAlpha, 255, 120, 40) : Color.FromArgb(groundAlpha, 80, 230, 255), 4f);
+                g.DrawEllipse(pGroundRing, scx - groundRingW / 2f, sGroundY - groundRingH / 2f, groundRingW, groundRingH);
 
-                using var dragonBrush = new SolidBrush(Color.FromArgb(160 - i * 16, 40, 160, 255));
-                g.FillEllipse(dragonBrush, arcX - size / 2f, arcY - size / 3f, size, size * 0.65f);
-
-                using var coreBrush = new SolidBrush(Color.FromArgb(210 - i * 20, 200, 245, 255));
-                g.FillEllipse(coreBrush, arcX - size / 4f, arcY - size / 6f, size / 2f, size * 0.35f);
+                using var brGroundDust = new SolidBrush(Color.FromArgb(groundAlpha / 3, 255, 230, 150));
+                g.FillEllipse(brGroundDust, scx - groundRingW * 0.4f, sGroundY - groundRingH * 0.4f, groundRingW * 0.8f, groundRingH * 0.8f);
             }
 
-            // 2. 황금 승룡 어퍼컷 섬광 및 용비늘 궤적
-            float fistX = scx + (FacingRight ? 18f : -18f);
-            float fistY = scy - 25f;
-            using (var goldAuraPen = new Pen(Color.FromArgb(240, 255, 225, 60), 4f))
+            // ----------------------------------------------------
+            // 2. 승천 기둥: 지면부터 주먹까지 솟구치는 거대한 용오름 오라 (Dragon Ascension Column)
+            // ----------------------------------------------------
+            float colHeight = Math.Max(25f, sGroundY - fistY);
+            float colWidth = (28f + (float)Math.Sin(StateTimer * 30f) * 6f) * PixelBuffer.Scale;
+
+            // 바깥쪽 반투명 청록/황금 에너지 기둥
+            using (var colBrush = new LinearGradientBrush(
+                new PointF(scx, sGroundY), new PointF(scx, fistY),
+                isEx ? Color.FromArgb(40, 255, 100, 20) : Color.FromArgb(30, 0, 140, 255),
+                isEx ? Color.FromArgb(200, 255, 200, 50) : Color.FromArgb(200, 70, 220, 255)))
             {
-                g.DrawEllipse(goldAuraPen, fistX - 22f, fistY - 22f, 44f, 44f);
-            }
-            using (var coreFlash = new SolidBrush(Color.FromArgb(255, 255, 255, 200)))
-            {
-                g.FillEllipse(coreFlash, fistX - 10f, fistY - 10f, 20f, 20f);
+                g.FillRectangle(colBrush, scx - colWidth / 2f, fistY, colWidth, colHeight);
             }
 
-            // 3. 한자 서예 텍스트 "龍 飛 御 天" 솟구치는 기운 투사
+            // ----------------------------------------------------
+            // 3. 나선형으로 용틀임하는 청룡 & 황금 쌍룡 회오리 (Ascending Double Helix Coils)
+            // ----------------------------------------------------
+            int spiralSegments = 16;
+            for (int i = 0; i < spiralSegments; i++)
+            {
+                float segmentY = fistY + (i / (float)spiralSegments) * colHeight;
+                float phase = StateTimer * 22f - i * 0.45f;
+                float sway = (float)Math.Sin(phase) * (20f + i * 1.5f) * PixelBuffer.Scale;
+                float segSize = (16f + (1f - i / (float)spiralSegments) * 14f) * PixelBuffer.Scale;
+
+                float xA = scx + sway;
+                float xB = scx - sway;
+
+                // 나선 A: 비룡 청록 오라 구체
+                using var brCyanCoil = new SolidBrush(isEx ? Color.FromArgb(190, 255, 80, 40) : Color.FromArgb(190, 40, 180, 255));
+                g.FillEllipse(brCyanCoil, xA - segSize / 2f, segmentY - segSize / 3f, segSize, segSize * 0.65f);
+
+                // 나선 B: 황금 번개 비늘 구체
+                using var brGoldCoil = new SolidBrush(Color.FromArgb(210, 255, 225, 70));
+                g.FillEllipse(brGoldCoil, xB - segSize * 0.4f, segmentY - segSize * 0.25f, segSize * 0.8f, segSize * 0.5f);
+
+                // 코어 하이라이트
+                using var brCore = new SolidBrush(Color.FromArgb(240, 255, 255, 240));
+                g.FillEllipse(brCore, xA - segSize * 0.15f, segmentY - segSize * 0.15f, segSize * 0.3f, segSize * 0.3f);
+            }
+
+            // ----------------------------------------------------
+            // 4. 거대한 비룡의 머리 (Roaring Azure Dragon Avatar / Maw)
+            // 주먹 끝에서 하늘을 향해 포효하는 웅장한 용의 머리 실루엣
+            // ----------------------------------------------------
+            float headX = fistX + dir * 10f * PixelBuffer.Scale;
+            float headY = fistY - 15f * PixelBuffer.Scale;
+            float scaleD = (isEx ? 1.35f : 1.1f) * PixelBuffer.Scale;
+
+            // 용의 턱, 뿔, 갈기, 주둥이를 그리는 GraphicsPath
+            using (var dragonHeadPath = new GraphicsPath())
+            {
+                // 주둥이, 코끝, 아랫입술, 목, 뒷목 갈기, 큰 뿔, 작은 뿔, 이마
+                PointF[] points = new PointF[]
+                {
+                    new PointF(headX + dir * 35f * scaleD, headY - 10f * scaleD), // 윗입술
+                    new PointF(headX + dir * 42f * scaleD, headY - 2f * scaleD),  // 코끝
+                    new PointF(headX + dir * 25f * scaleD, headY + 12f * scaleD), // 아랫입술
+                    new PointF(headX + dir * 18f * scaleD, headY + 4f * scaleD),  // 입 안쪽
+                    new PointF(headX - dir * 10f * scaleD, headY + 22f * scaleD), // 아래턱
+                    new PointF(headX - dir * 20f * scaleD, headY + 5f * scaleD),  // 목덜미 갈기
+                    new PointF(headX - dir * 28f * scaleD, headY - 24f * scaleD), // 큰 뿔 끝
+                    new PointF(headX - dir * 10f * scaleD, headY - 14f * scaleD), // 뿔 분기점
+                    new PointF(headX - dir * 16f * scaleD, headY - 32f * scaleD), // 작은 뿔 끝
+                    new PointF(headX + dir * 5f * scaleD,  headY - 16f * scaleD), // 이마
+                };
+                dragonHeadPath.AddPolygon(points);
+
+                // 반투명 용머리 내부 바디 채우기
+                using var brDragonSkin = new SolidBrush(isEx ? Color.FromArgb(200, 240, 60, 30) : Color.FromArgb(200, 30, 160, 255));
+                g.FillPath(brDragonSkin, dragonHeadPath);
+
+                // 용머리 외곽선
+                using var penDragonOutline = new Pen(isEx ? Color.FromArgb(255, 255, 210, 80) : Color.FromArgb(255, 170, 245, 255), 3.5f * PixelBuffer.Scale);
+                g.DrawPath(penDragonOutline, dragonHeadPath);
+            }
+
+            // 용의 타오르는 안광 (Dragon Eye)
+            float eyeX = headX + dir * 14f * scaleD;
+            float eyeY = headY - 6f * scaleD;
+            using (var brEyeGlow = new SolidBrush(Color.FromArgb(255, 255, 245, 60)))
+            {
+                g.FillEllipse(brEyeGlow, eyeX - 4f * PixelBuffer.Scale, eyeY - 4f * PixelBuffer.Scale, 8f * PixelBuffer.Scale, 8f * PixelBuffer.Scale);
+            }
+            using (var brEyePupil = new SolidBrush(Color.FromArgb(255, 255, 40, 20)))
+            {
+                g.FillEllipse(brEyePupil, eyeX - 2f * PixelBuffer.Scale, eyeY - 2f * PixelBuffer.Scale, 4f * PixelBuffer.Scale, 4f * PixelBuffer.Scale);
+            }
+
+            // 용의 긴 수염 (Dragon Whiskers) 2줄기
+            using (var penWhisker = new Pen(isEx ? Color.FromArgb(240, 255, 230, 100) : Color.FromArgb(240, 150, 240, 255), 2.5f))
+            {
+                float wPhase = StateTimer * 18f;
+                PointF[] whiskerUpper = new PointF[]
+                {
+                    new PointF(headX + dir * 38f * scaleD, headY - 4f * scaleD),
+                    new PointF(headX + dir * 55f * scaleD, headY + (float)Math.Sin(wPhase) * 12f * scaleD),
+                    new PointF(headX + dir * 75f * scaleD, headY - 15f * scaleD + (float)Math.Cos(wPhase) * 15f * scaleD),
+                };
+                g.DrawCurve(penWhisker, whiskerUpper);
+
+                PointF[] whiskerLower = new PointF[]
+                {
+                    new PointF(headX + dir * 32f * scaleD, headY + 6f * scaleD),
+                    new PointF(headX + dir * 48f * scaleD, headY + 20f * scaleD + (float)Math.Sin(wPhase + 1f) * 10f * scaleD),
+                    new PointF(headX + dir * 68f * scaleD, headY + 12f * scaleD + (float)Math.Cos(wPhase + 1f) * 14f * scaleD),
+                };
+                g.DrawCurve(penWhisker, whiskerLower);
+            }
+
+            // ----------------------------------------------------
+            // 5. 주먹 끝의 여의주(如意珠) 대폭발 섬광 & 방사형 광선 (Dragon Pearl Sunburst)
+            // ----------------------------------------------------
+            float pearlRadius = (16f + (float)Math.Sin(StateTimer * 35f) * 4f) * PixelBuffer.Scale;
+            using (var brPearlHalo = new SolidBrush(Color.FromArgb(170, 255, 210, 50)))
+            {
+                g.FillEllipse(brPearlHalo, fistX - pearlRadius * 1.6f, fistY - pearlRadius * 1.6f, pearlRadius * 3.2f, pearlRadius * 3.2f);
+            }
+            using (var brPearlCore = new SolidBrush(Color.FromArgb(255, 255, 255, 240)))
+            {
+                g.FillEllipse(brPearlCore, fistX - pearlRadius, fistY - pearlRadius, pearlRadius * 2f, pearlRadius * 2f);
+            }
+            using (var penFlash = new Pen(Color.FromArgb(240, 255, 240, 160), 3f))
+            {
+                float rayLen = 42f * PixelBuffer.Scale;
+                g.DrawLine(penFlash, fistX - rayLen, fistY, fistX + rayLen, fistY);
+                g.DrawLine(penFlash, fistX, fistY - rayLen, fistX, fistY + rayLen);
+                g.DrawLine(penFlash, fistX - rayLen * 0.7f, fistY - rayLen * 0.7f, fistX + rayLen * 0.7f, fistY + rayLen * 0.7f);
+                g.DrawLine(penFlash, fistX - rayLen * 0.7f, fistY + rayLen * 0.7f, fistX + rayLen * 0.7f, fistY - rayLen * 0.7f);
+            }
+
+            // ----------------------------------------------------
+            // 6. 장엄한 서예 한자 "龍 飛 御 天" 4자 분산 투사
+            // ----------------------------------------------------
             string[] dragonChars = { "龍", "飛", "御", "天" };
-            for (int c = 0; c < dragonChars.Length; c++)
+            float[] charYOffsets = new float[]
             {
-                float charY = scy - (c * 24f) - 15f;
-                float charX = scx + (float)Math.Sin(StateTimer * 15f + c) * 14f;
-                buffer.DrawOutlinedText(dragonChars[c], charX - 10f, charY, Color.FromArgb(255, 235, 75), Color.FromArgb(20, 40, 80), buffer.FontHeader, 2f);
+                sGroundY - 45f,                       // 龍 (지면 발구름 부근)
+                sGroundY - (colHeight * 0.38f),       // 飛 (도약 중단)
+                sGroundY - (colHeight * 0.72f),       // 御 (상승 상단)
+                fistY - 35f                           // 天 (하늘 정점, 주먹 위)
+            };
+
+            for (int c = 0; c < 4; c++)
+            {
+                float cY = charYOffsets[c];
+                float sideOffset = ((c % 2 == 0) ? -1f : 1f) * (26f * PixelBuffer.Scale);
+                float cX = scx + sideOffset + (float)Math.Sin(StateTimer * 16f + c) * 10f;
+
+                using (var brCharHalo = new SolidBrush(Color.FromArgb(190, 15, 25, 45)))
+                {
+                    g.FillEllipse(brCharHalo, cX - 22f, cY - 14f, 44f, 44f);
+                }
+                using (var penCharRing = new Pen(Color.FromArgb(230, 255, 215, 60), 2f))
+                {
+                    g.DrawEllipse(penCharRing, cX - 22f, cY - 14f, 44f, 44f);
+                }
+
+                buffer.DrawOutlinedText(dragonChars[c], cX - 11f, cY - 8f,
+                    isEx ? Color.FromArgb(255, 240, 120) : Color.FromArgb(255, 235, 75),
+                    Color.FromArgb(15, 20, 50),
+                    buffer.FontSubtitle, 2.8f);
             }
         }
 

@@ -399,12 +399,26 @@ namespace HanlangGame.Visuals
             }
             else if (action == "dragon")
             {
-                g.FillRectangle(brOut, bx, legY - 2, legW, 6);
-                g.FillRectangle(brRobeDk, bx + 1, legY - 1, legW - 2, 3);
-                g.FillRectangle(brWhite, bx + 1, legY + 2, legW - 2, 2);
-                g.FillRectangle(brOut, bx + legW - 2, legY + 1, legW, 6);
-                g.FillRectangle(brRobe, bx + legW - 1, legY + 2, legW - 2, 3);
-                g.FillRectangle(brWhite, bx + legW - 1, legY + 5, legW - 2, 2);
+                if (frame == 0)
+                {
+                    // 프레임 0: 도약 직전 웅크린 다리
+                    g.FillRectangle(brOut, bx, legY - 1, legW, 5);
+                    g.FillRectangle(brRobeDk, bx + 1, legY, legW - 2, 2);
+                    g.FillRectangle(brWhite, bx + 1, legY + 2, legW - 2, 2);
+                    g.FillRectangle(brOut, bx + legW - 1, legY + 1, legW, 5);
+                    g.FillRectangle(brRobe, bx + legW, legY + 2, legW - 2, 2);
+                    g.FillRectangle(brWhite, bx + legW, legY + 4, legW - 2, 2);
+                }
+                else
+                {
+                    // 프레임 1: 하늘로 힘차게 솟구쳐 뻗은 다리
+                    g.FillRectangle(brOut, bx, legY - 3, legW, 7);
+                    g.FillRectangle(brRobeDk, bx + 1, legY - 2, legW - 2, 3);
+                    g.FillRectangle(brWhite, bx + 1, legY + 1, legW - 2, 2);
+                    g.FillRectangle(brOut, bx + legW - 2, legY, legW, 8);
+                    g.FillRectangle(brRobe, bx + legW - 1, legY + 1, legW - 2, 4);
+                    g.FillRectangle(brWhite, bx + legW - 1, legY + 5, legW - 2, 2);
+                }
             }
             else if (action == "wave" || action == "guard")
             {
@@ -488,9 +502,20 @@ namespace HanlangGame.Visuals
             }
             else if (action == "dragon")
             {
-                g.FillRectangle(brOut, bx - 1, bodyY + 4, 6, 6);
-                g.FillRectangle(brRobe, bx, bodyY + 5, 4, 4);
-                g.FillRectangle(brSkin, bx + 3, bodyY + 5, 3, 3);
+                if (frame == 0)
+                {
+                    // 프레임 0: 웅크림 - 왼팔 가슴 앞 가드
+                    g.FillRectangle(brOut, bx + 1, bodyY + 2, 6, 7);
+                    g.FillRectangle(brRobe, bx + 2, bodyY + 3, 4, 5);
+                    g.FillRectangle(brSkin, bx + 3, bodyY + 2, 3, 3);
+                }
+                else
+                {
+                    // 프레임 1: 승천 - 왼팔 뒤로 젖혀 펄럭임
+                    g.FillRectangle(brOut, bx - 2, bodyY + 3, 6, 8);
+                    g.FillRectangle(brRobe, bx - 1, bodyY + 4, 4, 6);
+                    g.FillRectangle(brSkin, bx, bodyY + 7, 3, 3);
+                }
             }
             else if (action == "wave")
             {
@@ -982,15 +1007,35 @@ namespace HanlangGame.Visuals
             }
             else if (action == "dragon")
             {
-                int dArmX = bx + bodyW - 4;
-                int dArmY = headY - 6;
-                g.FillRectangle(brOut, dArmX, dArmY, 7, 14);
-                g.FillRectangle(brRobe, dArmX + 1, dArmY + 5, 5, 8);
-                g.FillRectangle(brSkin, dArmX + 1, dArmY, 5, 6);
-                g.FillRectangle(brWhite, dArmX + 2, dArmY + 1, 2, 2);
-                using var brGoldGlow = new SolidBrush(Color.FromArgb(255, 220, 60));
-                g.FillRectangle(brGoldGlow, dArmX - 1, dArmY + 1, 1, 12);
-                g.FillRectangle(brGoldGlow, dArmX + 7, dArmY + 1, 1, 12);
+                if (frame == 0)
+                {
+                    // 프레임 0: 어퍼컷 끌어올림 장전 (골반/허리 아래에서 힘 모으기)
+                    int dArmX = bx + bodyW - 2;
+                    int dArmY = bodyY + 3;
+                    g.FillRectangle(brOut, dArmX, dArmY, 7, 10);
+                    g.FillRectangle(brRobe, dArmX + 1, dArmY + 1, 5, 5);
+                    g.FillRectangle(brSkin, dArmX + 1, dArmY + 5, 5, 4);
+                    g.FillRectangle(brWhite, dArmX + 2, dArmY + 6, 3, 2); // 백색 붕대 주먹
+                    using var brGoldSpark = new SolidBrush(Color.FromArgb(255, 230, 80));
+                    g.FillRectangle(brGoldSpark, dArmX - 1, dArmY + 3, 9, 2);
+                }
+                else
+                {
+                    // 프레임 1: 하늘 높이 수직으로 뻗은 영웅적 승룡 어퍼컷!
+                    int dArmX = bx + bodyW - 4;
+                    int dArmY = headY - 10;
+                    g.FillRectangle(brOut, dArmX, dArmY, 7, 18);
+                    g.FillRectangle(brRobe, dArmX + 1, dArmY + 7, 5, 10);
+                    g.FillRectangle(brSkin, dArmX + 1, dArmY + 1, 5, 6);
+                    g.FillRectangle(brWhite, dArmX + 2, dArmY + 2, 3, 3); // 붕대 주먹
+                    using var brGoldGlow = new SolidBrush(Color.FromArgb(255, 225, 60));
+                    using var brCyanGlow = new SolidBrush(Color.FromArgb(120, 240, 255));
+                    // 주먹 주변 타오르는 황금 & 청룡 기운
+                    g.FillRectangle(brGoldGlow, dArmX - 2, dArmY - 2, 11, 3);
+                    g.FillRectangle(brCyanGlow, dArmX - 1, dArmY + 1, 9, 2);
+                    g.FillRectangle(brGoldGlow, dArmX - 2, dArmY + 1, 2, 14);
+                    g.FillRectangle(brGoldGlow, dArmX + 7, dArmY + 1, 2, 14);
+                }
             }
             else if (action == "wave")
             {

@@ -105,10 +105,15 @@ namespace HanlangGame.Entities
                 // 4프레임 발차기 (0: 무릎들기, 1: 중간뻗기, 2: 최대앞차기, 3: 접기)
                 AnimFrame = Math.Clamp((int)(StateTimer / 0.065f), 0, 3);
             }
-            else if (State == "spin")
+            else if (State == "spin" || State == "ex_spin")
             {
                 // 비기 훈민선풍각: 초고속 4프레임 회전 회오리
                 AnimFrame = (int)(StateTimer * 16f) % 4;
+            }
+            else if (State == "dragon" || State == "ex_dragon")
+            {
+                // 제2 비기 용비어천격: 0: 끌어올리는 하단 장전 자세, 1: 솟구치는 상단 승룡 어퍼컷 자세
+                AnimFrame = (StateTimer < 0.10f) ? 0 : 1;
             }
             else
             {

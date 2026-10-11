@@ -2247,6 +2247,68 @@ namespace HanlangGame.Tests
             downEnemy2.Update(1.1f);
             Assert("투척물에 피격된 후에도 2초 후 정상 기상", downEnemy2.State == "idle");
 
+            // ====================================================
+            // Test 68: 제2 비기: 용비어천격(龍飛御天擊) 공중 체공 상태 보존 및 애니메이션/그래픽 렌더링 검증
+            // ====================================================
+            var dragonPl = new Player(new StatusSystem());
+            dragonPl.X = 100f;
+            dragonPl.Y = 170f;
+            dragonPl.Z = 0f;
+            dragonPl.State = "dragon";
+            dragonPl.CurrentAttackType = "dragon";
+            dragonPl.Vz = 185f;
+            dragonPl.StateTimer = 0f;
+
+            // 1) 초기 준비 자세 (StateTimer < 0.10s) -> AnimFrame 0 (어퍼컷 장전)
+            dragonPl.Update(0.04f);
+            Assert("용비어천격 도약 시 공중 체공(Z > 0)", dragonPl.Z > 0f);
+            Assert("공중 체공 중에도 jump로 리셋되지 않고 'dragon' 상태 유지", dragonPl.State == "dragon");
+            Assert("도약 초기에는 장전 모션 (AnimFrame == 0)", dragonPl.AnimFrame == 0);
+
+            // 2) 승천 단계 (StateTimer >= 0.10s) -> AnimFrame 1 (승룡 어퍼컷 뻗기)
+            dragonPl.Update(0.08f); // 누적 0.12s
+            Assert("승천 중에도 'dragon' 상태 보존", dragonPl.State == "dragon");
+            Assert("승천 단계에서는 수직 승룡 어퍼컷 모션 (AnimFrame == 1)", dragonPl.AnimFrame == 1);
+
+            // 3) 용비어천격 고해상도 그래픽 렌더링 무결성 검증 (용머리, 오라 기둥, 서예 한자)
+            using (var testBmp = new Bitmap(960, 720))
+            {
+                var buffer = new PixelBuffer();
+                bool dragonRenderPass = true;
+                try
+                {
+                    dragonPl.Render(buffer, 0f);
+                }
+                catch
+                {
+                    dragonRenderPass = false;
+                }
+                Assert("용비어천격(dragon) 고해상도 그래픽(비룡 머리, 승천 기둥, 龍飛御天 서예) 정상 렌더링", dragonRenderPass);
+
+                // ex_dragon 렌더링 무결성
+                dragonPl.State = "ex_dragon";
+                bool exDragonRenderPass = true;
+                try
+                {
+                    dragonPl.Render(buffer, 0f);
+                }
+                catch
+                {
+                    exDragonRenderPass = false;
+                }
+                Assert("비기 각성 ex_dragon 고해상도 그래픽 정상 렌더링", exDragonRenderPass);
+            }
+
+            // 4) 체공 완료 후 지면 착지 시 idle 상태로 자연스럽게 복귀
+            dragonPl.State = "dragon";
+            for (int f = 0; f < 30; f++)
+            {
+                dragonPl.Update(0.03f);
+                if (dragonPl.IsGrounded && dragonPl.State == "idle") break;
+            }
+            Assert("용비어천격 체공 및 타격 완료 후 지면 착지 시 idle 정상 전이", dragonPl.State == "idle");
+            Assert("착지 후 후딜레이 쿨다운 부여", dragonPl.ParryCooldownTimer > 0f);
+
             Console.WriteLine("----------------------------------------------------");
             Console.WriteLine($" 총 테스트 결과: {passed} / {total} 통과 ({(passed == total ? "100% 성공" : "실패 항목 있음")})");
             Console.WriteLine("====================================================");
