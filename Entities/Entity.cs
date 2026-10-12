@@ -120,6 +120,11 @@ namespace HanlangGame.Entities
                 // 제3 비기 월인천강포: 0: 기 모으기 장전 자세, 1: 전방 파동포 일제 발사 자세
                 AnimFrame = (StateTimer < 0.12f) ? 0 : 1;
             }
+            else if (State == "wakeup_kick")
+            {
+                // 기상 쓸어차기: 0: 하단 회전 쓸기, 1: 360도 완성 및 기상 자세
+                AnimFrame = (StateTimer < 0.16f) ? 0 : 1;
+            }
             else
             {
                 AnimFrame = 0;

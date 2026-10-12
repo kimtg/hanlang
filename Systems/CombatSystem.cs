@@ -331,6 +331,7 @@ namespace HanlangGame.Systems
                                 : (player.CarriedEnemy != null ? 16 : 10)),
                             "knee" => 15,
                             "giantswing" => 25,
+                            "wakeup_kick" => player.Status.KickDamage + 4,
                             _ => player.Status.PunchDamage
                         };
 
@@ -437,6 +438,14 @@ namespace HanlangGame.Systems
                                 enemy.Vx = knockDir * 140f;
                                 enemy.Vz = 60f;
                             }
+                            else if (player.CurrentAttackType == "wakeup_kick")
+                            {
+                                enemy.State = "down";
+                                enemy.StateTimer = 0f;
+                                enemy.Vx = knockDir * 130f;
+                                enemy.Vz = 55f;
+                                Bubbles.Add(new SpeechBubble("기상 쓸어차기!", player.X, player.Y - player.Height - 16f));
+                            }
 
                             // 공중 추격타 (Airborne Juggle Spike): 급강하 슬램!
                             if (isAirJuggle)
@@ -461,6 +470,7 @@ namespace HanlangGame.Systems
                                        player.CurrentAttackType == "ex_dragon" || player.CurrentAttackType == "ex_wave" ||
                                        player.CurrentAttackType == "cudgel_swing" || player.CurrentAttackType == "spear_stab" ||
                                        player.CurrentAttackType == "dashpunch" || player.CurrentAttackType == "dashkick" ||
+                                       player.CurrentAttackType == "wakeup_kick" ||
                                        player.CurrentAttackType == "swing" || isKnockedDown;
                         bool isExOrSpecial = player.CurrentAttackType == "ex_spin" || player.CurrentAttackType == "ex_dragon" ||
                                              player.CurrentAttackType == "ex_wave" || player.CurrentAttackType == "giantswing";

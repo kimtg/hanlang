@@ -484,6 +484,21 @@ namespace HanlangGame.Visuals
                     g.FillRectangle(brOut, frontX + legW - 3, legY + 4, 2, 2);
                 }
             }
+            else if (action == "wakeup_kick")
+            {
+                // 기상 쓸어차기: 지면을 360도로 낮게 회전하며 다리를 뻗는 하단 쓸어차기 자세
+                g.FillRectangle(brOut, bx - 8, legY + 2, 26, 6);
+                g.FillRectangle(brWhite, bx - 7, legY + 3, 10, 4);
+                g.FillRectangle(brRobe, bx + 3, legY + 3, 4, 4);
+                g.FillRectangle(brWhite, bx + 7, legY + 3, 10, 4);
+                g.FillRectangle(brOut, bx - 8, legY + 4, 3, 2);
+                g.FillRectangle(brOut, bx + 16, legY + 4, 3, 2);
+                // 바닥을 휩쓰는 회전 풍압선 (Cyan & Gold Wind Slash)
+                using var brSweepCyan = new SolidBrush(Color.FromArgb(180, 100, 235, 255));
+                using var brSweepGold = new SolidBrush(Color.FromArgb(200, 255, 220, 80));
+                g.FillRectangle(brSweepCyan, bx - 12, legY + 5, 34, 2);
+                g.FillRectangle(brSweepGold, bx - 6, legY + 7, 22, 1);
+            }
             else // idle, carry, carry_idle
             {
                 int backX = bx;
@@ -587,6 +602,13 @@ namespace HanlangGame.Visuals
                 int kArmX = (frame == 2) ? (bx - 3) : (bx - 1);
                 g.FillRectangle(brOut, kArmX, bodyY + 2, 5, 6);
                 g.FillRectangle(brSkin, kArmX, bodyY + 4, 3, 3);
+            }
+            else if (action == "wakeup_kick")
+            {
+                // 한 손을 바닥에 짚어 회전 지지축 형성
+                g.FillRectangle(brOut, bx - 4, bodyY + 6, 6, 7);
+                g.FillRectangle(brRobe, bx - 3, bodyY + 7, 4, 4);
+                g.FillRectangle(brSkin, bx - 3, bodyY + 10, 4, 3);
             }
 
             // ==========================================
@@ -1032,8 +1054,14 @@ namespace HanlangGame.Visuals
                     g.FillRectangle(brWhiteLt, bx - 4, bodyY - 1, 2, 2);
                     g.FillRectangle(brWhiteLt, bx + bodyW + 2, bodyY - 1, 2, 2);
                     g.FillRectangle(brWhiteLt, bx - 4, legY + 3, 2, 2);
-                    g.FillRectangle(brWhiteLt, bx + bodyW + 2, legY + 3, 2, 2);
                 }
+            }
+            else if (action == "wakeup_kick")
+            {
+                // 반대쪽 팔을 공중으로 역동적으로 뻗어 회전 원심력 극대화
+                g.FillRectangle(brOut, bx + bodyW - 2, bodyY - 1, 8, 7);
+                g.FillRectangle(brRobe, bx + bodyW - 1, bodyY, 5, 5);
+                g.FillRectangle(brSkin, bx + bodyW + 2, bodyY, 4, 4);
             }
             else if (action == "guard")
             {

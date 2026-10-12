@@ -2366,6 +2366,96 @@ namespace HanlangGame.Tests
             Assert("월인천강포 발사 완료 후 idle 정상 전이", wavePl.State == "idle");
             Assert("발사 완료 후 후딜레이 쿨다운 부여", wavePl.ParryCooldownTimer > 0f);
 
+            // ====================================================
+            // Test 70: 제1 비기: 훈민선풍각(訓民旋風脚) 초호화 그래픽 렌더링, 품새 캔슬 연계, 다운 기상 반격기(wakeup_kick) 검증
+            // ====================================================
+            // 1) 훈민선풍각 초호화 고해상도 그래픽 렌더링 무결성 (지면 팔괘 진법, 진공 볼텍스, 8대 자모 옥패, 訓民旋風 서예)
+            var spinPl = new Player(new StatusSystem());
+            spinPl.X = 100f;
+            spinPl.Y = 170f;
+            spinPl.Z = 0f;
+            spinPl.State = "spin";
+            spinPl.CurrentAttackType = "spin";
+            spinPl.StateTimer = 0.15f;
+
+            using (var testBmp = new Bitmap(960, 720))
+            {
+                var buffer = new PixelBuffer();
+                bool spinRenderPass = true;
+                try
+                {
+                    spinPl.Render(buffer, 0f);
+                }
+                catch
+                {
+                    spinRenderPass = false;
+                }
+                Assert("훈민선풍각(spin) 고해상도 그래픽(팔괘 진법, 진공 회오리, 8대 자모 옥패, 訓民旋風 서예) 정상 렌더링", spinRenderPass);
+
+                // ex_spin (극·훈민선풍각) 렌더링 무결성
+                spinPl.State = "ex_spin";
+                bool exSpinRenderPass = true;
+                try
+                {
+                    spinPl.Render(buffer, 0f);
+                }
+                catch
+                {
+                    exSpinRenderPass = false;
+                }
+                Assert("비기 각성 ex_spin 고해상도 그래픽 정상 렌더링", exSpinRenderPass);
+            }
+
+            // 2) 품새 콤보 캔슬 (Martial Arts Cancel): 펀치 -> 발차기 캔슬
+            var cancelPl = new Player(new StatusSystem());
+            cancelPl.State = "punch";
+            cancelPl.StateTimer = 0.10f;
+            cancelPl.Status.CurrentMp = 50;
+
+            var cancelKickInput = new Input();
+            cancelKickInput.OnKeyDown(Keys.X);
+            cancelPl.HandleInput(cancelKickInput);
+            Assert("펀치 도중 발차기(X) 입력 시 발차기 품새로 즉시 캔슬 전환", cancelPl.State == "kick");
+            Assert("캔슬 발차기 공격 타입 갱신", cancelPl.CurrentAttackType == "kick");
+
+            // 3) 발차기 -> 비기(훈민선풍각) 캔슬 연계
+            cancelPl.State = "kick";
+            cancelPl.StateTimer = 0.10f;
+            var cancelSpinInput = new Input();
+            cancelSpinInput.OnKeyDown(Keys.Space);
+            cancelPl.HandleInput(cancelSpinInput);
+            Assert("발차기 도중 비기(Space) 입력 시 훈민선풍각으로 즉시 캔슬 전환", cancelPl.State == "spin");
+            Assert("캔슬 비기 MP 소모 정상 적용 (50 -> 35)", cancelPl.Status.CurrentMp == 35);
+
+            // 4) 다운 상태 기상 반격 쓸어차기 (Wakeup Sweeping Kick)
+            var downWakeupPl = new Player(new StatusSystem());
+            downWakeupPl.X = 100f;
+            downWakeupPl.Y = 170f;
+            downWakeupPl.Z = 0f;
+            downWakeupPl.State = "down";
+            downWakeupPl.StateTimer = 0.60f; // 바닥에 다운된 상태
+
+            var wakeupInput = new Input();
+            wakeupInput.OnKeyDown(Keys.Z);
+            downWakeupPl.HandleInput(wakeupInput);
+            Assert("다운 상태에서 Z키 입력 시 기상 쓸어차기(wakeup_kick) 즉시 발동", downWakeupPl.State == "wakeup_kick");
+            Assert("기상 쓸어차기 발동 시 0.5초 무적 시간 획득", downWakeupPl.InvincibleTimer >= 0.45f);
+
+            var wakeupHitbox = downWakeupPl.GetAttackHitbox();
+            Assert("기상 쓸어차기 360도 전방위 하단 히트박스 생성", wakeupHitbox.HasValue && wakeupHitbox.Value.Width >= 60f);
+
+            // 기상 쓸어차기 적중 시 주변 적 넉다운 판정
+            var nearbyThug = new Enemy(EnemyType.Thug, 115f, 170f, 1);
+            var combatWakeup = new CombatSystem();
+            combatWakeup.CheckCollisions(downWakeupPl, new List<Enemy> { nearbyThug });
+            Assert("기상 쓸어차기 공격 적중 성공", downWakeupPl.HasDealtDamage);
+            Assert("기상 쓸어차기에 피격된 적 즉시 다운 상태로 넉다운", nearbyThug.State == "down");
+
+            // 동작 완료 후 idle 정상 복귀 및 후속 무적 시간 (적 타격에 따른 0.135초 히트스탑 역경직 감안 0.50초 경과)
+            downWakeupPl.Update(0.50f);
+            Assert("기상 쓸어차기 완료 후 idle 안전 복귀", downWakeupPl.State == "idle");
+            Assert("기상 완료 후 안전 기상 무적 시간 유지", downWakeupPl.InvincibleTimer > 0f);
+
             Console.WriteLine("----------------------------------------------------");
             Console.WriteLine($" 총 테스트 결과: {passed} / {total} 통과 ({(passed == total ? "100% 성공" : "실패 항목 있음")})");
             Console.WriteLine("====================================================");

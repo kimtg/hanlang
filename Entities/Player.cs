@@ -36,7 +36,7 @@ namespace HanlangGame.Entities
             State == "dragon" || State == "wave" || State == "swing" ||
             State == "knee" || State == "giantswing" ||
             State == "spear_stab" || State == "cudgel_swing" || State == "fan_wave" ||
-            State == "ex_spin" || State == "ex_dragon" || State == "ex_wave" ||
+            State == "ex_spin" || State == "ex_dragon" || State == "ex_wave" || State == "wakeup_kick" ||
             PostAttackDelayTimer > 0f;
 
         // 들기 시스템 (물체 및 쓰러진 적)
@@ -240,6 +240,22 @@ namespace HanlangGame.Entities
                 }
             }
 
+            // 기상 반격 쓸어차기 (Wakeup Sweeping Kick): 지면에 쓰러져 있을 때(Z <= 2) Z키 입력 시 즉시 360도 하단 회전 쓸어차기로 기상 반격!
+            if (Status.CurrentHp > 0 && State == "down" && Z <= 2f && StateTimer >= 0.35f)
+            {
+                if (input.IsJustPressed(Keys.Z))
+                {
+                    State = "wakeup_kick";
+                    StateTimer = 0f;
+                    HasDealtDamage = false;
+                    CurrentAttackType = "wakeup_kick";
+                    InvincibleTimer = 0.5f;
+                    SoundSynth.PlayKick();
+                    SoundSynth.PlaySpecial();
+                    return;
+                }
+            }
+
             if (State == "hit" || State == "down" || Status.CurrentHp <= 0) return;
 
             // 0. 격투 게임식 공격 후딜레이(Recovery Delay): 딜레이 중에는 이동, 공격, 가드, 패링 불가
@@ -251,11 +267,34 @@ namespace HanlangGame.Entities
                 return;
             }
 
-            // 공격 동작 진행 중에는 이동 및 추가 액션/패링 불가
-            if (State == "punch" || State == "kick" || State == "dashpunch" || State == "dashkick" ||
-                State == "swing" || State == "spin" || State == "dragon" || State == "wave" ||
-                State == "spear_stab" || State == "cudgel_swing" || State == "fan_wave" ||
-                State == "ex_spin" || State == "ex_dragon" || State == "ex_wave")
+            // 품새 콤보 캔슬 (Martial Arts Cancel):
+            // 펀치(punch) 및 킥(kick) 진행 도중 (StateTimer >= 0.08f), 비기(Space) 또는 발차기(X)로 즉시 품새 전환 캔슬 허용!
+            bool canCancelToSpecial = (State == "punch" || State == "kick" || State == "dashpunch") && StateTimer >= 0.08f && Status.CurrentMp >= Status.GetSpecialMpCost(15);
+            bool canCancelToKick = (State == "punch") && StateTimer >= 0.08f;
+
+            bool isSpecialInput = input.IsJustPressed(Keys.Space) ||
+                                  (input.IsHeld(Keys.Space) && (input.IsJustPressed(Keys.Z) || input.IsJustPressed(Keys.X)));
+            bool isKickInput = input.IsJustPressed(Keys.X);
+
+            if (canCancelToSpecial && isSpecialInput)
+            {
+                // 비기로 캔슬 허용 -> 아래 2. 비기 섹션으로 통과!
+            }
+            else if (canCancelToKick && isKickInput)
+            {
+                // 펀치 -> 발차기 품새 캔슬 연계!
+                State = "kick";
+                StateTimer = 0f;
+                HasDealtDamage = false;
+                CurrentAttackType = "kick";
+                ComboCount = Math.Max(ComboCount, 1);
+                SoundSynth.PlayKick();
+                return;
+            }
+            else if (State == "punch" || State == "kick" || State == "dashpunch" || State == "dashkick" ||
+                     State == "swing" || State == "spin" || State == "dragon" || State == "wave" ||
+                     State == "spear_stab" || State == "cudgel_swing" || State == "fan_wave" ||
+                     State == "ex_spin" || State == "ex_dragon" || State == "ex_wave" || State == "wakeup_kick")
             {
                 Vx *= 0.5f;
                 Vy *= 0.5f;
@@ -370,13 +409,6 @@ namespace HanlangGame.Entities
                 }
             }
 
-            // 2. 지상 공격 동작 중 이동 불가
-            if (State == "punch" || State == "kick" || State == "spin" || State == "swing" || State == "dragon" || State == "wave")
-            {
-                Vx *= 0.5f;
-                Vy *= 0.5f;
-                return;
-            }
 
             // 2. 비기(Special) 및 EX 강화 비기 (Space, Space + Z, Space + X)
             bool isExWithZ = (input.IsJustPressed(Keys.Space) && (input.IsHeld(Keys.Z) || input.IsJustPressed(Keys.Z))) ||
@@ -498,6 +530,9 @@ namespace HanlangGame.Entities
                     }
                 }
             }
+
+            // 캔슬로 진입했으나 비기가 발동되지 않은 경우 기존 공격 모션 유지
+            if (State == "punch" || State == "kick" || State == "dashpunch") return;
 
             // 3. 지상 Z키: 무기 들고 있으면 '무기 공격', 들고 있으면 '들고 때린다', 들 게 있으면 '주워 든다', 없으면 '주먹'
             if (input.IsJustPressed(Keys.Z))
@@ -1027,6 +1062,17 @@ namespace HanlangGame.Entities
                     InvincibleTimer = 1.0f; // 기상 후 1초 무적
                 }
             }
+            else if (State == "wakeup_kick")
+            {
+                Vx = (FacingRight ? 1f : -1f) * 20f;
+                if (StateTimer > 0.32f)
+                {
+                    State = "idle";
+                    HasDealtDamage = false;
+                    ParryCooldownTimer = 0.20f;
+                    InvincibleTimer = 0.6f;
+                }
+            }
 
             // 자연 MP 완만 회복
             if (Status.CurrentMp < Status.MaxMp)
@@ -1039,7 +1085,7 @@ namespace HanlangGame.Entities
         {
             if (State != "punch" && State != "kick" && State != "jumpkick" && State != "spin" && State != "swing" && State != "dashpunch" && State != "dashkick" && State != "dragon" && State != "wave" && State != "knee" && State != "giantswing" &&
                 State != "spear_stab" && State != "cudgel_swing" && State != "fan_wave" &&
-                State != "ex_spin" && State != "ex_dragon" && State != "ex_wave")
+                State != "ex_spin" && State != "ex_dragon" && State != "ex_wave" && State != "wakeup_kick")
                 return null;
 
             // 격투 게임식 판정: 공격 후딜레이(Recovery) 구간에는 타격 판정 소멸
@@ -1059,6 +1105,13 @@ namespace HanlangGame.Entities
             if (State == "ex_spin" && StateTimer > 0.42f) return null;
             if (State == "ex_dragon" && StateTimer > 0.38f) return null;
             if (State == "ex_wave" && StateTimer > 0.45f) return null;
+            if (State == "wakeup_kick" && StateTimer > 0.28f) return null;
+
+            if (State == "wakeup_kick")
+            {
+                // 기상 쓸어차기: 360도 전방위 68px 하단 회전 쓸어차기 판정
+                return new RectangleF(X - 34f, Y - Z - 16f, 68f, 22f);
+            }
 
             if (State == "spear_stab")
             {
@@ -1357,61 +1410,167 @@ namespace HanlangGame.Entities
             var g = buffer.Graphics;
             buffer.SetHighQualityModes();
 
+            bool isEx = State == "ex_spin";
+
+            // 960x720 고해상도 스크린 좌표계
             float scx = Perspective.ProjectScreenX(X, cameraX, Y);
             float scy = Perspective.ProjectScreenY(Y - 15f, Z);
             float sGroundY = Perspective.ProjectScreenY(Y, 0f);
 
-            // 1. 지면 고해상도 선풍 회오리 풍압륜 (Ground Wind Cyclone)
-            float gwPulse = (24f + (float)Math.Sin(StateTimer * 25f) * 6f) * PixelBuffer.Scale;
-            using (var pGroundWind = new Pen(Color.FromArgb(160, 110, 230, 255), 3f))
+            // ----------------------------------------------------
+            // 1. 지면 거대 팔괘(八卦) 진공 태극 진법 (Bagua Yin-Yang Formation Matrix)
+            // ----------------------------------------------------
+            float baguaR = (isEx ? 65f : 50f) * PixelBuffer.Scale;
+            float baguaH = baguaR * 0.42f; // 바닥 원근 타원
+            float baguaRot = StateTimer * 160f; // 진법 회전 각도
+
+            // 외곽 진법 에너지 광륜
+            using (var brBaguaGround = new SolidBrush(isEx ? Color.FromArgb(45, 255, 60, 40) : Color.FromArgb(40, 60, 200, 255)))
             {
-                g.DrawEllipse(pGroundWind, scx - gwPulse, sGroundY - 10f, gwPulse * 2f, 20f);
+                g.FillEllipse(brBaguaGround, scx - baguaR * 1.15f, sGroundY - baguaH * 1.15f, baguaR * 2.3f, baguaH * 2.3f);
             }
 
-            // 2. 비기 천상 선풍 황금/청색 이중 광륜 (Radiant Celestial Aura Rings)
-            float rx = (24f + (float)Math.Sin(StateTimer * 30f) * 5f) * PixelBuffer.Scale;
-            float ry = (18f + (float)Math.Cos(StateTimer * 30f) * 4f) * PixelBuffer.Scale;
-            using (var pGoldHalo = new Pen(Color.FromArgb(230, 255, 230, 70), 4f))
-            using (var pCyanHalo = new Pen(Color.FromArgb(200, 80, 220, 255), 2.5f))
+            // 팔괘 외곽 링
+            using (var pBaguaRing = new Pen(isEx ? Color.FromArgb(220, 255, 120, 50) : Color.FromArgb(200, 100, 230, 255), 2.5f))
+            using (var pBaguaInner = new Pen(isEx ? Color.FromArgb(240, 255, 220, 90) : Color.FromArgb(220, 255, 240, 120), 1.8f))
             {
-                g.DrawEllipse(pGoldHalo, scx - rx, scy - ry, rx * 2f, ry * 2f);
-                g.DrawEllipse(pCyanHalo, scx - (rx - 8f), scy - (ry - 6f), (rx - 8f) * 2f, (ry - 6f) * 2f);
+                g.DrawEllipse(pBaguaRing, scx - baguaR, sGroundY - baguaH, baguaR * 2f, baguaH * 2f);
+                g.DrawEllipse(pBaguaInner, scx - baguaR * 0.75f, sGroundY - baguaH * 0.75f, baguaR * 1.5f, baguaH * 1.5f);
             }
 
-            // 3. 고속 회전 6방향 고해상도 빛의 검무 (Rotating Radiant Light Blades)
-            float rotAngle = StateTimer * 36f;
-            for (int i = 0; i < 6; i++)
+            // 8방향 팔괘(八卦) 효(爻) 룬 선 드로잉
+            for (int b = 0; b < 8; b++)
             {
-                float angle = rotAngle + i * ((float)Math.PI / 3f);
-                float cosA = (float)Math.Cos(angle);
-                float sinA = (float)Math.Sin(angle);
+                float bRad = (baguaRot + b * 45f) * (MathF.PI / 180f);
+                float cosB = MathF.Cos(bRad);
+                float sinB = MathF.Sin(bRad);
 
-                float x1 = scx + cosA * 15f;
-                float y1 = scy + sinA * 10f;
-                float x2 = scx + cosA * (75f + (float)Math.Sin(StateTimer * 20f) * 10f);
-                float y2 = scy + sinA * (55f + (float)Math.Cos(StateTimer * 20f) * 8f);
+                float outerX = scx + cosB * (baguaR * 0.95f);
+                float outerY = sGroundY + sinB * (baguaH * 0.95f);
+                float innerX = scx + cosB * (baguaR * 0.78f);
+                float innerY = sGroundY + sinB * (baguaH * 0.78f);
 
-                using var coreBeam = new Pen(Color.FromArgb(255, 255, 250, 180), 3f);
-                using var cyanBeam = new Pen(Color.FromArgb(160, 100, 225, 255), 5f);
-                g.DrawLine(cyanBeam, x1, y1, x2, y2);
-                g.DrawLine(coreBeam, x1, y1, x2, y2);
+                using var pTrigram = new Pen(isEx ? Color.FromArgb(250, 255, 200, 120) : Color.FromArgb(240, 140, 240, 255), 2.2f);
+                g.DrawLine(pTrigram, innerX, innerY, outerX, outerY);
             }
 
-            // 4. 훈민정음 자모 비급(ㄱ, ㄴ, ㄷ, ㄹ, ㅁ, ㅅ, ㅇ, ㅈ) 궤도 공전 광채 텍스트
+            // 지면 중앙 회전 음양 태극 문양
+            float groundTaeR = 14f * PixelBuffer.Scale;
+            float groundTaeH = groundTaeR * 0.42f;
+            using (var brTaeBlue = new SolidBrush(isEx ? Color.FromArgb(160, 180, 20, 20) : Color.FromArgb(160, 20, 90, 220)))
+            using (var brTaeRed = new SolidBrush(isEx ? Color.FromArgb(160, 255, 80, 40) : Color.FromArgb(160, 230, 40, 40)))
+            {
+                g.FillPie(brTaeBlue, scx - groundTaeR, sGroundY - groundTaeH, groundTaeR * 2f, groundTaeH * 2f, 0, 180);
+                g.FillPie(brTaeRed, scx - groundTaeR, sGroundY - groundTaeH, groundTaeR * 2f, groundTaeH * 2f, 180, 180);
+            }
+
+            // ----------------------------------------------------
+            // 2. 공중으로 솟구치는 이중 나선 진공 회오리 볼텍스 (Ascending Cyclone Vortex Columns)
+            // ----------------------------------------------------
+            float vortexHeight = Math.Max(35f, sGroundY - (scy - 28f * PixelBuffer.Scale));
+            int spiralSegments = 14;
+            for (int i = 0; i < spiralSegments; i++)
+            {
+                float tRatio = i / (float)spiralSegments;
+                float segY = sGroundY - tRatio * vortexHeight;
+                float phase = StateTimer * 32f - i * 0.55f;
+                float sway = MathF.Sin(phase) * (24f + (1f - tRatio) * 16f) * PixelBuffer.Scale;
+                float segW = (18f + MathF.Sin(i * 0.8f) * 8f) * PixelBuffer.Scale;
+                float segH = (8f + MathF.Cos(i * 0.8f) * 3f) * PixelBuffer.Scale;
+
+                float xA = scx + sway;
+                float xB = scx - sway;
+
+                using var brCyanVortex = new SolidBrush(isEx ? Color.FromArgb(150, 255, 90, 40) : Color.FromArgb(140, 80, 220, 255));
+                using var brGoldVortex = new SolidBrush(isEx ? Color.FromArgb(180, 255, 210, 80) : Color.FromArgb(160, 255, 230, 90));
+
+                g.FillEllipse(brCyanVortex, xA - segW / 2f, segY - segH / 2f, segW, segH);
+                g.FillEllipse(brGoldVortex, xB - segW / 2f, segY - segH / 2f, segW, segH);
+            }
+
+            // 360도 회전 풍압 진공 참격 칼날 (Wind Slash Arcs)
+            float rotAngle = StateTimer * 45f;
+            for (int k = 0; k < 6; k++)
+            {
+                float bladeAngle = rotAngle + k * (MathF.PI / 3f);
+                float cosK = MathF.Cos(bladeAngle);
+                float sinK = MathF.Sin(bladeAngle);
+
+                float bX1 = scx + cosK * 12f * PixelBuffer.Scale;
+                float bY1 = scy + sinK * 8f * PixelBuffer.Scale;
+                float bX2 = scx + cosK * (isEx ? 65f : 50f) * PixelBuffer.Scale;
+                float bY2 = scy + sinK * (isEx ? 42f : 32f) * PixelBuffer.Scale;
+
+                using var pBladeCyan = new Pen(isEx ? Color.FromArgb(180, 255, 90, 30) : Color.FromArgb(180, 110, 230, 255), 4.5f);
+                using var pBladeCore = new Pen(isEx ? Color.FromArgb(255, 255, 220, 150) : Color.FromArgb(255, 255, 255, 210), 2.2f);
+                g.DrawLine(pBladeCyan, bX1, bY1, bX2, bY2);
+                g.DrawLine(pBladeCore, bX1, bY1, bX2, bY2);
+            }
+
+            // ----------------------------------------------------
+            // 3. 8대 훈민정음 자모(`ㄱ, ㄴ, ㄷ, ㄹ, ㅁ, ㅅ, ㅇ, ㅈ`) 옥패 공전체 (8 Sacred Hangul Jade Talismans)
+            // ----------------------------------------------------
             string[] jamo = { "ㄱ", "ㄴ", "ㄷ", "ㄹ", "ㅁ", "ㅅ", "ㅇ", "ㅈ" };
+            float orbRx = (isEx ? 50f : 38f) * PixelBuffer.Scale;
+            float orbRy = (isEx ? 28f : 20f) * PixelBuffer.Scale;
+
             for (int p = 0; p < jamo.Length; p++)
             {
-                float sparkAngle = -rotAngle * 1.1f + p * ((float)Math.PI * 2f / jamo.Length);
-                float sparkR = (22f + ((p % 2 == 0) ? 6f : -4f)) * PixelBuffer.Scale;
-                float px = scx + (float)Math.Cos(sparkAngle) * sparkR;
-                float py = scy + (float)Math.Sin(sparkAngle) * (sparkR * 0.72f);
+                float sparkAngle = -rotAngle * 1.2f + p * (MathF.PI * 2f / jamo.Length);
+                float px = scx + MathF.Cos(sparkAngle) * orbRx;
+                float py = scy + MathF.Sin(sparkAngle) * orbRy;
 
-                Color jamoCol = (p % 2 == 0) ? Color.FromArgb(255, 245, 90) : Color.FromArgb(130, 240, 255);
-                buffer.DrawOutlinedText(jamo[p], px - 8f, py - 10f, jamoCol, Color.FromArgb(40, 20, 10), buffer.FontHeader, 2f);
+                // 청옥/황금빛 원형 옥패 메달리온 배경
+                float jadeR = 12f * PixelBuffer.Scale;
+                using (var brJade = new SolidBrush(isEx ? Color.FromArgb(200, 50, 15, 20) : Color.FromArgb(190, 15, 40, 60)))
+                {
+                    g.FillEllipse(brJade, px - jadeR, py - jadeR * 0.7f, jadeR * 2f, jadeR * 1.4f);
+                }
+                using (var pJadeBorder = new Pen(isEx ? Color.FromArgb(240, 255, 160, 60) : Color.FromArgb(220, 120, 240, 255), 1.8f))
+                {
+                    g.DrawEllipse(pJadeBorder, px - jadeR, py - jadeR * 0.7f, jadeR * 2f, jadeR * 1.4f);
+                }
+
+                // 옥패 중앙 첫소리 자모 서예
+                Color jamoCol = isEx ? Color.FromArgb(255, 240, 140) : ((p % 2 == 0) ? Color.FromArgb(255, 245, 100) : Color.FromArgb(160, 240, 255));
+                buffer.DrawOutlinedText(jamo[p], px - 6.5f * PixelBuffer.Scale, py - 6f * PixelBuffer.Scale,
+                    jamoCol, Color.FromArgb(20, 20, 40), buffer.FontHeader, 2.0f);
 
                 // 반짝이는 별빛 파티클
                 using var starBrush = new SolidBrush(Color.White);
                 g.FillEllipse(starBrush, px - 2f, py - 2f, 4f, 4f);
+            }
+
+            // ----------------------------------------------------
+            // 4. "訓 民 旋 風" (훈민선풍) 4방향 금박 서예 훈장 투사 (Calligraphy Talisman Discs)
+            // ----------------------------------------------------
+            string[] spinChars = { "訓", "民", "旋", "風" };
+            float charOrbitAngle = rotAngle * 0.8f;
+            float charRx = (isEx ? 62f : 48f) * PixelBuffer.Scale;
+            float charRy = (isEx ? 36f : 26f) * PixelBuffer.Scale;
+
+            for (int w = 0; w < 4; w++)
+            {
+                float cAngle = charOrbitAngle + w * (MathF.PI / 2f);
+                float cX = scx + MathF.Cos(cAngle) * charRx;
+                float cY = scy - 12f * PixelBuffer.Scale + MathF.Sin(cAngle) * charRy;
+
+                // 은빛/청묵빛 원형 광배 (Calligraphy Disc Halo)
+                float discR = 16f * PixelBuffer.Scale;
+                using (var brDisc = new SolidBrush(isEx ? Color.FromArgb(210, 40, 15, 20) : Color.FromArgb(200, 15, 25, 55)))
+                {
+                    g.FillEllipse(brDisc, cX - discR, cY - discR * 0.6f, discR * 2f, discR * 1.2f);
+                }
+                using (var pDiscRing = new Pen(isEx ? Color.FromArgb(250, 255, 190, 70) : Color.FromArgb(240, 255, 225, 90), 2.0f))
+                {
+                    g.DrawEllipse(pDiscRing, cX - discR, cY - discR * 0.6f, discR * 2f, discR * 1.2f);
+                }
+
+                // 15pt 해서체 황금 붓글씨 "訓 民 旋 風"
+                buffer.DrawOutlinedText(spinChars[w], cX - 8f * PixelBuffer.Scale, cY - 7f * PixelBuffer.Scale,
+                    isEx ? Color.FromArgb(255, 255, 160) : Color.FromArgb(255, 245, 110),
+                    Color.FromArgb(15, 15, 35),
+                    buffer.FontHeader, 2.2f);
             }
         }
 
