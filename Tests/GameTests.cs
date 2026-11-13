@@ -2456,6 +2456,80 @@ namespace HanlangGame.Tests
             Assert("기상 쓸어차기 완료 후 idle 안전 복귀", downWakeupPl.State == "idle");
             Assert("기상 완료 후 안전 기상 무적 시간 유지", downWakeupPl.InvincibleTimer > 0f);
 
+            // ====================================================
+            // Test 71: 전 9개 스테이지 다채로운 배경 건축물 비반복 다양성 검증
+            // ====================================================
+            {
+                var bgBuf = new PixelBuffer();
+                var bgStageMgr = new StageManager();
+                bool multiCamRenderOk = true;
+                bool allStagesDiverse = true;
+                float[] camPositions = { 0f, 180f, 380f, 540f, 1800f };
+
+                for (int st = 1; st <= 9; st++)
+                {
+                    bgStageMgr.CurrentStage = st;
+                    foreach (float cam in camPositions)
+                    {
+                        try
+                        {
+                            bgStageMgr.RenderBackground(bgBuf, cam);
+                        }
+                        catch
+                        {
+                            multiCamRenderOk = false;
+                        }
+                    }
+
+                    // 한 화면 내 좌측(x=40..280) vs 중앙(x=340..580) vs 우측(x=640..880) 건축물 영역 픽셀 차이 검증
+                    bgBuf.Clear(Color.Black);
+                    JoseonBackgrounds.RenderMidground(bgBuf, 120f, st, 420);
+
+                    int diffLC = 0;
+                    int diffCR = 0;
+                    for (int y = 230; y <= 410; y += 6)
+                    {
+                        for (int dx = 0; dx < 240; dx += 8)
+                        {
+                            var pL = bgBuf.Bitmap.GetPixel(40 + dx, y);
+                            var pC = bgBuf.Bitmap.GetPixel(360 + dx, y);
+                            var pR = bgBuf.Bitmap.GetPixel(680 + dx, y);
+                            if (pL != pC) diffLC++;
+                            if (pC != pR) diffCR++;
+                        }
+                    }
+                    if (diffLC < 120 || diffCR < 120)
+                    {
+                        allStagesDiverse = false;
+                    }
+                }
+                Assert("전 9개 스테이지 다중 카메라 위치(0~1800) 배경 정상 렌더링", multiCamRenderOk);
+                Assert("전 9개 스테이지 한 화면 내 좌/중/우 건축물 실루엣·구조 비반복 다양성 확보", allStagesDiverse);
+
+                // 기존 동일 공유되던 스테이지(5 vs 6, 7 vs 8 vs 9) 간 건축 양식 차별화 검증
+                int diff56 = 0;
+                var bufA = new PixelBuffer();
+                var bufB = new PixelBuffer();
+                bufA.Clear(Color.Black);
+                bufB.Clear(Color.Black);
+                JoseonBackgrounds.RenderMidground(bufA, 100f, 5, 420);
+                JoseonBackgrounds.RenderMidground(bufB, 100f, 6, 420);
+                for (int y = 240; y <= 410; y += 8)
+                    for (int x = 40; x <= 900; x += 12)
+                        if (bufA.Bitmap.GetPixel(x, y) != bufB.Bitmap.GetPixel(x, y)) diff56++;
+                Assert("5장(도성 주막거리)과 6장(육조거리) 중경 건축물 양식 완전 차별화", diff56 > 400);
+
+                int diff78 = 0;
+                bufA.Clear(Color.Black);
+                bufB.Clear(Color.Black);
+                JoseonBackgrounds.RenderMidground(bufA, 100f, 7, 420);
+                JoseonBackgrounds.RenderMidground(bufB, 100f, 8, 420);
+                for (int y = 240; y <= 410; y += 8)
+                    for (int x = 40; x <= 900; x += 12)
+                        if (bufA.Bitmap.GetPixel(x, y) != bufB.Bitmap.GetPixel(x, y)) diff78++;
+                Assert("7장(광화문)과 8장(근정전) 중경 건축물 양식 완전 차별화", diff78 > 400);
+            }
+
             Console.WriteLine("----------------------------------------------------");
             Console.WriteLine($" 총 테스트 결과: {passed} / {total} 통과 ({(passed == total ? "100% 성공" : "실패 항목 있음")})");
             Console.WriteLine("====================================================");
