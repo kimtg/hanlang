@@ -133,7 +133,7 @@ namespace HanlangGame.Engine
                         }
                     }
 
-                    string tempPath = Path.Combine(Path.GetTempPath(), $"hanlang_bgm_v6_{targetTrack}.mid");
+                    string tempPath = Path.Combine(Path.GetTempPath(), $"hanlang_bgm_v8_{targetTrack}.mid");
                     if (!File.Exists(tempPath) || new FileInfo(tempPath).Length != midBytes.Length)
                     {
                         try

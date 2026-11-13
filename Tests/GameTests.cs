@@ -2530,6 +2530,46 @@ namespace HanlangGame.Tests
                 Assert("7장(광화문)과 8장(근정전) 중경 건축물 양식 완전 차별화", diff78 > 400);
             }
 
+            // 72. 다채널(Ch 0~6 + Ch 9) 오케스트레이션, 다이내믹 Expression(CC 11), 확장 타악기 및 BGM 9곡 무결성 검증
+            {
+                string[] allBgmTracks =
+                {
+                    "stage_market", "stage_fortress", "stage_night", "stage_palace",
+                    "midboss", "finalboss", "title", "shop", "victory"
+                };
+
+                foreach (string tr in allBgmTracks)
+                {
+                    byte[] mid = MidiGenerator.GenerateBgmMid(tr);
+                    Assert($"BGM '{tr}' 유효 MIDI 헤더/트랙 및 충분한 크기", mid.Length > 2000 && mid[0] == 'M' && mid[1] == 'T' && mid[2] == 'h' && mid[3] == 'd');
+
+                    bool hasEndOfTrack = mid.Length >= 3 && mid[^3] == 0xFF && mid[^2] == 0x2F && mid[^1] == 0x00;
+                    Assert($"BGM '{tr}' End-of-Track 마커 정상", hasEndOfTrack);
+
+                    bool hasProgCh4 = false, hasProgCh5 = false, hasProgCh6 = false, hasExprCh2 = false;
+                    int noteOnCh4 = 0, noteOnCh5 = 0, noteOnCh6 = 0;
+                    var drumNotes = new HashSet<byte>();
+
+                    for (int i = 0; i < mid.Length - 2; i++)
+                    {
+                        byte b = mid[i];
+                        if (b == 0xC4) hasProgCh4 = true;
+                        else if (b == 0xC5) hasProgCh5 = true;
+                        else if (b == 0xC6) hasProgCh6 = true;
+                        else if (b == 0xB2 && mid[i + 1] == 0x0B) hasExprCh2 = true;
+                        else if (b == 0x94 && mid[i + 2] > 0) noteOnCh4++;
+                        else if (b == 0x95 && mid[i + 2] > 0) noteOnCh5++;
+                        else if (b == 0x96 && mid[i + 2] > 0) noteOnCh6++;
+                        else if (b == 0x99 && mid[i + 2] > 0) drumNotes.Add(mid[i + 1]);
+                    }
+
+                    Assert($"BGM '{tr}' Ch4/5/6 악기 프로그램(0xC4~0xC6) 배정", hasProgCh4 && hasProgCh5 && hasProgCh6);
+                    Assert($"BGM '{tr}' Ch2 Expression 스웰(CC 11) 적용", hasExprCh2);
+                    Assert($"BGM '{tr}' Ch4~6 멀티레이어 음표 존재", noteOnCh4 >= 12 && noteOnCh5 >= 6 && noteOnCh6 >= 4);
+                    Assert($"BGM '{tr}' Ch9 확장 타악기(6종 이상) 사용 (실제: {drumNotes.Count})", drumNotes.Count >= 6);
+                }
+            }
+
             Console.WriteLine("----------------------------------------------------");
             Console.WriteLine($" 총 테스트 결과: {passed} / {total} 통과 ({(passed == total ? "100% 성공" : "실패 항목 있음")})");
             Console.WriteLine("====================================================");
